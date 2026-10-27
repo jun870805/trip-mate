@@ -1,5 +1,6 @@
+import { TripHeaderActions } from "./components/TripHeaderActions";
 import { displayDate } from "./data/display-date";
-import { TripClocks } from "./components/TripClocks";
+import { TripFacts } from "./components/TripFacts";
 import { TripEditing } from "./components/TripEditor";
 import { useRoute, appHref } from "./hooks/useRoute";
 import { readTripSections } from "./data/trip-sections";
@@ -404,7 +405,7 @@ function TripLoader({
     accessDenied: boolean;
   } | null>(null);
   const [revision, setRevision] = useState(0);
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
@@ -420,7 +421,7 @@ function TripLoader({
           setData(
             isDemo ? parseTrip(trip, book as Workbook) : (book as TripData),
           );
-          setUpdatedAt(new Date());
+          setHasLoaded(true);
         }
       })
       .catch((cause) => {
@@ -467,7 +468,7 @@ function TripLoader({
       <>
         {editControls}
         <Empty>
-          {refreshing && updatedAt
+          {refreshing && hasLoaded
             ? "正在更新旅程資料…"
             : "正在讀取這趟旅程的行程與帳務…"}
         </Empty>
@@ -493,10 +494,10 @@ function TripLoader({
     <>
       {editControls}
       <section className="trip-heading no-print">
-        <a className="back-link" href={appHref()}>
-          <Icon name="back" size={16} />
-          所有旅程
-        </a>
+        <TripHeaderActions
+          busy={refreshing}
+          onRefresh={() => setRevision((n) => n + 1)}
+        />
         <div className="spread">
           <h1>{trip.name}</h1>
           <Badge>{trip.status}</Badge>
@@ -507,10 +508,15 @@ function TripLoader({
             {trip.destination}
           </span>
           <span>
+            <Icon name="itinerary" size={16} />
             {displayDate(trip.start)} - {displayDate(trip.end)}
           </span>
         </p>
-        <TripClocks timezone={data.timezone} />
+        <TripFacts
+          timezone={data.timezone}
+          rate={data.rate}
+          currency={data.currency}
+        />
       </section>
       <nav className="trip-nav no-print" aria-label="旅程功能">
         {tabs.map(([key, label]) => (
@@ -525,32 +531,6 @@ function TripLoader({
         ))}
       </nav>
       <div className="trip-content">
-        <div className="content-toolbar no-print">
-          <span>
-            1 TWD = {data.rate} {data.currency}
-            {updatedAt && (
-              <small className="update-time">
-                更新時間：
-                {updatedAt.toLocaleString("zh-TW", {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  hourCycle: "h23",
-                })}
-              </small>
-            )}
-          </span>
-          <button
-            className="quiet-button"
-            onClick={() => setRevision((n) => n + 1)}
-          >
-            <Icon name="refresh" size={15} />
-            更新資料
-          </button>
-        </div>
         {data.warnings.length > 0 && (
           <div className="warning-box no-print" role="status">
             {data.warnings.map((w) => (

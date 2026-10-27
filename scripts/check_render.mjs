@@ -16,7 +16,7 @@ try {
         import { renderToStaticMarkup } from 'react-dom/server'
         import { Overview, Itinerary, Fund, Expenses, Tasks } from './src/pages/TripViews'
         import App from './src/App'
-        import { TripClocks } from './src/components/TripClocks'
+        import { TripFacts } from './src/components/TripFacts'
         import { TripEditing, TripForm } from './src/components/TripEditor'
         import { CatalogEditor } from './src/components/CatalogEditor'
         import { GuideTools } from './src/components/ui'
@@ -25,6 +25,8 @@ try {
         import { DatePicker } from './src/components/DatePicker'
         import { pickerInputDisplay } from './src/data/date-picker'
         import { TimeWheel } from './src/components/TimeWheel'
+        import { PdfExportDialog } from './src/components/PdfExportDialog'
+        import { TripHeaderActions } from './src/components/TripHeaderActions'
         import bookingStyles from './src/components/BookingCards.module.css'
         import demo from './src/data/demo.json'
         const trip = parseCatalog(demo['旅程清單'])[0]
@@ -108,7 +110,20 @@ try {
         assert.ok(!itineraryHtml.includes(bookingStyles['flight-day-offset']) && !overnightHtml.includes('2028/01/02'))
         const legacyFlights = {...data,tables:{...data.tables,航班:data.tables['航班'].map(row=>({...row,出發航廈:'',抵達航廈:'',航廈:'舊航廈 T3'}))}}
         assert.ok(renderToStaticMarkup(createElement(Itinerary,{data:legacyFlights})).includes('既有航廈資訊：舊航廈 T3'))
-        assert.ok(itineraryHtml.includes('匯出範圍') && itineraryHtml.includes('目前日期') && itineraryHtml.includes('aria-pressed'))
+        assert.ok(itineraryHtml.includes('aria-label="匯出 PDF"') && itineraryHtml.includes('aria-pressed'))
+        assert.ok(!itineraryHtml.includes('另存為 PDF') && !itineraryHtml.includes('匯出範圍'), 'Export options and hints belong in the dialog')
+        const exportDialog=renderToStaticMarkup(createElement(PdfExportDialog,{dates:['2027-05-01','2027-05-02'],initialDates:['2027-05-02'],onClose(){},onConfirm(){}}))
+        assert.ok(exportDialog.includes('2027/05/01') && exportDialog.includes('2027/05/02') && exportDialog.includes('另存為 PDF'))
+        assert.equal((exportDialog.match(/checked=""/g)||[]).length,1)
+        const noSelection=renderToStaticMarkup(createElement(PdfExportDialog,{dates:['2027-05-01'],initialDates:[],onClose(){},onConfirm(){}}))
+        assert.ok(noSelection.includes('disabled=""') && noSelection.includes('請至少選擇一個日期'))
+        const noDates=renderToStaticMarkup(createElement(PdfExportDialog,{dates:[],initialDates:[],onClose(){},onConfirm(){}}))
+        assert.ok(noDates.includes('尚無每日行程') && !noDates.includes('disabled=""'))
+        const actions=renderToStaticMarkup(createElement(TripHeaderActions,{busy:false,onRefresh(){}}))
+        assert.ok(actions.includes('所有旅程') && actions.includes('aria-label="重新讀取旅程"') && actions.includes('class="icon-button"'))
+        assert.ok(!actions.includes('<time') && !actions.includes('更新資料'))
+        const busyActions=renderToStaticMarkup(createElement(TripHeaderActions,{busy:true,onRefresh(){}}))
+        assert.ok(busyActions.includes('disabled=""'))
         assert.ok(renderToStaticMarkup(createElement(Tasks, {data})).includes('7 天內到期'))
         let storageReads = 0
         window.sessionStorage = {getItem() { storageReads++; return JSON.stringify({draft:{旅程名稱:'舊的未儲存內容'}}) }}
@@ -159,9 +174,11 @@ try {
         assert.equal((wheels.match(/role="listbox"/g)||[]).length,2)
         assert.equal((wheels.match(/role="option"/g)||[]).length,84)
         assert.ok(!wheels.includes('<input') && wheels.includes('>00<') && wheels.includes('>23<') && wheels.includes('>59<'))
-        const clocks = renderToStaticMarkup(createElement(TripClocks, {timezone:'Asia/Tokyo'}))
-        assert.ok(clocks.includes('台灣現在') && clocks.includes('目的地現在') && clocks.includes('<time'))
-        assert.ok(!itineraryHtml.includes('旅程預設時區') && !itineraryHtml.includes('<small>UTC'), 'Timezones should appear through title clocks rather than individual itinerary entries')
+        const facts=renderToStaticMarkup(createElement(TripFacts,{timezone:'UTC+8',rate:4.5,currency:'JPY'}))
+        assert.ok(facts.includes('匯率：1 TWD = 4.5 JPY') && facts.includes('時差：+0 小時'))
+        assert.equal((facts.match(/<svg/g)||[]).length,2)
+        assert.ok(!facts.includes('<time') && !facts.includes('目的地現在'))
+        assert.ok(!itineraryHtml.includes('旅程預設時區') && !itineraryHtml.includes('<small>UTC'), 'Timezones should appear through title differences rather than individual itinerary entries')
         const emptyBook = Object.fromEntries(Object.entries(demo).map(([key, rows]) => [key, key === '旅程設定' ? rows : rows.slice(0, 1)]))
         const empty = parseTrip(trip, emptyBook)
         for (const component of [Overview, Itinerary, Fund, Expenses, Tasks]) {

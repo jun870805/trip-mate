@@ -100,5 +100,19 @@ export function formatClockTime(date: Date, input: string): string {
   }).formatToParts(local);
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((value) => value.type === type)!.value;
-  return `${dateInTimezone(date, zone).replaceAll("-", "/")} ${part("hour")}:${part("minute")}`;
+  return `${part("hour")}:${part("minute")}`;
+}
+
+/** Compare full local calendar timestamps, so crossing midnight never wraps the offset. */
+export function formatTimezoneDifference(
+  date: Date,
+  destination: string,
+): string {
+  const localMinute = (zone: string) =>
+    Date.parse(
+      `${dateInTimezone(date, zone)}T${formatClockTime(date, zone)}:00Z`,
+    );
+  const hours =
+    (localMinute(destination) - localMinute("Asia/Taipei")) / 3600000;
+  return `時差：${hours >= 0 ? "+" : ""}${hours} 小時`;
 }

@@ -94,7 +94,7 @@ python3 scripts/browser_smoke.py
 frontend/src/
 ├── App.tsx                   # 入口、旅程導覽、讀取生命週期
 ├── components/ui.tsx         # 共用元件與範本下載
-├── components/*.module.css   # 選擇器、搜尋、時鐘與預訂卡片的局部樣式
+├── components/*.module.css   # 選擇器、搜尋、旅程資訊與預訂卡片的局部樣式
 ├── pages/TripViews.tsx       # 總覽／行程／公積金／支出／進度
 ├── styles/                   # 共用元件、框架、入口、旅程頁面與表單樣式
 ├── data/schema.json          # 範本與網站共用固定欄位

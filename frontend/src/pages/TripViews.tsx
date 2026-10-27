@@ -1,3 +1,6 @@
+import { flushSync } from "react-dom";
+import { PdfExportDialog } from "../components/PdfExportDialog";
+import itineraryStyles from "./Itinerary.module.css";
 import bookingStyles from "../components/BookingCards.module.css";
 import { displayDate, flightDayOffset } from "../data/display-date";
 import { useTripToday } from "../hooks/useTripToday";
@@ -124,8 +127,11 @@ export function Itinerary({ data }: { data: TripData }) {
       ? today
       : "all",
   );
-  const [printScope, setPrintScope] = useState("all");
-  const dates = [...new Set(data.tables["每日行程"].map((r) => r["日期"]))];
+  const [printDates, setPrintDates] = useState<string[] | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const dates = [
+    ...new Set(data.tables["每日行程"].map((r) => r["日期"])),
+  ].sort();
   return (
     <section className="itinerary-section">
       <div className="print-heading">
@@ -134,36 +140,38 @@ export function Itinerary({ data }: { data: TripData }) {
           {data.trip.destination} - {displayDate(data.trip.start)} -{" "}
           {displayDate(data.trip.end)}
         </p>
-        {printScope === "current" && day !== "all" && (
-          <p>日期：{displayDate(day)}</p>
+        {printDates && printDates.length < dates.length && (
+          <p>日期：{printDates.map(displayDate).join("、")}</p>
         )}
       </div>
       <div className="section-heading no-print">
         <div>
           <h2>旅遊行程</h2>
         </div>
-        <div className="export-actions">
-          <label>
-            匯出範圍
-            <select
-              value={printScope}
-              onChange={(event) => setPrintScope(event.target.value)}
-            >
-              <option value="all">全部日期</option>
-              <option value="current" disabled={day === "all"}>
-                目前日期
-              </option>
-            </select>
-          </label>
-          <button className="button secondary" onClick={() => window.print()}>
-            <Icon name="download" size={16} />
-            匯出 PDF
-          </button>
-        </div>
+        <button
+          type="button"
+          className={itineraryStyles.exportTrigger}
+          aria-label="匯出 PDF"
+          title="匯出 PDF"
+          onClick={() => setExportOpen(true)}
+        >
+          <Icon name="download" size={20} />
+        </button>
       </div>
-      <p className="export-note no-print">
-        匯出包含所選日期的行程，以及全部航班與飯店；列印時選擇「另存為 PDF」。
-      </p>
+      {exportOpen && (
+        <PdfExportDialog
+          dates={dates}
+          initialDates={day === "all" ? dates : [day]}
+          onClose={() => setExportOpen(false)}
+          onConfirm={(selected) => {
+            flushSync(() => {
+              setPrintDates(selected);
+              setExportOpen(false);
+            });
+            window.print();
+          }}
+        />
+      )}
       <div className="two-column">
         <section className={bookingStyles["booking-section"]}>
           <h3>航班資訊</h3>
@@ -294,7 +302,6 @@ export function Itinerary({ data }: { data: TripData }) {
             className={day === "all" ? "active" : ""}
             onClick={() => {
               setDay("all");
-              setPrintScope("all");
             }}
           >
             全部日期
@@ -314,7 +321,7 @@ export function Itinerary({ data }: { data: TripData }) {
       {dates.length ? (
         dates.map((date) => (
           <section
-            className={`day-group ${day !== "all" && day !== date ? "screen-hidden" : ""} ${printScope === "current" && day !== "all" && day !== date ? "print-excluded" : ""}`}
+            className={`day-group ${day !== "all" && day !== date ? "screen-hidden" : ""} ${printDates !== null && !printDates.includes(date) ? "print-excluded" : ""}`}
             key={date}
           >
             <div className="day-label">

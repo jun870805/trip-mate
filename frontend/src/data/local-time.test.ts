@@ -6,6 +6,7 @@ import {
   normalizeLocalDateTime,
   validateFlightTimes,
   formatClockTime,
+  formatTimezoneDifference,
 } from "./timezone.ts";
 it("stores local date and time without inventing an airport offset", () => {
   assert.equal(
@@ -53,12 +54,42 @@ it("reads existing offset timestamps and newly entered local flights together", 
 });
 it("shows Taiwan and destination clocks for one instant, including date changes and DST", () => {
   const now = new Date("2027-01-01T16:30:00Z");
-  assert.equal(formatClockTime(now, "Asia/Taipei"), "2027/01/02 00:30");
-  assert.equal(formatClockTime(now, "Asia/Tokyo"), "2027/01/02 01:30");
-  assert.equal(formatClockTime(now, "UTC-5"), "2027/01/01 11:30");
-  assert.equal(formatClockTime(now, "UTC+05:45"), "2027/01/01 22:15");
+  assert.equal(formatClockTime(now, "Asia/Taipei"), "00:30");
+  assert.equal(formatClockTime(now, "Asia/Tokyo"), "01:30");
+  assert.equal(formatClockTime(now, "UTC-5"), "11:30");
+  assert.equal(formatClockTime(now, "UTC+05:45"), "22:15");
   assert.equal(
     formatClockTime(new Date("2027-07-01T04:30:00Z"), "America/New_York"),
-    "2027/07/01 00:30",
+    "00:30",
   );
+});
+
+it("shows signed destination offsets relative to Taiwan across DST and the date line", () => {
+  const winter = new Date("2027-01-01T16:30:59Z");
+  assert.equal(
+    formatTimezoneDifference(winter, "Asia/Taipei"),
+    "時差：+0 小時",
+  );
+  assert.equal(formatTimezoneDifference(winter, "Asia/Tokyo"), "時差：+1 小時");
+  assert.equal(
+    formatTimezoneDifference(winter, "America/New_York"),
+    "時差：-13 小時",
+  );
+  assert.equal(
+    formatTimezoneDifference(
+      new Date("2027-07-01T16:30:00Z"),
+      "America/New_York",
+    ),
+    "時差：-12 小時",
+  );
+  assert.equal(
+    formatTimezoneDifference(winter, "UTC+09:30"),
+    "時差：+1.5 小時",
+  );
+  assert.equal(
+    formatTimezoneDifference(winter, "UTC+05:45"),
+    "時差：-2.25 小時",
+  );
+  assert.equal(formatTimezoneDifference(winter, "UTC+14"), "時差：+6 小時");
+  assert.equal(formatTimezoneDifference(winter, "UTC-12"), "時差：-20 小時");
 });

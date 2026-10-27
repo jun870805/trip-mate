@@ -1,0 +1,17 @@
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.facts p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.facts svg {
+  flex-shrink: 0;
+}

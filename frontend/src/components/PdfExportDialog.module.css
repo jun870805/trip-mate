@@ -1,0 +1,31 @@
+.dialog {
+  width: min(480px, calc(100% - 32px));
+}
+.hint {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.dates {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.dates legend {
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.dates label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+.dates input {
+  accent-color: var(--brown);
+  width: 16px;
+  height: 16px;
+}

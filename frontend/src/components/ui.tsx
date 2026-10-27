@@ -57,6 +57,13 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
         <path d="M6 7a7 7 0 0 1 12-1l2 5M4 13l2 5a7 7 0 0 0 12-1" />
       </>
     ),
+    exchange: <path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />,
+    clock: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </>
+    ),
   };
   return (
     <svg
@@ -239,7 +246,7 @@ export function GuideTools({
             </li>
             <li>
               在 Google Sheets
-              修改行程等資料後，進入旅程按「更新資料」即可重新讀取。
+              修改行程等資料後，進入旅程按上方的重新整理圖示即可重新讀取。
             </li>
           </ol>
         </div>
