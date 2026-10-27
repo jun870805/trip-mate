@@ -182,3 +182,5 @@ GitHub Pages 路由與部署：
 - 自訂網域請設 `VITE_BASE_PATH=/`。其他部署或本機手動建置可明確指定，例如 `VITE_BASE_PATH=/trip-mate/ npm run build`；此值也用於圖示、JS/CSS、Excel 範本及所有站內連結。本機一般開發未設定時為 `/`。
 - 將整份 `frontend/dist/` 部署到 Pages，包含 `404.html` 與 `.nojekyll`。此為 GitHub Pages 404 的前端導回方式，首次深層連結請求仍會收到 HTTP 404，之後載入首頁並還原網址。
 - Vite 的 GitHub Pages base 設定參考：[官方部署說明](https://vite.dev/guide/static-deploy.html#github-pages)。
+
+完整部署步驟請見 [GitHub Pages 部署指南](docs/deploy-github-pages.md)。專案提供 `.github/workflows/pages.yml`，從 `main` 自動檢查並部署 `frontend/dist`；API Key 使用 repository secret，其他前端設定使用 repository variables。

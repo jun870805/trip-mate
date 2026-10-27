@@ -216,3 +216,10 @@
 - GitHub Pages 的 404 導回初次回應仍是 HTTP 404；不能宣稱為伺服器 rewrite 或已在正式 Pages 驗證。圖示、範本、JS/CSS 與所有站內連結使用相同 base。
 
 - 路由驗證包含純函式與實際產生的 404 script 模擬執行；`npm run check:pages` 檢查建置資源前綴、404 導回及無循環，已納入 `npm run check`。
+
+## GitHub Pages 部署操作
+
+- 使用者要求提供部署步驟；已準備 `.github/workflows/pages.yml` 與 `docs/deploy-github-pages.md`，尚未替使用者推送、設定 GitHub 或發布網站。
+- workflow 從 `main` 推送或手動觸發，執行 npm ci 與 npm run check 後部署 frontend/dist。建置 API Key 取自 repository secret `VITE_GOOGLE_SHEETS_API_KEY`；目錄 ID、OAuth Client ID、email 清單與 base 取自同名 repository variables。
+- GitHub Variables 的 email 清單直接填 JSON，不加 shell 外層單引號。本機 .env.local 不會自動帶入 GitHub Actions。
+- Pages Source 設為 GitHub Actions。正式網址須加入 Google API Key HTTP referrers 與 OAuth Authorized JavaScript origins；origins 只含 scheme／host／port，不含專案路徑。
