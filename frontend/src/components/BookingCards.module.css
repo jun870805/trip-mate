@@ -1,0 +1,134 @@
+.detail-item {
+  margin-top: 24px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.detail-item > p {
+  margin-top: 8px;
+}
+.detail-item :global(.text-link) {
+  display: inline-block;
+  margin-top: 10px;
+}
+.flight-route {
+  display: grid;
+  grid-template-columns: 1fr 24px 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.flight-route > div:last-child {
+  text-align: right;
+}
+.flight-route strong {
+  font-size: 15px;
+}
+.flight-route p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.flight-route b {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.flight-route small {
+  display: block;
+  color: var(--muted);
+}
+@media print {
+  .detail-item {
+    break-inside: avoid;
+  }
+  .flight-route b {
+    font-size: 16pt;
+  }
+}
+
+.booking-section {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+.booking-section > h3 {
+  margin: 0;
+}
+.booking-card.detail-item {
+  margin: 0;
+}
+.booking-card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  break-inside: avoid;
+}
+
+.flight-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.flight-card-heading > span:first-child {
+  white-space: nowrap;
+}
+.flight-card-heading > span:last-child {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.flight-route b {
+  white-space: nowrap;
+}
+.flight-day-offset {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.hotel-name {
+  display: block;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.hotel-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(64px, 25%, 120px);
+  align-items: start;
+  gap: 12px;
+}
+.hotel-info {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.hotel-info > p {
+  margin-top: 8px;
+}
+.hotel-dates {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+}
+.hotel-dates p {
+  white-space: nowrap;
+}
+.hotel-dates small {
+  color: var(--muted);
+}
+.hotel-photo {
+  aspect-ratio: 1;
+}
+.hotel-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+@media print {
+  .hotel-name {
+    font-size: 15pt;
+  }
+}

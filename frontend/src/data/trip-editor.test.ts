@@ -1,0 +1,765 @@
+import { it } from "node:test";
+import assert from "node:assert/strict";
+import demo from "./demo.json" with { type: "json" };
+import { parseCatalog, parseTrip, summarize } from "./portal.ts";
+import {
+  mutateTripBook,
+  readRows,
+  editorSheets,
+  validateEditorBook,
+  buildCellUpdates,
+  createTripEditor,
+} from "./trip-editor.ts";
+import { readGuideConfig, WRITE_SCOPE } from "./guide-auth.ts";
+const trip = parseCatalog(demo["旅程清單"])[0];
+const config = readGuideConfig({
+  VITE_GOOGLE_CLIENT_ID: "client",
+  VITE_GUIDE_EMAILS: '["guide@example.com"]',
+});
+const session = {
+  email: "guide@example.com",
+  token: "test-token",
+  expiresAt: Date.now() + 60000,
+  scopes: [WRITE_SCOPE],
+};
+it("creates a fund spend, equal rounded deductions and exactly one linked expense", () => {
+  const next = mutateTripBook(trip, demo, {
+    kind: "fund",
+    mode: "add",
+    values: {
+      交易ID: "F010",
+      日期: "2027-05-02",
+      類型: "支出",
+      項目: "晚餐",
+      記帳金額: "1000",
+    },
+    shares: [
+      { memberId: "M001", amount: "" },
+      { memberId: "M002", amount: "" },
+      { memberId: "M003", amount: "" },
+    ],
+    expense: { 支出ID: "E010", 分類: "餐飲" },
+  });
+  const data = parseTrip(trip, next),
+    added = data.transactions.find((row) => row.id === "F010")!;
+  assert.deepEqual(
+    added.shares.map((row) => row.amount),
+    [-334, -334, -334],
+  );
+  assert.equal(
+    data.expenses.filter((row) => row.transactionId === "F010").length,
+    1,
+  );
+  assert.equal(
+    summarize(data).surplus,
+    summarize(parseTrip(trip, demo)).surplus + 2,
+  );
+  assert.equal(
+    readRows(next, "公積金交易").length,
+    readRows(demo, "公積金交易").length + 1,
+  );
+});
+it("edits and removes a fund transaction together with all related rows", () => {
+  const added = mutateTripBook(trip, demo, {
+    kind: "fund",
+    mode: "add",
+    values: { 交易ID: "F010", 日期: "2027-05-02", 類型: "儲值", 項目: "加值" },
+    shares: [{ memberId: "M001", amount: "2000" }],
+    expense: {},
+  });
+  assert.equal(
+    parseTrip(trip, added).members[0].balance,
+    parseTrip(trip, demo).members[0].balance + 2000,
+  );
+  const removed = mutateTripBook(trip, added, {
+    kind: "fund",
+    mode: "delete",
+    id: "F010",
+    values: {},
+    shares: [],
+    expense: {},
+  });
+  assert.equal(
+    parseTrip(trip, removed).members[0].balance,
+    parseTrip(trip, demo).members[0].balance,
+  );
+});
+it("rejects deletion of referenced members, flights, hotels and paid expenses", () => {
+  for (const [sheet, id] of [
+    ["團員", "M001"],
+    ["航班", "A001"],
+    ["飯店", "H001"],
+  ] as const)
+    assert.throws(
+      () =>
+        mutateTripBook(trip, demo, {
+          kind: "record",
+          mode: "delete",
+          sheet,
+          id,
+          values: {},
+        }),
+      /引用|使用|關聯/,
+    );
+  assert.throws(
+    () =>
+      mutateTripBook(trip, demo, {
+        kind: "expense",
+        mode: "delete",
+        id: "E001",
+        values: {},
+        shares: [],
+      }),
+    /收款/,
+  );
+});
+it("groups receipts across pretrip items while preserving individual collection status", () => {
+  const next = mutateTripBook(trip, demo, {
+    kind: "receipt",
+    mode: "add",
+    values: {
+      收款批次ID: "B010",
+      團員ID: "M003",
+      收款日期: "2027-04-10",
+      備註: "一起收",
+    },
+    allocations: [
+      { expenseId: "E001", amount: "1000", id: "R010" },
+      { expenseId: "E002", amount: "2000", id: "R011" },
+    ],
+  });
+  assert.equal(
+    readRows(next, "收款明細").filter((row) => row["收款批次ID"] === "B010")
+      .length,
+    2,
+  );
+  assert.equal(
+    parseTrip(trip, next)
+      .dues.filter((row) => row.memberId === "M003")
+      .reduce((sum, row) => sum + row.received, 0),
+    300000,
+  );
+});
+it("scoped validation does not block task edits due to unrelated bad accounting", () => {
+  const book = structuredClone(demo);
+  book["公積金交易"][1][4] = "bad";
+  assert.doesNotThrow(() => validateEditorBook(trip, book, "tasks"));
+  assert.throws(() => validateEditorBook(trip, book, "accounting"));
+  assert.ok(editorSheets("accounting").includes("收款明細"));
+});
+it("updates only the selected transaction participant rows and preserves unrelated data", () => {
+  const original = parseTrip(trip, demo).transactions.find(
+    (row) => row.id === "F001",
+  );
+  const next = mutateTripBook(trip, demo, {
+    kind: "fund",
+    mode: "edit",
+    id: "F002",
+    values: {
+      交易ID: "F002",
+      日期: "2027-05-01",
+      類型: "支出",
+      項目: "晚餐更正",
+      記帳金額: "1001",
+    },
+    shares: [
+      { memberId: "M001", amount: "" },
+      { memberId: "M002", amount: "" },
+    ],
+    expense: { 支出ID: "E003", 分類: "餐飲" },
+  });
+  const data = parseTrip(trip, next);
+  assert.deepEqual(
+    data.transactions.find((row) => row.id === "F001"),
+    original,
+  );
+  assert.deepEqual(
+    data.transactions
+      .find((row) => row.id === "F002")
+      ?.shares.map((row) => row.amount),
+    [-501, -501],
+  );
+  assert.equal(
+    data.expenses.filter((row) => row.transactionId === "F002").length,
+    1,
+  );
+  const deleted = mutateTripBook(trip, next, {
+    kind: "fund",
+    mode: "delete",
+    id: "F002",
+    values: {},
+    shares: [],
+    expense: {},
+  });
+  assert.ok(
+    !parseTrip(trip, deleted).expenses.some(
+      (row) => row.transactionId === "F002",
+    ),
+  );
+});
+it("creates pretrip costs and edits receipt batches without changing other batches", () => {
+  let book = mutateTripBook(trip, demo, {
+    kind: "expense",
+    mode: "add",
+    values: {
+      支出ID: "E010",
+      日期: "2027-04-10",
+      項目: "門票",
+      分類: "活動",
+      金額: "300",
+    },
+    shares: [
+      { memberId: "M001", amount: "100" },
+      { memberId: "M002", amount: "200" },
+    ],
+  });
+  assert.equal(
+    parseTrip(trip, book).dues.find(
+      (row) => row.expenseId === "E010" && row.memberId === "M002",
+    )?.expected,
+    20000,
+  );
+  book = mutateTripBook(trip, book, {
+    kind: "receipt",
+    mode: "edit",
+    id: "B001",
+    values: { 收款批次ID: "B001", 團員ID: "M001", 收款日期: "2027-04-03" },
+    allocations: [{ expenseId: "E001", amount: "9000", id: "R001" }],
+  });
+  assert.equal(
+    readRows(book, "收款明細").find((row) => row["收款明細ID"] === "R003")?.[
+      "實收金額"
+    ],
+    "6000",
+  );
+  assert.equal(
+    readRows(book, "收款明細").filter((row) => row["收款批次ID"] === "B001")
+      .length,
+    1,
+  );
+  book = mutateTripBook(trip, book, {
+    kind: "receipt",
+    mode: "delete",
+    id: "B001",
+    values: {},
+    allocations: [],
+  });
+  assert.equal(
+    parseTrip(trip, book).dues.find(
+      (row) => row.expenseId === "E001" && row.memberId === "M001",
+    )?.received,
+    0,
+  );
+  book = mutateTripBook(trip, book, {
+    kind: "expense",
+    mode: "delete",
+    id: "E010",
+    values: {},
+    shares: [],
+  });
+  assert.ok(!parseTrip(trip, book).expenses.some((row) => row.id === "E010"));
+});
+it("rejects inconsistent sums, duplicate allocations, changed IDs and unsafe links", () => {
+  assert.throws(
+    () =>
+      mutateTripBook(trip, demo, {
+        kind: "expense",
+        mode: "add",
+        values: {
+          支出ID: "E010",
+          日期: "2027-04-10",
+          項目: "門票",
+          分類: "活動",
+          金額: "300",
+        },
+        shares: [{ memberId: "M001", amount: "100" }],
+      }),
+    /不一致/,
+  );
+  assert.throws(
+    () =>
+      mutateTripBook(trip, demo, {
+        kind: "record",
+        mode: "edit",
+        sheet: "團員",
+        id: "M001",
+        values: { 團員ID: "M010", 顯示名稱: "新名稱" },
+      }),
+    /ID/,
+  );
+  assert.throws(
+    () =>
+      mutateTripBook(trip, demo, {
+        kind: "record",
+        mode: "add",
+        sheet: "飯店",
+        values: {
+          住宿ID: "H010",
+          飯店名稱: "飯店",
+          入住日期: "2027-05-01",
+          退房日期: "2027-05-02",
+          地址: "地址",
+          地圖網址: "javascript:alert(1)",
+        },
+      }),
+    /網址/,
+  );
+});
+it("handles editable new IDs, refunds and justified adjustments", () => {
+  let book = mutateTripBook(trip, demo, {
+    kind: "record",
+    mode: "add",
+    sheet: "團員",
+    values: { 團員ID: "M042", 顯示名稱: "新團員", 排序: "4" },
+  });
+  book = mutateTripBook(trip, book, {
+    kind: "record",
+    mode: "edit",
+    sheet: "團員",
+    id: "M042",
+    values: { 團員ID: "M042", 顯示名稱: "更名", 排序: "4" },
+  });
+  assert.equal(readRows(book, "團員").at(-1)?.["顯示名稱"], "更名");
+  book = mutateTripBook(trip, book, {
+    kind: "record",
+    mode: "delete",
+    sheet: "團員",
+    id: "M042",
+    values: {},
+  });
+  book = mutateTripBook(trip, book, {
+    kind: "fund",
+    mode: "add",
+    values: { 日期: "2027-05-03", 類型: "退款", 項目: "退款" },
+    shares: [{ memberId: "M001", amount: "100" }],
+    expense: {},
+  });
+  assert.equal(parseTrip(trip, book).transactions.at(-1)?.amount, -100);
+  assert.throws(
+    () =>
+      mutateTripBook(trip, book, {
+        kind: "fund",
+        mode: "add",
+        values: { 日期: "2027-05-03", 類型: "調整", 項目: "調整" },
+        shares: [{ memberId: "M001", amount: "10" }],
+        expense: {},
+      }),
+    /備註/,
+  );
+  book = mutateTripBook(trip, book, {
+    kind: "fund",
+    mode: "add",
+    values: { 日期: "2027-05-03", 類型: "調整", 項目: "調整", 備註: "補登" },
+    shares: [{ memberId: "M001", amount: "10" }],
+    expense: {},
+  });
+  assert.equal(parseTrip(trip, book).transactions.at(-1)?.amount, 10);
+});
+it("preserves reordered and extra columns, literal formulas and expands the sheet in one batch", () => {
+  const before = structuredClone(demo);
+  before["團員"] = [
+    ["排序", "顯示名稱", "團員ID", "額外欄"],
+    [1, "原名", "M001", "keep"],
+    [2, "乙", "M002"],
+    [3, "丙", "M003"],
+  ];
+  const next = mutateTripBook(trip, before, {
+    kind: "record",
+    mode: "edit",
+    sheet: "團員",
+    id: "M001",
+    values: { 團員ID: "M001", 顯示名稱: "=not-a-formula", 排序: "1" },
+  });
+  assert.equal(next["團員"][1][3], "keep");
+  const grids = Object.keys(demo)
+    .filter((name) => name !== "旅程清單")
+    .map((title, index) => ({
+      title,
+      sheetId: index + 1,
+      rowCount: 1,
+      columnCount: 1,
+    }));
+  const requests = buildCellUpdates(before, next, grids) as {
+    appendDimension?: unknown;
+    updateCells?: {
+      rows: { values: { userEnteredValue: { stringValue: string } }[] }[];
+    };
+  }[];
+  assert.ok(requests.some((row) => row.appendDimension));
+  assert.equal(requests.filter((row) => row.updateCells).length, 1);
+  assert.equal(
+    requests.find((row) => row.updateCells)?.updateCells?.rows[0].values[0]
+      .userEnteredValue.stringValue,
+    "=not-a-formula",
+  );
+});
+function fakeApi() {
+  let book = structuredClone(demo),
+    writes = 0,
+    denied = 0,
+    failAfter = false;
+  const grids = Object.keys(demo)
+    .filter((name) => name !== "旅程清單")
+    .map((title, index) => ({
+      sheetId: index + 1,
+      title,
+      gridProperties: { rowCount: 1000, columnCount: 26 },
+    }));
+  const fetcher: typeof fetch = async (input, init) => {
+    assert.equal(
+      new Headers(init?.headers).get("Authorization"),
+      "Bearer test-token",
+    );
+    const url = new URL(String(input));
+    assert.equal(url.searchParams.has("key"), false);
+    if (denied) return Response.json({}, { status: denied });
+    if (url.pathname.endsWith(":batchUpdate")) {
+      writes++;
+      const body = JSON.parse(String(init?.body));
+      assert.ok(
+        body.requests.every(
+          (request: {
+            updateCells?: { fields: string };
+            appendDimension?: unknown;
+          }) =>
+            request.appendDimension ||
+            request.updateCells?.fields === "userEnteredValue",
+        ),
+      );
+      for (const request of body.requests) {
+        if (!request.updateCells) continue;
+        const { start, rows } = request.updateCells,
+          grid = grids.find((row) => row.sheetId === start.sheetId)!;
+        const data = book[grid.title as keyof typeof book] as (
+          | string
+          | number
+        )[][];
+        while (data.length <= start.rowIndex) data.push([]);
+        while (data[start.rowIndex].length <= start.columnIndex)
+          data[start.rowIndex].push("");
+        data[start.rowIndex][start.columnIndex] =
+          rows[0].values[0].userEnteredValue.stringValue;
+      }
+      return Response.json({});
+    }
+    if (failAfter && writes) throw new Error("network down");
+    if (url.pathname.endsWith("values:batchGet"))
+      return Response.json({
+        valueRanges: url.searchParams.getAll("ranges").map((range) => ({
+          values:
+            book[range.split("!")[0].replaceAll("'", "") as keyof typeof book],
+        })),
+      });
+    return Response.json({
+      sheets: grids.map((properties) => ({ properties })),
+    });
+  };
+  return {
+    fetcher,
+    get writes() {
+      return writes;
+    },
+    setDenied: (value: number) => {
+      denied = value;
+    },
+    setFailAfter: () => {
+      failAfter = true;
+    },
+    change: () => {
+      book["團員"][1][1] = "他處更新";
+    },
+  };
+}
+it("writes authenticated changes once as atomic requests and rejects stale snapshots", async () => {
+  const api = fakeApi(),
+    editor = createTripEditor(trip, "tasks", config, api.fetcher),
+    before = await editor.read(session);
+  const result = await editor.save(session, before, {
+    kind: "record",
+    mode: "add",
+    sheet: "開團待辦",
+    values: {
+      任務ID: "P042",
+      事項: "集合",
+      分類: "其他",
+      狀態: "待辦",
+      截止日期: "2027-04-30",
+      排序: "1",
+    },
+  });
+  assert.equal(api.writes, 1);
+  assert.ok(
+    readRows(result.book, "開團待辦").some((row) => row["任務ID"] === "P042"),
+  );
+  api.change();
+  await assert.rejects(
+    editor.save(session, result, {
+      kind: "record",
+      mode: "delete",
+      sheet: "開團待辦",
+      id: "P042",
+      values: {},
+    }),
+    /已在其他地方更新/,
+  );
+  assert.equal(api.writes, 1);
+});
+it("denies missing sessions, missing scopes, Google refusals and ambiguous post-write results", async () => {
+  const api = fakeApi(),
+    editor = createTripEditor(trip, "tasks", config, api.fetcher);
+  await assert.rejects(editor.read(null));
+  await assert.rejects(editor.read({ ...session, scopes: [] }));
+  const before = await editor.read(session);
+  api.setFailAfter();
+  await assert.rejects(
+    editor.save(session, before, {
+      kind: "record",
+      mode: "add",
+      sheet: "開團待辦",
+      values: {
+        任務ID: "P042",
+        事項: "集合",
+        狀態: "待辦",
+        截止日期: "2027-04-30",
+      },
+    }),
+    /已送出儲存/,
+  );
+  assert.equal(api.writes, 1);
+  for (const code of [401, 403, 500]) {
+    const failing = fakeApi();
+    failing.setDenied(code);
+    await assert.rejects(
+      createTripEditor(trip, "tasks", config, failing.fetcher).read(session),
+    );
+  }
+});
+it("checks task references when deleting members through the authenticated API", async () => {
+  const api = fakeApi(),
+    editor = createTripEditor(trip, "accounting", config, api.fetcher);
+  let snapshot = await editor.read(session);
+  snapshot = await editor.save(session, snapshot, {
+    kind: "record",
+    mode: "add",
+    sheet: "團員",
+    values: { 團員ID: "M042", 顯示名稱: "新團員", 排序: "4" },
+  });
+  snapshot = await editor.save(session, snapshot, {
+    kind: "record",
+    mode: "delete",
+    sheet: "團員",
+    id: "M042",
+    values: {},
+  });
+  assert.ok(
+    !readRows(snapshot.book, "團員").some((row) => row["團員ID"] === "M042"),
+  );
+  await assert.rejects(
+    editor.save(session, snapshot, {
+      kind: "record",
+      mode: "delete",
+      sheet: "團員",
+      id: "M001",
+      values: {},
+    }),
+    /引用|關聯/,
+  );
+  assert.equal(api.writes, 2);
+});
+it("does not retry refused or ambiguous writes and does not write outside its scope", async () => {
+  const mutation = {
+    kind: "record" as const,
+    mode: "add" as const,
+    sheet: "開團待辦" as const,
+    values: {
+      任務ID: "P042",
+      事項: "新事項",
+      狀態: "待辦",
+      截止日期: "2027-04-30",
+    },
+  };
+  const api = fakeApi(),
+    editor = createTripEditor(trip, "tasks", config, async (url, init) => {
+      const result = await api.fetcher(url, init);
+      if (init?.method === "POST") throw new TypeError("connection lost");
+      return result;
+    });
+  const before = await editor.read(session);
+  await assert.rejects(
+    editor.save(session, before, mutation),
+    /儲存結果無法確認/,
+  );
+  assert.equal(api.writes, 1);
+  const after = await editor.read(session);
+  assert.ok(
+    readRows(after.book, "開團待辦").some((row) => row["任務ID"] === "P042"),
+  );
+  await assert.rejects(
+    editor.save(session, after, {
+      kind: "record",
+      mode: "delete",
+      sheet: "團員",
+      id: "M001",
+      values: {},
+    }),
+    /編輯範圍/,
+  );
+  const denied = fakeApi(),
+    refused = createTripEditor(trip, "tasks", config, async (url, init) =>
+      init?.method === "POST"
+        ? Response.json({}, { status: 403 })
+        : denied.fetcher(url, init),
+    );
+  const state = await refused.read(session);
+  await assert.rejects(refused.save(session, state, mutation), /拒絕編輯/);
+  assert.equal(denied.writes, 0);
+});
+it("accepts personal amounts containing digits and one leading minus only", async () => {
+  const { isPersonalAmountInput } = await import("./trip-editor.ts");
+  for (const value of ["", "-", "0", "123", "-123", "001"])
+    assert.equal(isPersonalAmountInput(value), true);
+  for (const value of [
+    "1.5",
+    "1,000",
+    "1e3",
+    "+1",
+    "--1",
+    "1-2",
+    " 12",
+    "12元",
+  ])
+    assert.equal(isPersonalAmountInput(value), false);
+});
+
+it("adds separate terminals to legacy flight sheets while preserving old columns and unrelated cells", () => {
+  const book: import("./portal.ts").Workbook = structuredClone(demo);
+  const headers = book["航班"][0];
+  for (const field of ["出發航廈", "抵達航廈"]) {
+    const col = headers.indexOf(field);
+    if (col >= 0) for (const row of book["航班"]) row.splice(col, 1);
+  }
+  headers.push("航廈", "額外資料");
+  book["航班"][1].push("舊航廈資訊", "保留");
+  const original = structuredClone(book);
+  assert.doesNotThrow(() => validateEditorBook(trip, book, "itinerary"));
+  const row = readRows(book, "航班")[0];
+  const next = mutateTripBook(trip, book, {
+    kind: "record",
+    sheet: "航班",
+    mode: "edit",
+    id: row["航班ID"],
+    values: { ...row, 出發航廈: "T1", 抵達航廈: "T2" },
+  });
+  const flight = readRows(next, "航班")[0];
+  assert.equal(flight["出發航廈"], "T1");
+  assert.equal(flight["抵達航廈"], "T2");
+  assert.equal(flight["航廈"], "舊航廈資訊");
+  assert.equal(flight["額外資料"], "保留");
+  const requests = JSON.stringify(
+    buildCellUpdates(book, next, [
+      { title: "航班", sheetId: 9, rowCount: 100, columnCount: headers.length },
+    ]),
+  );
+  assert.ok(
+    requests.includes('"rowIndex":0'),
+    "New column headers must be written in the same atomic request",
+  );
+  assert.ok(
+    requests.includes('"stringValue":"出發航廈"') &&
+      requests.includes('"stringValue":"抵達航廈"'),
+  );
+  assert.deepEqual(book, original);
+  for (const name of Object.keys(book).filter((name) => name !== "航班"))
+    assert.deepEqual(next[name], book[name]);
+});
+
+it("saves hotel check-in and check-out times independently and upgrades legacy columns atomically", () => {
+  const book: import("./portal.ts").Workbook = structuredClone(demo);
+  for (const field of ["入住時間", "退房時間"]) {
+    const col = book["飯店"][0].indexOf(field);
+    if (col >= 0) for (const row of book["飯店"]) row.splice(col, 1);
+  }
+  const original = structuredClone(book);
+  assert.doesNotThrow(() => validateEditorBook(trip, book, "itinerary"));
+  const row = readRows(book, "飯店")[0];
+  const mutation = {
+    kind: "record",
+    sheet: "飯店",
+    mode: "edit",
+    id: row["住宿ID"],
+    values: { ...row, 入住時間: "15:00", 退房時間: "12:00" },
+  } as const;
+  const next = mutateTripBook(trip, book, mutation);
+  const hotel = readRows(next, "飯店")[0];
+  assert.equal(hotel["入住時間"], "15:00");
+  assert.equal(hotel["退房時間"], "12:00");
+  assert.equal(hotel["入住日期"], row["入住日期"]);
+  assert.equal(hotel["退房日期"], row["退房日期"]);
+  const request = JSON.stringify(
+    buildCellUpdates(book, next, [
+      { title: "飯店", sheetId: 10, rowCount: 100, columnCount: 26 },
+    ]),
+  );
+  assert.ok(
+    request.includes('"stringValue":"入住時間"') &&
+      request.includes('"stringValue":"退房時間"'),
+  );
+  assert.deepEqual(book, original);
+  for (const key of ["入住時間", "退房時間"])
+    for (const value of ["24:00", "12:60", "3:00 PM"])
+      assert.throws(
+        () =>
+          mutateTripBook(trip, book, {
+            ...mutation,
+            values: { ...mutation.values, [key]: value },
+          }),
+        /時間格式/,
+      );
+  assert.doesNotThrow(() =>
+    mutateTripBook(trip, book, {
+      ...mutation,
+      values: { ...mutation.values, 入住時間: "", 退房時間: "" },
+    }),
+  );
+});
+
+it("adds an optional hotel photo to legacy sheets and rejects non-web image URLs", () => {
+  const book: import("./portal.ts").Workbook = structuredClone(demo);
+  const col = book["飯店"][0].indexOf("飯店圖片網址");
+  if (col >= 0) for (const row of book["飯店"]) row.splice(col, 1);
+  assert.doesNotThrow(() => validateEditorBook(trip, book, "itinerary"));
+  const row = readRows(book, "飯店")[0];
+  const mutation = {
+    kind: "record",
+    sheet: "飯店",
+    mode: "edit",
+    id: row["住宿ID"],
+    values: { ...row, 飯店圖片網址: "https://example.com/hotel.jpg" },
+  } as const;
+  const next = mutateTripBook(trip, book, mutation);
+  assert.equal(
+    readRows(next, "飯店")[0]["飯店圖片網址"],
+    "https://example.com/hotel.jpg",
+  );
+  const requests = JSON.stringify(
+    buildCellUpdates(book, next, [
+      { title: "飯店", sheetId: 10, rowCount: 100, columnCount: 26 },
+    ]),
+  );
+  assert.ok(requests.includes('"stringValue":"飯店圖片網址"'));
+  assert.equal(book["飯店"][0].includes("飯店圖片網址"), false);
+  assert.throws(
+    () =>
+      mutateTripBook(trip, book, {
+        ...mutation,
+        values: { ...row, 飯店圖片網址: "javascript:alert(1)" },
+      }),
+    /http/,
+  );
+  assert.doesNotThrow(() =>
+    mutateTripBook(trip, book, {
+      ...mutation,
+      values: { ...row, 飯店圖片網址: "" },
+    }),
+  );
+});

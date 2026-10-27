@@ -1,3 +1,4 @@
+import styles from "./CountrySearch.module.css";
 import { useEffect, useId, useRef, useState } from "react";
 import { searchCountries } from "../data/countries";
 import type { Country } from "../data/countries";
@@ -29,14 +30,14 @@ export function CountrySearch({
   }
   return (
     <div
-      className="country-search"
+      className={styles["country-search"]}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null))
           setOpen(false);
       }}
     >
       <label htmlFor={`${id}-input`}>搜尋國家／地區</label>
-      <div className="country-query">
+      <div className={styles["country-query"]}>
         <input
           id={`${id}-input`}
           ref={input}
@@ -102,7 +103,7 @@ export function CountrySearch({
       </div>
       {open && (
         <div
-          className="country-results"
+          className={styles["country-results"]}
           role="listbox"
           id={`${id}-options`}
           aria-label="國家搜尋結果"
@@ -118,7 +119,7 @@ export function CountrySearch({
                 aria-selected={
                   active === index || selected?.code === country.code
                 }
-                className={active === index ? "active" : ""}
+                className={active === index ? styles.active : ""}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(country)}
               >

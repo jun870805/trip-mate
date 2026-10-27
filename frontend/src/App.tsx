@@ -1,3 +1,6 @@
+import { displayDate } from "./data/display-date";
+import { TripClocks } from "./components/TripClocks";
+import { TripEditing } from "./components/TripEditor";
 import { useRoute, appHref } from "./hooks/useRoute";
 import { readTripSections } from "./data/trip-sections";
 import { useEffect, useState } from "react";
@@ -140,6 +143,10 @@ export default function App() {
             trip={selected}
             isDemo={isDemo}
             guideSession={guide.session}
+            loginBusy={guide.busy}
+            onLogin={guide.login}
+            onExpired={guide.invalidate}
+            onBusy={setWriting}
             tab={route.tab || "overview"}
           />
         ) : inTrip ? (
@@ -289,7 +296,8 @@ export default function App() {
                             </div>
                             <h3>{trip.name}</h3>
                             <p className="muted">
-                              {trip.start} — {trip.end}
+                              {displayDate(trip.start)} -{" "}
+                              {displayDate(trip.end)}
                             </p>
                             <span className="card-action">
                               查看旅程
@@ -376,11 +384,19 @@ function TripLoader({
   isDemo,
   tab,
   guideSession,
+  loginBusy,
+  onLogin,
+  onExpired,
+  onBusy,
 }: {
   trip: Trip;
   isDemo: boolean;
   tab: string;
   guideSession: GuideSession | null;
+  loginBusy: boolean;
+  onLogin: () => void;
+  onExpired: () => void;
+  onBusy: (busy: boolean) => void;
 }) {
   const [data, setData] = useState<TripData | null>(null);
   const [error, setError] = useState<{
@@ -420,23 +436,42 @@ function TripLoader({
       });
     return () => controller.abort();
   }, [trip, isDemo, revision]);
+  const editControls = !isDemo ? (
+    <TripEditing
+      key="guide-trip-editing"
+      trip={trip}
+      tab={tab}
+      session={guideSession}
+      loginBusy={loginBusy}
+      onLogin={onLogin}
+      onExpired={onExpired}
+      onBusy={onBusy}
+      onSaved={() => setRevision((value) => value + 1)}
+    />
+  ) : null;
   if (error)
     return (
-      <TripReadFailure
-        trip={trip}
-        message={error.message}
-        accessDenied={error.accessDenied}
-        session={guideSession}
-        retry={() => setRevision((n) => n + 1)}
-      />
+      <>
+        {editControls}
+        <TripReadFailure
+          trip={trip}
+          message={error.message}
+          accessDenied={error.accessDenied}
+          session={guideSession}
+          retry={() => setRevision((n) => n + 1)}
+        />
+      </>
     );
   if (!data)
     return (
-      <Empty>
-        {refreshing && updatedAt
-          ? "正在更新旅程資料…"
-          : "正在讀取這趟旅程的行程與帳務…"}
-      </Empty>
+      <>
+        {editControls}
+        <Empty>
+          {refreshing && updatedAt
+            ? "正在更新旅程資料…"
+            : "正在讀取這趟旅程的行程與帳務…"}
+        </Empty>
+      </>
     );
   const routeRoot = appHref(
     `/${isDemo ? "demo" : "trip"}/${encodeURIComponent(trip.id)}`,
@@ -456,6 +491,7 @@ function TripLoader({
     : "";
   return (
     <>
+      {editControls}
       <section className="trip-heading no-print">
         <a className="back-link" href={appHref()}>
           <Icon name="back" size={16} />
@@ -471,9 +507,10 @@ function TripLoader({
             {trip.destination}
           </span>
           <span>
-            {trip.start} — {trip.end}
+            {displayDate(trip.start)} - {displayDate(trip.end)}
           </span>
         </p>
+        <TripClocks timezone={data.timezone} />
       </section>
       <nav className="trip-nav no-print" aria-label="旅程功能">
         {tabs.map(([key, label]) => (
@@ -493,7 +530,16 @@ function TripLoader({
             1 TWD = {data.rate} {data.currency}
             {updatedAt && (
               <small className="update-time">
-                更新時間：{updatedAt.toLocaleString("zh-TW")}
+                更新時間：
+                {updatedAt.toLocaleString("zh-TW", {
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hourCycle: "h23",
+                })}
               </small>
             )}
           </span>

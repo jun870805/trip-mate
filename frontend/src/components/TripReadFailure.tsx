@@ -1,3 +1,4 @@
+import { displayDate } from "../data/display-date";
 import { appHref } from "../hooks/useRoute";
 import type { Trip } from "../data/portal";
 import type { GuideSession } from "../data/guide-auth";
@@ -27,7 +28,7 @@ export function TripReadFailure({
         <p className="trip-meta">
           <span>{trip.destination}</span>
           <span>
-            {trip.start} — {trip.end}
+            {displayDate(trip.start)} - {displayDate(trip.end)}
           </span>
         </p>
       </section>

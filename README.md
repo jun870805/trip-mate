@@ -1,6 +1,6 @@
 # 蕃薯旅遊團
 
-給每年一起出國的高中同學使用的旅遊工具。手機優先、純前端，資料由 Google Sheets 維護；一般團員免登入查看，指定導遊可登入維護入口旅程清單。旅程內的行程、帳務與待辦仍維持唯讀。
+給每年一起出國的高中同學使用的旅遊工具。手機優先、純前端，資料由 Google Sheets 維護；一般團員免登入查看，指定導遊可登入維護入口旅程清單，以及旅程內的行程、團員、帳務與待辦。
 
 ## 啟動
 
@@ -94,12 +94,14 @@ python3 scripts/browser_smoke.py
 frontend/src/
 ├── App.tsx                   # 入口、旅程導覽、讀取生命週期
 ├── components/ui.tsx         # 共用元件與範本下載
+├── components/*.module.css   # 選擇器、搜尋、時鐘與預訂卡片的局部樣式
 ├── pages/TripViews.tsx       # 總覽／行程／公積金／支出／進度
+├── styles/                   # 共用元件、框架、入口、旅程頁面與表單樣式
 ├── data/schema.json          # 範本與網站共用固定欄位
 ├── data/portal-api.ts        # Google Sheets batchGet 唯讀 adapter
 ├── data/portal.ts            # 欄位驗證與帳務計算
 ├── data/demo.json            # 明確標示的獨立範例
-└── index.css                 # RWD、風格與列印樣式
+└── index.css                 # Tailwind、全域變數與基礎樣式入口
 scripts/
 ├── generate_templates.py     # 只用 Python 標準函式庫產生範本
 ├── check_render.mjs          # 頁面 render 檢查
@@ -126,7 +128,7 @@ VITE_GUIDE_EMAILS='["your-email@gmail.com"]'
 
 登入後首頁會出現「新增旅程」，各旅程卡片會出現「編輯」「刪除」。可填寫試算表網址，程式會取出 ID。新增時可使用「建立空白旅程試算表」按鈕建立完整新檔並自動填入 ID，也可自行貼上既有檔案網址；既有檔案的「旅程設定」ID 須與入口旅程 ID 一致。旅程 ID 由系統預設自動編號，新增時可修改為未使用且格式正確的 ID（T001～T999，之後接 T1000）。刪除需確認，且只移除目錄紀錄，不刪除 Google 檔案。
 
-登入使用 Google Identity Services token model 與 Google userinfo 的已驗證 email，token 只存在記憶體；登出、重新整理或過期後需重新登入。授權包含 `openid email`、`https://www.googleapis.com/auth/spreadsheets` 與 `https://www.googleapis.com/auth/drive.file`。Sheets scope 是 Google 提供的試算表讀寫授權；既有資料的寫入只操作目錄「旅程清單」分頁，其他旅程資料仍唯讀；另可在明確按鈕操作下建立新旅程檔案並設定其共用權限。
+登入使用 Google Identity Services token model 與 Google userinfo 的已驗證 email，登入 session 與 token 保存於 localStorage，重新整理後會向 Google 驗證再恢復；過期或登出後需重新登入。授權包含 `openid email`、`https://www.googleapis.com/auth/spreadsheets` 與 `https://www.googleapis.com/auth/drive.file`。Sheets scope 是 Google 提供的試算表讀寫授權；導遊可編輯目錄與旅程內資料；另可在明確按鈕操作下建立新旅程檔案並設定其共用權限。
 
 儲存前會重新讀取清單，比對開啟編輯時的快照；偵測不同時請取消、重新讀取後再編輯。這不能取代多使用者交易鎖，目前以單一導遊為使用前提。網路中斷而不確定寫入結果時，先重新讀取，避免直接重送。
 
@@ -184,3 +186,20 @@ GitHub Pages 路由與部署：
 - Vite 的 GitHub Pages base 設定參考：[官方部署說明](https://vite.dev/guide/static-deploy.html#github-pages)。
 
 完整部署步驟請見 [GitHub Pages 部署指南](docs/deploy-github-pages.md)。專案提供 `.github/workflows/pages.yml`，從 `main` 自動檢查並部署 `frontend/dist`；API Key 使用 repository secret，其他前端設定使用 repository variables。
+
+
+第二階段導遊編輯：
+
+- 進入旅程後按「編輯進度」「編輯行程」或「編輯帳務」。帳務的資料類型可切換公積金、行前費用、收款及團員；行程可切換每日行程、航班與飯店。
+- 當次表單按儲存才寫入，不做草稿暫存；取消或關閉後須重填。既有 ID 固定，新 ID 自動建議且可改成合規未使用值，所有關聯用選單或團員勾選。
+- 公積金消費輸入實際金額與參與者，即同步建立交易、分攤與支出總表；預覽每人扣款與公共尾差。儲值／退款填各人金額，由網站加總。調整需填原因。
+- 行前費用輸入實際刷卡台幣金額與每人應繳；收款可在同一批次加入多項費用。已收款的費用須先處理收款才能刪除；被引用的團員、航班與飯店不可直接刪除。
+- 旅程檔案必須授予導遊帳號實際編輯權；只有目錄可編輯並不足以編輯各旅程。私人旅程也能由具檔案權限的導遊開啟編輯，正常觀看權限不因此改變。範例模式不提供雲端編輯。
+- 每次儲存先授權重新讀取、比對快照，再以一次 spreadsheets.batchUpdate 套用相關分頁。這提供同一筆變更的原子套用，但讀寫之間仍非多導遊原子鎖。
+- 儲存結果不明或重新讀取失敗時，先重新讀取確認，不直接重送。介面會要求重新載入編輯資料；單純欄位驗證錯誤則留在表單修正。
+
+新增 `scripts/trip_editor_browser_smoke.py` 供具備 Playwright 的環境驗證網站編輯，沿用上方測試 Vite 設定（guide@example.com／test-client）。所有 Google 登入與 API 皆攔截模擬，測試不寫入真實雲端。執行 `python3 scripts/trip_editor_browser_smoke.py`。
+
+航班與每日行程直接填寫各地當地時間，不需輸入時差。旅程標題會顯示台灣與目的地目前的日期時間；目的地依旅程設定的預設時區顯示。舊航班的含偏移格式仍可讀取，新的當地時間不會自動換成台灣或瀏覽器時間。
+
+導遊登入會按網站部署路徑分開保存至 localStorage；恢復前重新驗證 Google 帳號與指定 email，保留原 token 到期時間，不因重整延長。登出、到期或驗證失敗會清除保存資料，同一專案的分頁間會同步登入／登出。瀏覽器若阻擋儲存則僅維持當次登入並顯示提示。表單內容仍不做草稿暫存。

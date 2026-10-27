@@ -1,0 +1,20 @@
+.trip-clocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.trip-clocks p {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.trip-clocks span {
+  color: var(--muted);
+}
+.trip-clocks time {
+  font-variant-numeric: tabular-nums;
+  color: var(--brown);
+}

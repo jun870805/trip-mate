@@ -1,6 +1,9 @@
+import bookingStyles from "../components/BookingCards.module.css";
+import { displayDate, flightDayOffset } from "../data/display-date";
 import { useTripToday } from "../hooks/useTripToday";
 import { useState } from "react";
 import {
+  safeUrl,
   money,
   summarize,
   summarizeMembers,
@@ -82,7 +85,8 @@ export function Overview({
                 <a className="text-link" href={`${routeRoot}/tasks`}>
                   {row["事項"]}
                 </a>
-                ・{row["截止日期"]}
+                {" - "}
+                {displayDate(row["截止日期"])}
                 {row["截止日期"] < today ? "（已逾期）" : ""}
               </p>
             ))}
@@ -127,10 +131,12 @@ export function Itinerary({ data }: { data: TripData }) {
       <div className="print-heading">
         <h1>{data.trip.name}</h1>
         <p>
-          {data.trip.destination}・{data.trip.start} — {data.trip.end}
+          {data.trip.destination} - {displayDate(data.trip.start)} -{" "}
+          {displayDate(data.trip.end)}
         </p>
-        <p>旅程預設時區：{data.timezone}</p>
-        {printScope === "current" && day !== "all" && <p>日期：{day}</p>}
+        {printScope === "current" && day !== "all" && (
+          <p>日期：{displayDate(day)}</p>
+        )}
       </div>
       <div className="section-heading no-print">
         <div>
@@ -159,31 +165,48 @@ export function Itinerary({ data }: { data: TripData }) {
         匯出包含所選日期的行程，以及全部航班與飯店；列印時選擇「另存為 PDF」。
       </p>
       <div className="two-column">
-        <section className="panel">
+        <section className={bookingStyles["booking-section"]}>
           <h3>航班資訊</h3>
           {data.tables["航班"].length ? (
             data.tables["航班"].map((row) => (
-              <article className="detail-item" key={row["航班ID"]}>
-                <div className="spread">
-                  <strong>{row["航空公司"]}</strong>
-                  <Badge soft>{row["航班編號"]}</Badge>
+              <article
+                className={
+                  bookingStyles["detail-item"] +
+                  " " +
+                  bookingStyles["booking-card"]
+                }
+                key={row["航班ID"]}
+              >
+                <div className={bookingStyles["flight-card-heading"]}>
+                  <span>{displayDate(row["出發時間"].slice(0, 10))}</span>
+                  <span>
+                    {row["航空公司"]} {row["航班編號"]}
+                  </span>
                 </div>
-                <div className="flight-route">
+                <div className={bookingStyles["flight-route"]}>
                   <div>
                     <strong>{row["出發機場"]}</strong>
-                    <p>{row["出發時間"].slice(0, 10)}</p>
+                    {row["出發航廈"] && <small>{row["出發航廈"]}</small>}
                     <b>{row["出發時間"].slice(11, 16)}</b>
-                    <small>UTC{row["出發時間"].slice(19)}</small>
                   </div>
                   <Icon name="arrow" />
                   <div>
                     <strong>{row["抵達機場"]}</strong>
-                    <p>{row["抵達時間"].slice(0, 10)}</p>
-                    <b>{row["抵達時間"].slice(11, 16)}</b>
-                    <small>UTC{row["抵達時間"].slice(19)}</small>
+                    {row["抵達航廈"] && <small>{row["抵達航廈"]}</small>}
+                    <b>
+                      {row["抵達時間"].slice(11, 16)}
+                      {flightDayOffset(row["出發時間"], row["抵達時間"]) && (
+                        <span className={bookingStyles["flight-day-offset"]}>
+                          {" "}
+                          {flightDayOffset(row["出發時間"], row["抵達時間"])}
+                        </span>
+                      )}
+                    </b>
                   </div>
                 </div>
-                {row["航廈"] && <p>航廈：{row["航廈"]}</p>}
+                {row["航廈"] && !row["出發航廈"] && !row["抵達航廈"] && (
+                  <p>既有航廈資訊：{row["航廈"]}</p>
+                )}
                 {row["行李說明"] && (
                   <p className="muted">行李：{row["行李說明"]}</p>
                 )}
@@ -194,29 +217,63 @@ export function Itinerary({ data }: { data: TripData }) {
             <Empty>尚未填寫航班資訊。</Empty>
           )}
         </section>
-        <section className="panel">
+        <section className={bookingStyles["booking-section"]}>
           <h3>住宿資訊</h3>
           {data.tables["飯店"].length ? (
             data.tables["飯店"].map((row) => (
-              <article className="detail-item" key={row["住宿ID"]}>
-                <strong>{row["飯店名稱"]}</strong>
-                <p>
-                  {row["入住日期"]} 入住 — {row["退房日期"]} 退房
-                </p>
-                <p className="muted">{row["地址"]}</p>
-                {row["電話"] && (
-                  <p>
-                    電話：
-                    <a
-                      className="text-link"
-                      href={`tel:${row["電話"].replace(/[^+0-9,;#*]/g, "")}`}
-                    >
-                      {row["電話"]}
-                    </a>
-                  </p>
-                )}
-                {row["備註"] && <p className="muted">{row["備註"]}</p>}
-                <ExternalLink url={row["地圖網址"]}>開啟地圖</ExternalLink>
+              <article
+                className={
+                  bookingStyles["detail-item"] +
+                  " " +
+                  bookingStyles["booking-card"]
+                }
+                key={row["住宿ID"]}
+              >
+                <div className={bookingStyles["hotel-content"]}>
+                  <div className={bookingStyles["hotel-info"]}>
+                    <strong className={bookingStyles["hotel-name"]}>
+                      {row["飯店名稱"]}
+                    </strong>
+                    <div className={bookingStyles["hotel-dates"]}>
+                      <p>
+                        <small>入住</small> {displayDate(row["入住日期"])}
+                        {row["入住時間"] && ` ${row["入住時間"]}`}
+                      </p>
+                      <p>
+                        <small>退房</small> {displayDate(row["退房日期"])}
+                        {row["退房時間"] && ` ${row["退房時間"]}`}
+                      </p>
+                    </div>
+                    <p className="muted">{row["地址"]}</p>
+                    {row["電話"] && (
+                      <p>
+                        電話：
+                        <a
+                          className="text-link"
+                          href={`tel:${row["電話"].replace(/[^+0-9,;#*]/g, "")}`}
+                        >
+                          {row["電話"]}
+                        </a>
+                      </p>
+                    )}
+                    {row["備註"] && <p className="muted">{row["備註"]}</p>}
+                    <ExternalLink url={row["地圖網址"]}>開啟地圖</ExternalLink>
+                  </div>
+                  <div className={bookingStyles["hotel-photo"]}>
+                    {safeUrl(row["飯店圖片網址"] || "") && (
+                      <img
+                        key={row["飯店圖片網址"]}
+                        src={safeUrl(row["飯店圖片網址"])}
+                        alt={`${row["飯店名稱"]}照片`}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={(event) => {
+                          event.currentTarget.style.visibility = "hidden";
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
               </article>
             ))
           ) : (
@@ -227,9 +284,7 @@ export function Itinerary({ data }: { data: TripData }) {
       <div className="section-heading">
         <div>
           <h3>每日行程</h3>
-          <p className="muted">
-            時間為活動所在地時間；未特別標示時使用 {data.timezone}。
-          </p>
+          <p className="muted">所有時間均為活動所在地的當地時間。</p>
         </div>
       </div>
       {dates.length > 0 && (
@@ -278,7 +333,7 @@ export function Itinerary({ data }: { data: TripData }) {
                   <article className="timeline-item" key={row["行程ID"]}>
                     <div className="timeline-time">
                       {row["開始時間"] || "時間彈性"}
-                      {row["結束時間"] && <small>— {row["結束時間"]}</small>}
+                      {row["結束時間"] && <small>- {row["結束時間"]}</small>}
                     </div>
                     <div className="timeline-card">
                       <div className="spread">
@@ -287,9 +342,6 @@ export function Itinerary({ data }: { data: TripData }) {
                       </div>
                       {row["地點"] && <p className="muted">{row["地點"]}</p>}
                       {row["說明"] && <p>{row["說明"]}</p>}
-                      {row["時區"] && (
-                        <p className="muted">時區：{row["時區"]}</p>
-                      )}
                       {row["航班ID"] && (
                         <p className="muted">
                           航班：
@@ -441,7 +493,7 @@ export function Fund({ data }: { data: TripData }) {
                 <Badge soft>{t.type}</Badge>
                 <div>
                   <strong>{t.title}</strong>
-                  <small>{t.date}</small>
+                  <small>{displayDate(t.date)}</small>
                 </div>
                 <strong className="ledger-amount">
                   {money(t.amount, data.currency)}
@@ -547,7 +599,7 @@ export function Expenses({ data }: { data: TripData }) {
                 <div>
                   <strong>{e.title}</strong>
                   <small>
-                    {e.date}・{e.category}
+                    {displayDate(e.date)} - {e.category}
                   </small>
                 </div>
                 <div>
@@ -629,7 +681,8 @@ export function Expenses({ data }: { data: TripData }) {
                   )
                   .map((r) => (
                     <p className="receipt-note" key={r["收款明細ID"]}>
-                      {r["收款日期"]}・
+                      {displayDate(r["收款日期"])}
+                      {" - "}
                       {
                         data.expenses.find(
                           (expense) => expense.id === r["支出ID"],
@@ -743,8 +796,10 @@ export function Tasks({ data }: { data: TripData }) {
                   {overdue && <span className="negative">已逾期</span>}
                 </div>
                 <h3>{row["事項"]}</h3>
-                <p>截止日期：{row["截止日期"]}</p>
-                {row["完成日期"] && <p>完成日期：{row["完成日期"]}</p>}
+                <p>截止日期：{displayDate(row["截止日期"])}</p>
+                {row["完成日期"] && (
+                  <p>完成日期：{displayDate(row["完成日期"])}</p>
+                )}
                 {row["負責團員ID"] && (
                   <p className="muted">
                     負責人：

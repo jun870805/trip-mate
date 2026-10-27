@@ -1,3 +1,4 @@
+import { RequiredMark } from "./RequiredMark";
 import { useRef, useState } from "react";
 import { DRIVE_FILE_SCOPE } from "../data/guide-auth";
 import type { GuideSession } from "../data/guide-auth";
@@ -153,7 +154,10 @@ export function TripFileCreator({
             />
             <div className="field-pair">
               <label>
-                當地幣別
+                <span>
+                  當地幣別
+                  <RequiredMark />
+                </span>
                 {country?.multipleCurrencies && !manualCurrency ? (
                   <select
                     name="newFileCurrency"
@@ -198,7 +202,10 @@ export function TripFileCreator({
                 )}
               </label>
               <label>
-                旅程時區
+                <span>
+                  旅程時區
+                  <RequiredMark />
+                </span>
                 {country?.multipleTimezones && !manualTimezone ? (
                   <select
                     name="newFileTimezone"
@@ -283,7 +290,10 @@ export function TripFileCreator({
               </p>
             )}
             <label>
-              旅程匯率（1 TWD＝多少當地幣）
+              <span>
+                旅程匯率（1 TWD＝多少當地幣）
+                <RequiredMark />
+              </span>
               <input
                 name="newFileRate"
                 inputMode="decimal"

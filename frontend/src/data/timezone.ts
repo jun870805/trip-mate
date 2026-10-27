@@ -49,3 +49,56 @@ export function dateInTimezone(date: Date, input: string): string {
     parts.find((p) => p.type === type)!.value;
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
+
+/** Local wall-clock time, independent of this browser's timezone. */
+export function normalizeLocalDateTime(input: string): string {
+  const value = input.trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value))
+    throw new Error("請填寫當地日期與時間。");
+  const local = value.length === 16 ? value + ":00" : value;
+  const parsed = new Date(local + "Z");
+  if (
+    !Number.isFinite(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 19) !== local
+  )
+    throw new Error("當地日期或時間不正確。");
+  return local;
+}
+export function validateFlightTimes(departure: string, arrival: string): void {
+  const absolute = (value: string) => /[+-]\d{2}:\d{2}$/.test(value);
+  for (const value of [departure, arrival]) {
+    const match =
+      /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?)([+-]\d{2}:\d{2})?$/.exec(
+        value,
+      );
+    if (!match) throw new Error("航班時間請填當地日期與時間。");
+    normalizeLocalDateTime(match[1]);
+    if (match[2] && !Number.isFinite(Date.parse(value)))
+      throw new Error("航班時間格式不正確。");
+  }
+  // Existing offset records represent instants. Local clocks at different airports
+  // cannot be ordered without location-specific timezone information.
+  if (
+    absolute(departure) &&
+    absolute(arrival) &&
+    Date.parse(arrival) <= Date.parse(departure)
+  )
+    throw new Error("抵達時間必須晚於出發時間。");
+}
+export function formatClockTime(date: Date, input: string): string {
+  const zone = normalizeTimezone(input),
+    fixed = /^UTC([+-])(\d{2}):(\d{2})$/.exec(zone);
+  const offset = fixed
+    ? (Number(fixed[2]) * 60 + Number(fixed[3])) * (fixed[1] === "-" ? -1 : 1)
+    : 0;
+  const local = new Date(date.getTime() + offset * 60000);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: fixed ? "UTC" : zone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(local);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((value) => value.type === type)!.value;
+  return `${dateInTimezone(date, zone).replaceAll("-", "/")} ${part("hour")}:${part("minute")}`;
+}

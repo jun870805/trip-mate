@@ -1,4 +1,4 @@
-import { normalizeTimezone } from "./timezone.ts";
+import { normalizeTimezone, validateFlightTimes } from "./timezone.ts";
 import schema from "./schema.json" with { type: "json" };
 import type { SheetRows } from "./sheets.ts";
 import { assertRecordIds } from "./record-id.ts";
@@ -119,7 +119,13 @@ function table(book: Workbook, name: SheetName): Row[] {
   const headers = cells[0].map((v) => String(v).trim());
   ensure(new Set(headers).size === headers.length, `${name}：欄位名稱重複。`);
   for (const header of schema[name])
-    ensure(headers.includes(header), `${name}：缺少欄位「${header}」。`);
+    ensure(
+      headers.includes(header) ||
+        (name === "航班" && ["出發航廈", "抵達航廈"].includes(header)) ||
+        (name === "飯店" &&
+          ["入住時間", "退房時間", "飯店圖片網址"].includes(header)),
+      `${name}：缺少欄位「${header}」。`,
+    );
   return cells
     .slice(1)
     .map((row, index) => ({ row, index }))
@@ -133,7 +139,10 @@ function table(book: Workbook, name: SheetName): Row[] {
       for (const [key, value] of Object.entries(result)) {
         if (value && key.endsWith("日期"))
           atField(result, key, () => date(value));
-        if (value && ["開始時間", "結束時間"].includes(key))
+        if (
+          value &&
+          ["開始時間", "結束時間", "入住時間", "退房時間"].includes(key)
+        )
           ensure(
             /^([01]\d|2[0-3]):[0-5]\d$/.test(value),
             `${name} 第 ${index + 2} 列時間格式錯誤。`,
@@ -451,20 +460,8 @@ export function parseTrip(trip: Trip, book: Workbook): TripData {
       ["航空公司", "航班編號", "出發機場", "抵達機場", "出發時間", "抵達時間"],
       "航班",
     );
-    for (const field of ["出發時間", "抵達時間"]) {
-      ensure(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/.test(
-          row[field],
-        ) && Number.isFinite(Date.parse(row[field])),
-        "航班時間須包含日期、秒數及時區，例如 2027-05-01T09:00:00+08:00。",
-      );
-      date(row[field].slice(0, 10));
-    }
-    ensure(
-      Date.parse(row["抵達時間"]) > Date.parse(row["出發時間"]),
-      "抵達時間必須晚於出發時間。",
-      row,
-      "抵達時間",
+    atField(row, "出發時間／抵達時間", () =>
+      validateFlightTimes(row["出發時間"], row["抵達時間"]),
     );
   }
   for (const row of tables["飯店"]) {

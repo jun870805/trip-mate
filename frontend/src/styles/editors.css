@@ -1,0 +1,302 @@
+.dialog-heading,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.delete-button {
+  color: #9c3e2d;
+}
+.auth-message {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 20px 0;
+  padding: 14px 18px;
+  border: 1px solid #d7b296;
+  border-radius: 8px;
+  background: #f4e1d2;
+  font-size: 13px;
+}
+.auth-message .quiet-button {
+  flex-shrink: 0;
+}
+.save-notice {
+  margin-top: 20px;
+  color: var(--brown);
+  font-size: 13px;
+}
+.catalog-dialog {
+  width: min(600px, calc(100% - 32px));
+  max-height: 90dvh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: #44372e;
+  padding: 0;
+  margin: auto;
+}
+.catalog-dialog::backdrop {
+  background: #44372e66;
+}
+.catalog-dialog form {
+  padding: 24px;
+}
+.dialog-heading {
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.dialog-heading h2 {
+  font-size: 22px;
+}
+.catalog-fields {
+  display: grid;
+  gap: 18px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.catalog-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  min-width: 0;
+}
+.catalog-fields input,
+.catalog-fields select {
+  width: 100%;
+  max-width: none;
+  min-height: 38px;
+  border: 1px solid #cbb69e;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 15px;
+  background: #fffdf8;
+  color: #44372e;
+  min-width: 0;
+}
+.catalog-fields input[readonly] {
+  background: #eee7dc;
+}
+.catalog-fields small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.8;
+}
+.field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.dialog-actions {
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+.form-error {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid #d7b296;
+  border-radius: 4px;
+  background: #f4e1d2;
+  color: #823e28;
+  font-size: 13px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.form-error .button {
+  margin-top: 10px;
+}
+.delete-note {
+  line-height: 1.9;
+}
+.delete-note .muted {
+  margin-top: 12px;
+}
+.danger-button {
+  background: #9c3e2d;
+  border-color: #9c3e2d;
+}
+@media (max-width: 700px) {
+  .catalog-dialog form {
+    padding: 20px;
+  }
+  .catalog-fields input,
+  .catalog-fields select {
+    font-size: 16px;
+  }
+  .field-pair {
+    gap: 12px;
+  }
+}
+
+.file-creator {
+  border-radius: 8px;
+  background: #f7f0e6;
+  font-size: 13px;
+}
+.file-creator > summary {
+  padding: 13px 15px;
+  color: var(--brown);
+  font-weight: 600;
+}
+.file-creator-body {
+  padding: 0 15px 16px;
+  display: grid;
+  gap: 16px;
+}
+.file-creator-body .muted {
+  font-size: 12px;
+}
+.catalog-fields .checkbox-label {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.8;
+}
+.catalog-fields .checkbox-label input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex-shrink: 0;
+  margin-top: 3px;
+  accent-color: var(--brown);
+}
+.created-file {
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.9;
+}
+@media (max-width: 700px) {
+  .file-creator .field-pair {
+    grid-template-columns: 1fr;
+  }
+}
+.conflict-preview {
+  font: 12px/1.7 var(--font-sans);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow: auto;
+  margin: 12px 0;
+}
+
+.trip-edit-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.trip-editor {
+  width: min(760px, calc(100% - 32px));
+}
+.trip-editor-body {
+  padding: 24px;
+}
+.catalog-dialog .trip-record-form {
+  padding: 0;
+}
+.trip-record-form > h3 {
+  margin: 12px 0 20px;
+}
+.editor-list-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+.editor-list-toolbar label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+.editor-records {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+}
+.editor-record {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.editor-record > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.editor-record small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.editor-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.catalog-fields textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid #cbb69e;
+  border-radius: 4px;
+  background: #fffdf8;
+  color: #44372e;
+  font: inherit;
+  line-height: 1.7;
+  resize: vertical;
+}
+.participant-fields,
+.receipt-allocations {
+  display: grid;
+  gap: 16px;
+  margin-top: 8px;
+}
+.participant-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.receipt-allocation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+  background: #f7f0e6;
+  border-radius: 8px;
+}
+@media (max-width: 700px) {
+  .trip-editor-body {
+    padding: 20px;
+  }
+  .receipt-allocation {
+    grid-template-columns: 1fr;
+  }
+  .trip-edit-tools .button {
+    flex: 1;
+  }
+}
+.catalog-fields textarea {
+  font-size: 15px;
+}
+@media (max-width: 700px) {
+  .catalog-fields textarea {
+    font-size: 16px;
+  }
+}
+.editor-record-amount {
+  display: block;
+  margin-top: 4px;
+  color: var(--brown);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}

@@ -16,10 +16,16 @@ try {
         import { renderToStaticMarkup } from 'react-dom/server'
         import { Overview, Itinerary, Fund, Expenses, Tasks } from './src/pages/TripViews'
         import App from './src/App'
+        import { TripClocks } from './src/components/TripClocks'
+        import { TripEditing, TripForm } from './src/components/TripEditor'
         import { CatalogEditor } from './src/components/CatalogEditor'
         import { GuideTools } from './src/components/ui'
         import { TripReadFailure } from './src/components/TripReadFailure'
         import { parseCatalog, parseTrip, tripSheets } from './src/data/portal'
+        import { DatePicker } from './src/components/DatePicker'
+        import { pickerInputDisplay } from './src/data/date-picker'
+        import { TimeWheel } from './src/components/TimeWheel'
+        import bookingStyles from './src/components/BookingCards.module.css'
         import demo from './src/data/demo.json'
         const trip = parseCatalog(demo['旅程清單'])[0]
         const data = parseTrip(trip, demo)
@@ -62,12 +68,15 @@ try {
           if (!target.trip) assert.ok(!/readonly(?:=|\s|>)/i.test(form), 'Automatically suggested ID must be editable when adding')
           if (!target.trip) assert.ok(form.includes('建立空白旅程試算表') && form.includes('建立並填入 ID'), 'New trips must offer file creation')
           else assert.ok(!form.includes('建立並填入 ID'), 'Existing-trip edits must not create extra files')
+          if(target.trip && !target.remove) assert.ok(form.includes('value="2027/05/01"'), 'Editable date inputs must display slash-separated dates')
           if (!target.trip) assert.ok(form.includes('搜尋國家／地區') && form.includes('role="combobox"'), 'New file creation must offer country search')
         }
         for (const [component, text] of [[Overview, '旅程總覽'], [Itinerary, '匯出 PDF'], [Fund, '公共餘款'], [Expenses, '行前收款狀況'], [Tasks, '開團進度']]) {
           const html = renderToStaticMarkup(createElement(component, { data, routeRoot: '/demo/T001' }))
           assert.ok(html.includes(text), text)
           assert.ok(!html.includes('NaN') && !html.includes('undefined'), 'Unexpected invalid value')
+          assert.ok(!html.includes('—') && !html.includes('–'), 'Date/time ranges must use a half-width hyphen')
+          assert.ok(!/2027-[0-9]{2}-[0-9]{2}/.test(html), 'Dates in reading views must use slashes')
         }
         const partial = {...data, sectionErrors:{accounting:'bad amount',tasks:'bad task'}}
         const partialOverview = renderToStaticMarkup(createElement(Overview, {data:partial,routeRoot:'/trip/T001'}))
@@ -78,6 +87,27 @@ try {
         const expenseHtml = renderToStaticMarkup(createElement(Expenses, {data}))
         assert.ok(expenseHtml.includes('團員收款摘要') && expenseHtml.includes('只看未收齊'))
         const itineraryHtml = renderToStaticMarkup(createElement(Itinerary, {data}))
+        assert.ok(itineraryHtml.includes('<small>T1</small>') && itineraryHtml.includes('<small>T2</small>'))
+        assert.ok(!itineraryHtml.includes('出發航廈：') && !itineraryHtml.includes('抵達航廈：'))
+        assert.equal(itineraryHtml.split(bookingStyles['detail-item']+' '+bookingStyles['booking-card']).length-1,data.tables['航班'].length+data.tables['飯店'].length)
+        assert.ok(itineraryHtml.includes('class="'+bookingStyles['hotel-name']+'">範例飯店</strong>'))
+        assert.ok(itineraryHtml.includes('class="'+bookingStyles['hotel-dates']+'"><p><small>入住</small> 2027/05/01 15:00</p><p><small>退房</small> 2027/05/03 12:00</p>'))
+        const legacyStay={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,入住時間:'',退房時間:''}))}}
+        const legacyStayHtml=renderToStaticMarkup(createElement(Itinerary,{data:legacyStay}))
+        assert.ok(!legacyStayHtml.includes('undefined') && legacyStayHtml.includes('<small>入住</small> 2027/05/01</p>'))
+        assert.ok(itineraryHtml.includes('class="'+bookingStyles['hotel-photo']+'"></div>'), 'Missing hotel photos should leave an empty reserved space')
+        const withPhoto={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,飯店圖片網址:'https://example.com/hotel.jpg'}))}}
+        const photoHtml=renderToStaticMarkup(createElement(Itinerary,{data:withPhoto}))
+        assert.ok(photoHtml.includes('src="https://example.com/hotel.jpg"') && photoHtml.includes('alt="範例飯店照片"'))
+        const invalidPhoto={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,飯店圖片網址:'javascript:alert(1)'}))}}
+        assert.ok(!renderToStaticMarkup(createElement(Itinerary,{data:invalidPhoto})).includes('javascript:'))
+        const overnight = {...data,tables:{...data.tables,航班:[{...data.tables['航班'][0],出發時間:'2027-12-31T23:00',抵達時間:'2028-01-02T16:34'}]}}
+        const overnightHtml = renderToStaticMarkup(createElement(Itinerary,{data:overnight}))
+        assert.ok(overnightHtml.includes('class="'+bookingStyles['flight-card-heading']+'"><span>2027/12/31</span><span>範例航空 範例航班</span>'))
+        assert.ok(overnightHtml.includes('16:34<span class="'+bookingStyles['flight-day-offset']+'"> (+2)</span>'))
+        assert.ok(!itineraryHtml.includes(bookingStyles['flight-day-offset']) && !overnightHtml.includes('2028/01/02'))
+        const legacyFlights = {...data,tables:{...data.tables,航班:data.tables['航班'].map(row=>({...row,出發航廈:'',抵達航廈:'',航廈:'舊航廈 T3'}))}}
+        assert.ok(renderToStaticMarkup(createElement(Itinerary,{data:legacyFlights})).includes('既有航廈資訊：舊航廈 T3'))
         assert.ok(itineraryHtml.includes('匯出範圍') && itineraryHtml.includes('目前日期') && itineraryHtml.includes('aria-pressed'))
         assert.ok(renderToStaticMarkup(createElement(Tasks, {data})).includes('7 天內到期'))
         let storageReads = 0
@@ -87,6 +117,51 @@ try {
         assert.ok(!freshForm.includes('舊的未儲存內容') && !freshForm.includes('草稿'))
         assert.ok(freshForm.includes('建立並填入 ID'))
         delete window.sessionStorage
+        const editingHandlers = {onLogin(){},onExpired(){},onBusy(){},onSaved(){},onCancel(){},onSave(){}}
+        assert.equal(renderToStaticMarkup(createElement(TripEditing, {trip,tab:'overview',session:null,loginBusy:false,...editingHandlers})), '')
+        const editingTools = renderToStaticMarkup(createElement(TripEditing, {trip,tab:'overview',session,loginBusy:false,...editingHandlers}))
+        for(const label of ['編輯進度','編輯行程','編輯帳務']) assert.ok(editingTools.includes(label))
+        for(const entity of ['團員','開團待辦','每日行程','航班','飯店','公積金','行前費用','收款']) {
+          const form = renderToStaticMarkup(createElement(TripForm,{trip,book:demo,entity,row:null,busy:false,...editingHandlers}))
+          assert.ok(form.includes('儲存') && form.includes('取消'))
+          for (const label of form.matchAll(/<label[^>]*>(.*?)<[/]label>/g)) {
+            if (/<(?:input|select|textarea)[^>]*required=/.test(label[1])) assert.ok(label[1].includes('class="required-mark"'), entity+' required fields must show an asterisk')
+          }
+          assert.ok(!/type="(?:date|datetime-local|time)"/.test(form), 'Editors must use custom pickers with editable text and 24-hour time')
+          assert.ok(!form.includes(session.token) && !form.includes('草稿'))
+          for(const input of form.matchAll(/<input[^>]*aria-haspopup="dialog"[^>]*>/g)) assert.ok(input[0].includes('value=""'), entity+' must not prefill date/time inputs')
+          if(entity==='開團待辦') assert.ok(form.includes('負責人') && form.includes('<select'))
+          if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址'))
+          if(entity==='每日行程') { assert.ok(form.includes('關聯航班') && form.includes('關聯飯店')); assert.ok(!form.includes('時區（選填')); }
+          if(entity==='航班') {assert.ok(form.includes('出發航廈') && form.includes('抵達航廈'));assert.ok(form.includes('出發當地時間') && form.includes('抵達當地時間'));assert.ok(!form.includes('時差'));}
+          if(entity==='公積金') assert.ok(form.includes('個人金額') && form.includes('checkbox'))
+          if(entity==='行前費用') assert.ok(form.includes('實際刷卡金額') && form.includes('TWD'))
+          if(entity==='收款') assert.ok(form.includes('繳款團員') && form.includes('加入收款項目'))
+        }
+        for(const [entity,sheet] of [['團員','團員'],['開團待辦','開團待辦'],['每日行程','每日行程'],['航班','航班'],['飯店','飯店'],['公積金','公積金交易'],['行前費用','支出明細'],['收款','收款明細']]) {
+          const headers = demo[sheet][0], row=Object.fromEntries(headers.map((key,index)=>[key,String(demo[sheet][1][index]??'')]))
+          const form = renderToStaticMarkup(createElement(TripForm,{trip,book:demo,entity,row,busy:false,...editingHandlers}))
+          assert.ok(form.includes('readOnly') || form.includes('readonly'))
+          assert.ok(!form.includes('undefined') && !form.includes('NaN'))
+          const dateKey = {開團待辦:'截止日期',每日行程:'日期',飯店:'入住日期',公積金:'日期',行前費用:'日期',收款:'收款日期',航班:'出發時間'}[entity]
+          if(dateKey && row[dateKey]) assert.ok(form.includes('value="'+pickerInputDisplay(entity==='航班'?row[dateKey].slice(0,16):row[dateKey])+'"'), 'Editing must preserve the existing date')
+          if(entity==='公積金'||entity==='行前費用'){ assert.ok(!/<label>金額<input/.test(form)); assert.ok(form.includes('pattern="-?[0-9]+"')); assert.ok(form.includes('aria-label=')); }
+        }
+        const picker = renderToStaticMarkup(createElement(DatePicker,{label:'日期',value:'',start:trip.start,onChange(){throw new Error('Opening must never set a value')}}))
+        assert.ok(picker.includes('value=""') && picker.includes('aria-label="'+trip.start.replaceAll('-','/')+'"'))
+        assert.ok(picker.includes('popover="auto"') && picker.includes('取消'))
+        for(const type of ['time','datetime-local']) {
+          const form = renderToStaticMarkup(createElement(DatePicker,{label:'時間',type,value:type==='time'?'23:05':'2027-04-22T23:05',onChange(){}}))
+          assert.ok(form.includes('23:05') && form.includes('HH:mm') && !form.includes('type="time"'))
+        }
+        assert.ok(picker.includes('選擇年份與月份'))
+        const wheels = renderToStaticMarkup(createElement(TimeWheel,{value:'23:59',active:false,onChange(){throw new Error('Rendering wheels must not commit a value')}}))
+        assert.equal((wheels.match(/role="listbox"/g)||[]).length,2)
+        assert.equal((wheels.match(/role="option"/g)||[]).length,84)
+        assert.ok(!wheels.includes('<input') && wheels.includes('>00<') && wheels.includes('>23<') && wheels.includes('>59<'))
+        const clocks = renderToStaticMarkup(createElement(TripClocks, {timezone:'Asia/Tokyo'}))
+        assert.ok(clocks.includes('台灣現在') && clocks.includes('目的地現在') && clocks.includes('<time'))
+        assert.ok(!itineraryHtml.includes('旅程預設時區') && !itineraryHtml.includes('<small>UTC'), 'Timezones should appear through title clocks rather than individual itinerary entries')
         const emptyBook = Object.fromEntries(Object.entries(demo).map(([key, rows]) => [key, key === '旅程設定' ? rows : rows.slice(0, 1)]))
         const empty = parseTrip(trip, emptyBook)
         for (const component of [Overview, Itinerary, Fund, Expenses, Tasks]) {

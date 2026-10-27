@@ -207,7 +207,7 @@ export function GuideTools({
         <summary>網站設定教學</summary>
         <div className="setup-body">
           <p>
-            目前網站可新增、編輯及移除旅程清單；行程、帳務與待辦仍在試算表維護。
+            導遊登入後可維護旅程清單，並在旅程內編輯行程、公積金、支出、收款與進度。
           </p>
           <ol className="setup-steps">
             <li>
@@ -225,6 +225,9 @@ export function GuideTools({
             </li>
             <li>
               檢查新檔已開放連結檢視，再按表單「儲存」加入旅程清單。建立檔案與儲存入口為兩個動作；取消表單不會刪除已建立的檔案。
+            </li>
+            <li>
+              進入旅程後，按「編輯行程」「編輯帳務」或「編輯進度」維護內容。公積金消費會同步建立分攤與支出紀錄，行前收款可在同批次加入多個項目。
             </li>
             <li>
               首次使用建檔與共用功能，請在 Google Cloud 啟用 Google Drive

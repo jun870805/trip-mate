@@ -1,6 +1,14 @@
+import {
+  guideSessionKey,
+  readStoredGuideSession,
+  saveStoredGuideSession,
+  clearStoredGuideSession,
+  restoreStoredGuideSession,
+} from "../data/guide-session";
 import { useEffect, useRef, useState } from "react";
 import {
   authorizeGuide,
+  assertGuideSession,
   GUIDE_SCOPES,
   readGuideConfig,
 } from "../data/guide-auth";
@@ -21,6 +29,14 @@ interface GoogleIdentity {
 declare global {
   interface Window {
     google?: GoogleIdentity;
+  }
+}
+export const guideStorageKey = guideSessionKey(import.meta.env.BASE_URL);
+function browserStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
   }
 }
 export const guideConfig = readGuideConfig(import.meta.env);
@@ -51,7 +67,12 @@ function loadGoogle(): Promise<GoogleIdentity> {
   return loadingGoogle;
 }
 export function useGuideAuth() {
-  const [session, setSession] = useState<GuideSession | null>(null);
+  const [session, setSessionState] = useState<GuideSession | null>(null);
+  const sessionRef = useRef<GuideSession | null>(null);
+  function setSession(value: GuideSession | null) {
+    sessionRef.current = value;
+    setSessionState(value);
+  }
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
@@ -65,6 +86,63 @@ export function useGuideAuth() {
       mounted.current = false;
       generation.current++;
     };
+  }, []);
+  useEffect(() => {
+    async function restore() {
+      const storage = browserStorage();
+      const saved =
+        storage &&
+        readStoredGuideSession(storage, guideStorageKey, guideConfig);
+      const attempt = ++generation.current;
+      setSession(null);
+      setError("");
+      if (!saved) {
+        setBusy(false);
+        return;
+      }
+      setBusy(true);
+      const current = () => mounted.current && generation.current === attempt;
+      try {
+        const verified = await restoreStoredGuideSession(
+          saved,
+          guideConfig,
+          (url, init) =>
+            fetch(url, { ...init, signal: AbortSignal.timeout(15000) }),
+        );
+        assertGuideSession(verified, guideConfig);
+        const latest = readStoredGuideSession(
+          storage,
+          guideStorageKey,
+          guideConfig,
+        );
+        if (
+          current() &&
+          latest?.token === saved.token &&
+          latest.expiresAt === saved.expiresAt
+        )
+          setSession(verified);
+      } catch {
+        if (current()) {
+          clearStoredGuideSession(storage, guideStorageKey, saved.token);
+          setError("無法恢復登入，請重新登入。");
+        }
+      } finally {
+        if (current()) setBusy(false);
+      }
+    }
+    const changed = (event: StorageEvent) => {
+      const storage = browserStorage();
+      if (
+        !storage ||
+        (event.storageArea && event.storageArea !== storage) ||
+        (event.key !== guideStorageKey && event.key !== null)
+      )
+        return;
+      void restore();
+    };
+    void restore();
+    window.addEventListener("storage", changed);
+    return () => window.removeEventListener("storage", changed);
   }, []);
   useEffect(() => {
     if (guideConfig.error) return;
@@ -85,17 +163,37 @@ export function useGuideAuth() {
   }, [revision]);
   useEffect(() => {
     if (!session) return;
+    const expire = () => {
+      if (
+        sessionRef.current?.token !== session.token ||
+        sessionRef.current.expiresAt !== session.expiresAt
+      )
+        return;
+      const storage = browserStorage();
+      if (storage)
+        clearStoredGuideSession(storage, guideStorageKey, session.token);
+      setSession(null);
+      setError("導遊登入已過期，請重新登入。");
+    };
+    const checkExpiry = () => {
+      if (Date.now() >= session.expiresAt) expire();
+    };
     const timer = window.setTimeout(
-      () => {
-        setSession(null);
-        setError("導遊登入已過期，請重新登入。");
-      },
+      expire,
       Math.max(0, session.expiresAt - Date.now()),
     );
-    return () => window.clearTimeout(timer);
+    window.addEventListener("focus", checkExpiry);
+    document.addEventListener("visibilitychange", checkExpiry);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", checkExpiry);
+      document.removeEventListener("visibilitychange", checkExpiry);
+    };
   }, [session]);
   function logout() {
     generation.current++;
+    const storage = browserStorage();
+    if (storage) clearStoredGuideSession(storage, guideStorageKey);
     setSession(null);
     setBusy(false);
     setError("");
@@ -127,7 +225,20 @@ export function useGuideAuth() {
           if (!current()) return;
           authorizeGuide(response, guideConfig)
             .then((value) => {
-              if (current()) setSession(value);
+              if (current()) {
+                setSession(value);
+                const storage = browserStorage();
+                if (
+                  !storage ||
+                  !saveStoredGuideSession(
+                    storage,
+                    guideStorageKey,
+                    value,
+                    guideConfig,
+                  )
+                )
+                  setError("已登入，但瀏覽器無法保存登入狀態。");
+              }
             })
             .catch((cause) => {
               if (current())

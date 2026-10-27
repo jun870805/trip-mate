@@ -1,3 +1,4 @@
+import { displayDate } from "../data/display-date";
 import { createPortalRepository } from "../data/portal-api";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -15,6 +16,8 @@ import { nextRecordIdFromRows } from "../data/record-id";
 import { assertRecordId } from "../data/record-id";
 import { parseCatalog } from "../data/portal";
 import { TripFileCreator } from "./TripFileCreator";
+import { DatePicker } from "./DatePicker";
+import { RequiredMark } from "./RequiredMark";
 
 export interface EditorTarget {
   trip: Trip | null;
@@ -221,7 +224,10 @@ export function CatalogEditor({
             disabled={busy || checking || !session}
           >
             <label>
-              旅程名稱
+              <span>
+                旅程名稱
+                <RequiredMark />
+              </span>
               <input
                 required
                 name="tripName"
@@ -230,7 +236,10 @@ export function CatalogEditor({
               />
             </label>
             <label>
-              目的地
+              <span>
+                目的地
+                <RequiredMark />
+              </span>
               <input
                 required
                 name="destination"
@@ -240,28 +249,41 @@ export function CatalogEditor({
             </label>
             <div className="field-pair">
               <label>
-                開始日期
-                <input
+                <span>
+                  開始日期
+                  <RequiredMark />
+                </span>
+                <DatePicker
+                  label="開始日期"
                   required
                   type="date"
                   value={draft["開始日期"]}
-                  onChange={(e) => field("開始日期", e.target.value)}
+                  onChange={(value) => field("開始日期", value)}
                 />
               </label>
               <label>
-                結束日期
-                <input
+                <span>
+                  結束日期
+                  <RequiredMark />
+                </span>
+                <DatePicker
+                  label="結束日期"
                   required
                   type="date"
                   min={draft["開始日期"]}
                   value={draft["結束日期"]}
-                  onChange={(e) => field("結束日期", e.target.value)}
+                  start={draft["開始日期"]}
+                  onChange={(value) => field("結束日期", value)}
                 />
               </label>
             </div>
             <label>
-              旅程狀態
+              <span>
+                旅程狀態
+                <RequiredMark />
+              </span>
               <select
+                required
                 value={draft["旅程狀態"]}
                 onChange={(e) => field("旅程狀態", e.target.value)}
               >
@@ -271,7 +293,10 @@ export function CatalogEditor({
               </select>
             </label>
             <label>
-              旅程試算表 ID 或網址
+              <span>
+                旅程試算表 ID 或網址
+                <RequiredMark />
+              </span>
               <input
                 required
                 value={draft["試算表ID"]}
@@ -325,7 +350,10 @@ export function CatalogEditor({
               />
             )}
             <label>
-              旅程 ID
+              <span>
+                旅程 ID
+                <RequiredMark />
+              </span>
               <input
                 required
                 value={draft["旅程ID"]}
@@ -367,7 +395,12 @@ export function CatalogEditor({
               最新清單與編輯時不同。請比較後採用最新版本作為儲存基準；目前表單內容不會被清除。
             </p>
             <pre className="conflict-preview">
-              {JSON.stringify(conflict, null, 2)}
+              {JSON.stringify(
+                conflict,
+                (_key, value) =>
+                  typeof value === "string" ? displayDate(value) : value,
+                2,
+              )}
             </pre>
             <button
               type="button"
