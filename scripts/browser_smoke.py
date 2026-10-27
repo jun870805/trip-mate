@@ -1,0 +1,120 @@
+"""Browser smoke tests using intercepted Sheets data, never real account data.
+Start Vite with dummy API configuration (see README), then run this script.
+"""
+import argparse
+import json
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+from playwright.sync_api import sync_playwright, expect
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--url', default='http://127.0.0.1:5188')
+parser.add_argument('--chrome', help='Optional path to a Chrome/Chromium executable')
+args = parser.parse_args()
+root = Path(__file__).resolve().parents[1]
+book = json.loads((root / 'frontend/src/data/demo.json').read_text())
+artifacts = Path('/private/tmp/trip-mate-browser')
+artifacts.mkdir(exist_ok=True)
+
+with sync_playwright() as p:
+    options = {'headless': True}
+    if args.chrome:
+        options['executable_path'] = args.chrome
+    browser = p.chromium.launch(**options)
+    try:
+        page = browser.new_page(viewport={'width': 1280, 'height': 900})
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        failure = {'once': False, 'denied': False}
+        def sheets(route):
+            if failure['denied']:
+                route.fulfill(status=403, headers={'access-control-allow-origin': '*'}, json={'error': {'code': 403, 'status': 'PERMISSION_DENIED', 'message': 'The caller does not have permission'}})
+                return
+            if failure['once']:
+                failure['once'] = False
+                route.fulfill(status=403, headers={'access-control-allow-origin': '*'}, json={'error': {'message': 'test error'}})
+                return
+            ranges = parse_qs(urlparse(route.request.url).query).get('ranges', [])
+            values = [{'values': book[r.split('!')[0].strip("'")]} for r in ranges]
+            route.fulfill(headers={'access-control-allow-origin': '*'}, json={'valueRanges': values})
+        page.route('https://sheets.googleapis.com/**', sheets)
+        page.goto(args.url)
+        page.wait_for_load_state('networkidle')
+        expect(page.get_by_role('heading', name='選擇旅程')).to_be_visible()
+        expect(page.locator('.trip-card')).to_have_count(1)
+        page.locator('.trip-card').click()
+        expect(page.get_by_role('heading', name='旅程總覽')).to_be_visible()
+        assert '#/' not in page.url
+        page.reload()
+        expect(page.get_by_role('heading', name='旅程總覽')).to_be_visible()
+        page.screenshot(path=str(artifacts / 'desktop-overview.png'), full_page=True)
+        nav = page.get_by_role('navigation', name='旅程功能')
+        nav.get_by_role('link', name='公積金', exact=True).click()
+        page.go_back()
+        expect(page.get_by_role('heading', name='旅程總覽')).to_be_visible()
+        page.go_forward()
+        expect(page.get_by_role('heading', name='每位團員的餘額')).to_be_visible()
+        expect(page.locator('.member-card')).to_have_count(3)
+        expect(page.get_by_text('JPY 2', exact=True).first).to_be_visible()
+        page.get_by_label('團員', exact=True).select_option('M001')
+        expect(page.locator('.ledger-row')).to_have_count(3)
+        nav.get_by_role('link', name='支出', exact=True).click()
+        expect(page.get_by_text('部分已收', exact=True)).to_be_visible()
+        page.get_by_label('團員', exact=True).select_option('M001')
+        expect(page.locator('.collection-card')).to_have_count(2)
+        page.locator('.collection-card summary').first.click()
+        expect(page.get_by_text('收款批次：B001', exact=False).first).to_be_visible()
+        nav.get_by_role('link', name='進度', exact=True).click()
+        page.get_by_role('button', name='已完成', exact=True).click()
+        expect(page.locator('.task-card')).to_have_count(2)
+        nav.get_by_role('link', name='行程', exact=True).click()
+        page.get_by_role('button', name='05/02', exact=True).click()
+        expect(page.get_by_role('heading', name='搭機出發')).not_to_be_visible()
+        page.evaluate('window.__printed = false; window.print = () => { window.__printed = true }')
+        page.get_by_role('button', name='匯出 PDF', exact=True).click()
+        assert page.evaluate('window.__printed')
+        page.emulate_media(media='print')
+        expect(page.get_by_role('heading', name='搭機出發')).to_be_visible()
+        expect(page.get_by_role('heading', name='大阪城散步')).to_be_visible()
+        page.pdf(path=str(artifacts / 'itinerary.pdf'), format='A4', print_background=True)
+        page.emulate_media(media='screen')
+        page.get_by_label('匯出範圍', exact=True).select_option('current')
+        page.emulate_media(media='print')
+        expect(page.get_by_role('heading', name='搭機出發')).not_to_be_visible()
+        expect(page.get_by_role('heading', name='大阪城散步')).to_be_visible()
+        page.pdf(path=str(artifacts / 'itinerary-current-day.pdf'), format='A4', print_background=True)
+        page.emulate_media(media='screen')
+        for width in [390, 320, 768, 1280]:
+            page.set_viewport_size({'width': width, 'height': 844})
+            for tab in ['總覽', '行程', '公積金', '支出', '進度']:
+                nav.get_by_role('link', name=tab, exact=True).click()
+                assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), f'Overflow at {width}: {tab}'
+            if width == 390:
+                page.screenshot(path=str(artifacts / 'mobile-tasks.png'), full_page=True)
+        failure['once'] = True
+        page.get_by_role('button', name='更新資料', exact=True).click()
+        expect(page.get_by_role('alert')).to_contain_text('請稍後再試，或聯絡導遊。')
+        page.get_by_role('button', name='重新讀取', exact=True).click()
+        expect(page.get_by_role('heading', name='開團進度', exact=True)).to_be_visible()
+        nav.get_by_role('link', name='總覽', exact=True).click()
+        failure['denied'] = True
+        page.get_by_role('button', name='更新資料', exact=True).click()
+        expect(page.get_by_role('heading', name='旅程總覽', exact=True)).to_be_visible()
+        expect(page.get_by_role('alert')).to_contain_text('此旅程暫不開放觀看')
+        expect(page.get_by_role('navigation', name='旅程功能')).to_have_count(0)
+        expect(page.get_by_text('一般存取權', exact=False)).to_have_count(0)
+        failure['denied'] = False
+        page.get_by_role('button', name='重新讀取', exact=True).click()
+        expect(page.get_by_role('navigation', name='旅程功能')).to_be_visible()
+        expect(page.get_by_text('此旅程暫不開放觀看', exact=True)).to_have_count(0)
+        page.get_by_role('link', name='所有旅程', exact=True).first.click()
+        expect(page.get_by_role('link', name='查看範例', exact=False)).to_have_count(0)
+        expect(page.get_by_text('試算表範本與設定方式', exact=True)).to_have_count(0)
+        expect(page.get_by_text('網站設定教學', exact=True)).to_have_count(0)
+        page.goto(args.url + '/demo/T001/overview')
+        expect(page.get_by_text('請先以導遊帳號登入後查看範例。', exact=True)).to_be_visible()
+        expect(page.get_by_role('navigation', name='旅程功能')).to_have_count(0)
+        assert not errors, errors
+        print('Browser smoke checks passed. Screenshots and PDF:', artifacts)
+    finally:
+        browser.close()

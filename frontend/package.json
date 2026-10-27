@@ -1,0 +1,31 @@
+{
+  "name": "@trip-mate/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/data/*.test.ts",
+    "test:coverage": "node --experimental-strip-types --test --experimental-test-coverage --test-coverage-include=src/data/*.ts --test-coverage-exclude=src/data/*.test.ts --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 src/data/*.test.ts"
+  },
+  "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.4",
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.1.18",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  }
+}

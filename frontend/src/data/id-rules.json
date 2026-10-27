@@ -1,0 +1,64 @@
+{
+  "trip": {
+    "prefix": "T",
+    "table": "旅程清單",
+    "column": "旅程ID",
+    "meaning": "Trip"
+  },
+  "member": {
+    "prefix": "M",
+    "table": "團員",
+    "column": "團員ID",
+    "referenceColumns": ["負責團員ID"],
+    "meaning": "Member"
+  },
+  "fund": {
+    "prefix": "F",
+    "table": "公積金交易",
+    "column": "交易ID",
+    "referenceColumns": ["公積金交易ID"],
+    "meaning": "Fund"
+  },
+  "expense": {
+    "prefix": "E",
+    "table": "支出明細",
+    "column": "支出ID",
+    "meaning": "Expense"
+  },
+  "receipt": {
+    "prefix": "R",
+    "table": "收款明細",
+    "column": "收款明細ID",
+    "meaning": "Receipt"
+  },
+  "batch": {
+    "prefix": "B",
+    "table": "收款明細",
+    "column": "收款批次ID",
+    "meaning": "Batch"
+  },
+  "flight": {
+    "prefix": "A",
+    "table": "航班",
+    "column": "航班ID",
+    "meaning": "Airline"
+  },
+  "hotel": {
+    "prefix": "H",
+    "table": "飯店",
+    "column": "住宿ID",
+    "meaning": "Hotel"
+  },
+  "itinerary": {
+    "prefix": "I",
+    "table": "每日行程",
+    "column": "行程ID",
+    "meaning": "Itinerary"
+  },
+  "task": {
+    "prefix": "P",
+    "table": "開團待辦",
+    "column": "任務ID",
+    "meaning": "Preparation"
+  }
+}

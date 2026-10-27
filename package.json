@@ -1,0 +1,19 @@
+{
+  "name": "trip-mate",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "preview": "npm run preview --workspace frontend",
+    "typecheck": "npm run typecheck --workspace frontend",
+    "test": "npm run test --workspace frontend",
+    "test:coverage": "npm run test:coverage --workspace frontend",
+    "test:render": "node scripts/check_render.mjs",
+    "templates": "python3 scripts/generate_templates.py",
+    "check": "npm run test:coverage && npm run test:render && python3 scripts/check_templates.py && node scripts/check_apps_script.mjs && npm run build && npm run check:pages",
+    "check:pages": "node scripts/check_pages_build.mjs"
+  }
+}
