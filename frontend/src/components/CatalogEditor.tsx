@@ -1,3 +1,4 @@
+import { CloseButton } from "./CloseButton";
 import { displayDate } from "../data/display-date";
 import { createPortalRepository } from "../data/portal-api";
 import { useEffect, useRef, useState } from "react";
@@ -5,6 +6,7 @@ import type { FormEvent } from "react";
 import type { Trip, Row } from "../data/portal";
 import type { SheetRows } from "../data/sheets";
 import type { GuideSession } from "../data/guide-auth";
+import { isSuperUser } from "../data/guide-auth";
 import {
   createCatalogEditor,
   GuideApiError,
@@ -16,6 +18,7 @@ import { nextRecordIdFromRows } from "../data/record-id";
 import { assertRecordId } from "../data/record-id";
 import { parseCatalog } from "../data/portal";
 import { TripFileCreator } from "./TripFileCreator";
+import { GuideSharing } from "./GuideSharing";
 import { DatePicker } from "./DatePicker";
 import { RequiredMark } from "./RequiredMark";
 
@@ -118,6 +121,11 @@ export function CatalogEditor({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [createdTripId, setCreatedTripId] = useState<string | null>(null);
+  const restricted = Boolean(
+    session &&
+      (!target.trip || target.remove) &&
+      !isSuperUser(session, guideConfig),
+  );
   const saving = useRef(false);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -133,7 +141,7 @@ export function CatalogEditor({
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (saving.current || !session) return;
+    if (saving.current || !session || restricted) return;
     saving.current = true;
     setBusy(true);
     onBusy(true);
@@ -183,15 +191,7 @@ export function CatalogEditor({
       <form onSubmit={(event) => void submit(event)}>
         <div className="dialog-heading">
           <h2 id="catalog-editor-title">{title}</h2>
-          <button
-            type="button"
-            className="quiet-button"
-            onClick={close}
-            disabled={busy}
-            aria-label="關閉編輯"
-          >
-            關閉
-          </button>
+          <CloseButton onClick={close} disabled={busy} label="關閉編輯" />
         </div>
         {authError && (
           <p role="alert" className="form-error">
@@ -211,7 +211,11 @@ export function CatalogEditor({
             </button>
           </div>
         )}
-        {target.remove ? (
+        {restricted ? (
+          <p role="alert" className="form-error">
+            非管理員：只有超級使用者可新增或刪除旅程。
+          </p>
+        ) : target.remove ? (
           <div className="delete-note">
             <p>確定刪除「{target.trip?.name}」？</p>
             <p className="muted">
@@ -292,83 +296,103 @@ export function CatalogEditor({
                 ))}
               </select>
             </label>
-            <label>
-              <span>
-                旅程試算表 ID 或網址
-                <RequiredMark />
-              </span>
-              <input
-                required
-                value={draft["試算表ID"]}
-                onChange={(e) => field("試算表ID", e.target.value)}
-                autoComplete="off"
-              />
-              <small>請使用此趟旅程的試算表，不是旅程目錄。</small>
-            </label>
-            <div>
-              <button
-                type="button"
-                className="button secondary"
-                disabled={checking}
-                onClick={() => void inspect()}
-              >
-                {checking ? "檢查中…" : "檢查公開讀取"}
-              </button>
-              {readCheck && (
-                <p role="status" className="muted">
-                  {readCheck}
-                </p>
-              )}
-            </div>
-            {!target.trip && (
-              <TripFileCreator
-                name={draft["旅程名稱"]}
-                tripId={draft["旅程ID"]}
-                spreadsheetId={draft["試算表ID"]}
-                session={session}
-                loginBusy={loginBusy}
-                onLogin={onLogin}
-                onExpired={onExpired}
-                beforeCreate={() => {
-                  assertRecordId("trip", draft["旅程ID"]);
-                  if (
-                    parseCatalog(snapshot).some(
-                      (trip) => trip.id === draft["旅程ID"],
-                    )
-                  )
-                    throw new Error("旅程 ID 已被使用，請先修改後再建立檔案。");
-                }}
-                onCreated={(file) => {
-                  field("試算表ID", file.id);
-                  setCreatedTripId(file.tripId);
-                }}
-                onBusy={(value) => {
-                  saving.current = value;
-                  setBusy(value);
-                  onBusy(value);
-                }}
-              />
+            {isSuperUser(session, guideConfig) && (
+              <>
+                <label>
+                  <span>
+                    旅程試算表 ID 或網址
+                    <RequiredMark />
+                  </span>
+                  <input
+                    required
+                    value={draft["試算表ID"]}
+                    onChange={(e) => field("試算表ID", e.target.value)}
+                    autoComplete="off"
+                  />
+                  <small>請使用此趟旅程的試算表，不是旅程目錄。</small>
+                </label>
+                <GuideSharing
+                  spreadsheetId={draft["試算表ID"]}
+                  session={session}
+                  loginBusy={loginBusy}
+                  onLogin={onLogin}
+                  onExpired={onExpired}
+                  onBusy={(value) => {
+                    saving.current = value;
+                    setBusy(value);
+                    onBusy(value);
+                  }}
+                />
+                <div>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={checking}
+                    onClick={() => void inspect()}
+                  >
+                    {checking ? "檢查中…" : "檢查公開讀取"}
+                  </button>
+                  {readCheck && (
+                    <p role="status" className="muted">
+                      {readCheck}
+                    </p>
+                  )}
+                </div>
+                {!target.trip && (
+                  <TripFileCreator
+                    name={draft["旅程名稱"]}
+                    tripId={draft["旅程ID"]}
+                    spreadsheetId={draft["試算表ID"]}
+                    session={session}
+                    loginBusy={loginBusy}
+                    onLogin={onLogin}
+                    onExpired={onExpired}
+                    beforeCreate={() => {
+                      assertRecordId("trip", draft["旅程ID"]);
+                      if (
+                        parseCatalog(snapshot).some(
+                          (trip) => trip.id === draft["旅程ID"],
+                        )
+                      )
+                        throw new Error(
+                          "旅程 ID 已被使用，請先修改後再建立檔案。",
+                        );
+                    }}
+                    onCreated={(file) => {
+                      field("試算表ID", file.id);
+                      setCreatedTripId(file.tripId);
+                    }}
+                    onBusy={(value) => {
+                      saving.current = value;
+                      setBusy(value);
+                      onBusy(value);
+                    }}
+                  />
+                )}
+              </>
             )}
-            <label>
-              <span>
-                旅程 ID
-                <RequiredMark />
-              </span>
-              <input
-                required
-                value={draft["旅程ID"]}
-                readOnly={!!target.trip || !!createdTripId}
-                onChange={(e) => field("旅程ID", e.target.value)}
-                pattern="T([0-9]{3}|[1-9][0-9]{3})"
-                autoComplete="off"
-              />
-              <small>
-                {target.trip || createdTripId
-                  ? "既有 ID 固定。"
-                  : "預設自動編號，可修改為未使用的 T001～T9999。"}
-                請與旅程試算表「旅程設定」中的旅程ID保持一致。
-              </small>
-            </label>
+            {isSuperUser(session, guideConfig) && (
+              <label>
+                <span>
+                  旅程 ID
+                  <RequiredMark />
+                </span>
+                <input
+                  required
+                  value={draft["旅程ID"]}
+                  readOnly={!!target.trip || !!createdTripId}
+                  onChange={(e) => field("旅程ID", e.target.value)}
+                  pattern="T([0-9]{3}|[1-9][0-9]{3})"
+                  autoComplete="off"
+                />
+                <small>
+                  {target.trip || createdTripId
+                    ? "既有 ID 固定。"
+                    : "預設自動編號，可修改為未使用的 T001～T9999。"}
+                  請與旅程試算表「旅程設定」中的旅程ID保持一致。
+                </small>
+              </label>
+            )}
             <label>
               封面圖片網址（選填）
               <input
@@ -394,14 +418,16 @@ export function CatalogEditor({
             <p>
               最新清單與編輯時不同。請比較後採用最新版本作為儲存基準；目前表單內容不會被清除。
             </p>
-            <pre className="conflict-preview">
-              {JSON.stringify(
-                conflict,
-                (_key, value) =>
-                  typeof value === "string" ? displayDate(value) : value,
-                2,
-              )}
-            </pre>
+            {isSuperUser(session, guideConfig) && (
+              <pre className="conflict-preview">
+                {JSON.stringify(
+                  conflict,
+                  (_key, value) =>
+                    typeof value === "string" ? displayDate(value) : value,
+                  2,
+                )}
+              </pre>
+            )}
             <button
               type="button"
               className="button secondary"
@@ -433,6 +459,7 @@ export function CatalogEditor({
             className={`button ${target.remove ? "danger-button" : ""}`}
             type="submit"
             disabled={
+              restricted ||
               busy ||
               checking ||
               !!conflict ||

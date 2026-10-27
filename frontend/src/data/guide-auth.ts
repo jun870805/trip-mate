@@ -68,6 +68,27 @@ export function assertGuideSession(
   if (!Number.isFinite(session.expiresAt) || session.expiresAt <= now)
     throw new Error("導遊登入已過期，請重新登入。");
 }
+export function assertSuperUser(
+  session: GuideSession | null,
+  config: GuideConfig,
+  now = Date.now(),
+): asserts session is GuideSession {
+  assertGuideSession(session, config, now);
+  if (session.email.toLowerCase() !== config.emails[0])
+    throw new Error("非管理員：只有超級使用者可新增或刪除旅程。");
+}
+export function isSuperUser(
+  session: GuideSession | null,
+  config: GuideConfig,
+  now = Date.now(),
+): boolean {
+  try {
+    assertSuperUser(session, config, now);
+    return true;
+  } catch {
+    return false;
+  }
+}
 export async function authorizeGuide(
   response: TokenResponse,
   config: GuideConfig,

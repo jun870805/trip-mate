@@ -1,3 +1,4 @@
+import { CloseButton } from "./CloseButton";
 import { useEffect, useId, useRef, useState } from "react";
 import { displayDate } from "../data/display-date";
 import styles from "./PdfExportDialog.module.css";
@@ -47,14 +48,7 @@ export function PdfExportDialog({
       >
         <div className="dialog-heading">
           <h2 id={id}>匯出 PDF</h2>
-          <button
-            type="button"
-            className="quiet-button"
-            onClick={onClose}
-            aria-label="關閉匯出設定"
-          >
-            關閉
-          </button>
+          <CloseButton onClick={onClose} label="關閉匯出設定" />
         </div>
         <p className={styles.hint}>
           匯出所選日期的每日行程，以及全部航班與住宿。請在列印視窗選擇「另存為

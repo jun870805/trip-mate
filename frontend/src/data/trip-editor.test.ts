@@ -4,6 +4,7 @@ import demo from "./demo.json" with { type: "json" };
 import { parseCatalog, parseTrip, summarize } from "./portal.ts";
 import {
   mutateTripBook,
+  automaticTripIds,
   readRows,
   editorSheets,
   validateEditorBook,
@@ -762,4 +763,104 @@ it("adds an optional hotel photo to legacy sheets and rejects non-web image URLs
       values: { ...row, 飯店圖片網址: "" },
     }),
   );
+});
+it("keeps ordinary guides able to edit data inside an existing trip", async () => {
+  const roles = readGuideConfig({
+    VITE_GOOGLE_CLIENT_ID: "client",
+    VITE_GUIDE_EMAILS: '["owner@example.com","guide@example.com"]',
+  });
+  const api = fakeApi(),
+    editor = createTripEditor(trip, "tasks", roles, api.fetcher),
+    before = await editor.read(session);
+  await editor.save(session, before, {
+    kind: "record",
+    mode: "add",
+    sheet: "開團待辦",
+    values: {
+      任務ID: "P042",
+      事項: "一般管理者新增待辦",
+      分類: "其他",
+      狀態: "待辦",
+      截止日期: "2027-04-30",
+      排序: "10",
+    },
+  });
+  assert.equal(api.writes, 1);
+});
+it("assigns default IDs to ordinary guide mutations while preserving existing IDs and foreign references", () => {
+  const record = automaticTripIds(demo, {
+    kind: "record",
+    mode: "add",
+    sheet: "每日行程",
+    values: { 行程ID: "I999", 航班ID: "A001", 住宿ID: "H001" },
+  });
+  assert.equal(record.values["行程ID"], "I005");
+  assert.equal(record.values["航班ID"], "A001");
+  const fund = automaticTripIds(demo, {
+    kind: "fund",
+    mode: "add",
+    values: { 交易ID: "F999", 類型: "支出" },
+    shares: [],
+    expense: { 支出ID: "E999" },
+  });
+  assert.equal(fund.values["交易ID"], "F004");
+  assert.equal(fund.kind === "fund" && fund.expense["支出ID"], "E005");
+  const receipt = automaticTripIds(demo, {
+    kind: "receipt",
+    mode: "add",
+    values: { 收款批次ID: "B999" },
+    allocations: [
+      { id: "R999", expenseId: "E001", amount: "100" },
+      { id: "R998", expenseId: "E002", amount: "50" },
+    ],
+  });
+  assert.equal(receipt.values["收款批次ID"], "B003");
+  assert.deepEqual(
+    receipt.kind === "receipt" && receipt.allocations.map((r) => r.id),
+    ["R004", "R005"],
+  );
+  const edit = automaticTripIds(demo, {
+    kind: "receipt",
+    mode: "edit",
+    id: "B001",
+    values: { 收款批次ID: "B999" },
+    allocations: [{ id: "R999", expenseId: "E001", amount: "100" }],
+  });
+  assert.equal(edit.values["收款批次ID"], "B001");
+  assert.equal(edit.kind === "receipt" && edit.allocations[0].id, "R001");
+});
+it("keeps defaults for expenses, linked fund records and deletions without changing existing record identities", () => {
+  const expense = automaticTripIds(demo, {
+    kind: "expense",
+    mode: "add",
+    values: { 支出ID: "E999" },
+    shares: [],
+  });
+  assert.equal(expense.values["支出ID"], "E005");
+  const fund = automaticTripIds(demo, {
+    kind: "fund",
+    mode: "edit",
+    id: "F002",
+    values: { 交易ID: "F999", 類型: "支出" },
+    shares: [],
+    expense: { 支出ID: "E999" },
+  });
+  assert.equal(fund.values["交易ID"], "F002");
+  assert.equal(fund.kind === "fund" && fund.expense["支出ID"], "E003");
+  const deletion = {
+    kind: "record",
+    mode: "delete",
+    id: "I001",
+    sheet: "每日行程",
+    values: {},
+  } as const;
+  assert.deepEqual(automaticTripIds(demo, deletion), deletion);
+  const receipt = automaticTripIds(demo, {
+    kind: "receipt",
+    mode: "edit",
+    id: "B001",
+    values: {},
+    allocations: [{ id: "R001", expenseId: "E005", amount: "100" }],
+  });
+  assert.equal(receipt.kind === "receipt" && receipt.allocations[0].id, "R001");
 });

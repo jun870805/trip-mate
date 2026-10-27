@@ -2,7 +2,11 @@ import schema from "./schema.json" with { type: "json" };
 import { parseCatalog, safeUrl } from "./portal.ts";
 import type { Row } from "./portal.ts";
 import type { SheetRows } from "./sheets.ts";
-import { assertGuideSession } from "./guide-auth.ts";
+import {
+  assertGuideSession,
+  assertSuperUser,
+  isSuperUser,
+} from "./guide-auth.ts";
 import type { GuideConfig, GuideSession } from "./guide-auth.ts";
 import { nextRecordIdFromRows } from "./record-id.ts";
 
@@ -83,7 +87,8 @@ export function createCatalogEditor(
       before: SheetRows,
       mutation: CatalogMutation,
     ): Promise<SheetRows> {
-      assertGuideSession(session, config);
+      if (mutation.kind === "edit") assertGuideSession(session, config);
+      else assertSuperUser(session, config);
       if (!catalogId) throw new Error("尚未設定旅程目錄 ID。");
       parseCatalog(before);
       const headers = before[0].map((v) => String(v).trim());
@@ -116,8 +121,20 @@ export function createCatalogEditor(
         );
         if (mutation.kind === "edit" && clean["旅程ID"] !== mutation.id)
           throw new Error("既有旅程 ID 不可變更。");
-        for (const [key, value] of Object.entries(clean))
+        const canChangeSpreadsheet = isSuperUser(session, config);
+        if (
+          mutation.kind === "edit" &&
+          !canChangeSpreadsheet &&
+          clean["試算表ID"] !==
+            spreadsheetIdFromInput(
+              String(original[headers.indexOf("試算表ID")] ?? ""),
+            )
+        )
+          throw new Error("只有超級使用者可變更旅程試算表 ID 或網址。");
+        for (const [key, value] of Object.entries(clean)) {
+          if (key === "試算表ID" && !canChangeSpreadsheet) continue;
           values[headers.indexOf(key)] = value;
+        }
       }
       next[rowIndex] = values;
       parseCatalog(next);
@@ -148,18 +165,30 @@ export function createCatalogEditor(
         throw new Error("Google 回傳的旅程清單格式不正確。");
       if (fingerprint(body.values) !== fingerprint(before))
         throw new CatalogConflictError(body.values as SheetRows);
-      assertGuideSession(session, config);
+      if (mutation.kind === "edit") assertGuideSession(session, config);
+      else assertSuperUser(session, config);
+      if (
+        mutation.kind === "edit" &&
+        !isSuperUser(session, config) &&
+        values[headers.indexOf("試算表ID")] !==
+          original[headers.indexOf("試算表ID")]
+      )
+        throw new Error("只有超級使用者可變更旅程試算表 ID 或網址。");
       const range = `'旅程清單'!A${rowIndex + 1}:${column(values.length)}${rowIndex + 1}`;
       const url = new URL(base.slice(0, -1) + ":batchUpdate");
       const data =
         mutation.kind === "edit"
-          ? schema["旅程清單"].map((key) => {
-              const index = headers.indexOf(key);
-              return {
-                range: `'旅程清單'!${column(index + 1)}${rowIndex + 1}`,
-                values: [[values[index]]],
-              };
-            })
+          ? schema["旅程清單"]
+              .filter(
+                (key) => key !== "試算表ID" || isSuperUser(session, config),
+              )
+              .map((key) => {
+                const index = headers.indexOf(key);
+                return {
+                  range: `'旅程清單'!${column(index + 1)}${rowIndex + 1}`,
+                  values: [[values[index]]],
+                };
+              })
           : [{ range, values: [values] }];
       const result = await fetcher(url, {
         method: "POST",

@@ -1,3 +1,4 @@
+import { CloseButton } from "./components/CloseButton";
 import { TripHeaderActions } from "./components/TripHeaderActions";
 import { displayDate } from "./data/display-date";
 import { TripFacts } from "./components/TripFacts";
@@ -12,7 +13,8 @@ import { parseCatalog, parseCatalogView, parseTrip } from "./data/portal";
 import type { Trip, TripData, Workbook } from "./data/portal";
 import { Icon, Empty, Badge, ErrorBox, GuideTools } from "./components/ui";
 import { Overview, Itinerary, Fund, Expenses, Tasks } from "./pages/TripViews";
-import { useGuideAuth } from "./hooks/useGuideAuth";
+import { useGuideAuth, guideConfig } from "./hooks/useGuideAuth";
+import { isSuperUser } from "./data/guide-auth";
 import { CatalogEditor } from "./components/CatalogEditor";
 import type { EditorTarget } from "./components/CatalogEditor";
 import type { SheetRows } from "./data/sheets";
@@ -120,9 +122,7 @@ export default function App() {
         {guide.error && !editorTarget && (
           <div className="auth-message no-print" role="alert">
             <p>{guide.error}</p>
-            <button className="quiet-button" onClick={guide.clearError}>
-              關閉
-            </button>
+            <CloseButton onClick={guide.clearError} />
           </div>
         )}
         {notice && (
@@ -567,7 +567,12 @@ function TripLoader({
           {!data.sectionErrors?.itinerary && <Itinerary data={data} />}
         </div>
         {tab === "fund" && !sectionError && <Fund data={data} />}
-        {tab === "expenses" && !sectionError && <Expenses data={data} />}
+        {tab === "expenses" && !sectionError && (
+          <Expenses
+            data={data}
+            showIds={isSuperUser(guideSession, guideConfig)}
+          />
+        )}
         {tab === "tasks" && !sectionError && <Tasks data={data} />}
       </div>
     </>

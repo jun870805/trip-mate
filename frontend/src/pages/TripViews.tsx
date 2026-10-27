@@ -539,7 +539,13 @@ export function Fund({ data }: { data: TripData }) {
     </section>
   );
 }
-export function Expenses({ data }: { data: TripData }) {
+export function Expenses({
+  data,
+  showIds = false,
+}: {
+  data: TripData;
+  showIds?: boolean;
+}) {
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [memberId, setMemberId] = useState("all");
   const totals = summarize(data);
@@ -699,7 +705,8 @@ export function Expenses({ data }: { data: TripData }) {
                       TWD {r["實收金額"]}
                       {r["備註"] && `・${r["備註"]}`}
                       <small>
-                        收款批次：{r["收款批次ID"]}・本批次合計{" "}
+                        {showIds && <>收款批次：{r["收款批次ID"]}・</>}
+                        本批次合計{" "}
                         {money(
                           data.tables["收款明細"]
                             .filter(

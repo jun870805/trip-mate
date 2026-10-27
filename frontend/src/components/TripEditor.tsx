@@ -1,9 +1,11 @@
+import { CloseButton } from "./CloseButton";
 import bookingStyles from "./BookingCards.module.css";
 import { displayDate, displayDateTime } from "../data/display-date";
 import { useEffect, useRef, useState } from "react";
 import type { Trip, Row, Workbook } from "../data/portal";
 import { money, toMinor } from "../data/portal";
 import type { GuideSession } from "../data/guide-auth";
+import { isSuperUser } from "../data/guide-auth";
 import { guideConfig } from "../hooks/useGuideAuth";
 import { nextRecordIdFromRows, nextRecordId } from "../data/record-id";
 import rules from "../data/id-rules.json" with { type: "json" };
@@ -321,14 +323,7 @@ export function TripEditor({
       <div className="trip-editor-body">
         <div className="dialog-heading">
           <h2 id="trip-editor-title">編輯{scopeNames[scope]}</h2>
-          <button
-            type="button"
-            className="quiet-button"
-            disabled={busy}
-            onClick={onClose}
-          >
-            關閉
-          </button>
+          <CloseButton onClick={onClose} disabled={busy} />
         </div>
         {!session ? (
           <div className="form-error">
@@ -370,6 +365,7 @@ export function TripEditor({
                     entity={target.entity}
                     row={target.row}
                     busy={busy}
+                    canEditIds={isSuperUser(session, guideConfig)}
                     onCancel={() => setTarget(null)}
                     onSave={(mutation) => void save(mutation)}
                   />
@@ -585,12 +581,14 @@ export function TripForm({
   busy,
   onCancel,
   onSave,
+  canEditIds = false,
 }: {
   trip: Trip;
   book: Workbook;
   entity: Entity;
   row: Row | null;
   busy: boolean;
+  canEditIds?: boolean;
   onCancel: () => void;
   onSave: (mutation: TripMutation) => void;
 }) {
@@ -693,7 +691,8 @@ export function TripForm({
                 key={itemId(relation, item)}
                 value={itemId(relation, item)}
               >
-                {itemLabel(relation, item, book)}（{itemId(relation, item)}）
+                {itemLabel(relation, item, book)}
+                {canEditIds && `（${itemId(relation, item)}）`}
               </option>
             ))}
           </select>
@@ -854,18 +853,20 @@ export function TripForm({
         {names[entity]}
       </h3>
       <fieldset className="catalog-fields" disabled={busy}>
-        <label>
-          <span>
-            {names[entity]} ID
-            <RequiredMark />
-          </span>
-          <input
-            required
-            readOnly={!!row}
-            value={values[idKey] || ""}
-            onChange={(event) => field(idKey, event.target.value)}
-          />
-        </label>
+        {canEditIds && (
+          <label>
+            <span>
+              {names[entity]} ID
+              <RequiredMark />
+            </span>
+            <input
+              required
+              readOnly={!!row}
+              value={values[idKey] || ""}
+              onChange={(event) => field(idKey, event.target.value)}
+            />
+          </label>
+        )}
         {financial ? (
           <>
             {renderField({ key: "日期", type: "date", required: true })}
@@ -887,28 +888,30 @@ export function TripForm({
               renderField({ key: "分類", required: true })}
             {entity === "公積金" && values["類型"] === "支出" && (
               <>
-                <label>
-                  <span>
-                    支出 ID
-                    <RequiredMark />
-                  </span>
-                  <input
-                    required
-                    readOnly={
-                      !!row &&
-                      !!readRows(book, "支出明細").find(
-                        (item) => item["公積金交易ID"] === row["交易ID"],
-                      )
-                    }
-                    value={expense["支出ID"]}
-                    onChange={(event) =>
-                      setExpense((current) => ({
-                        ...current,
-                        支出ID: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
+                {canEditIds && (
+                  <label>
+                    <span>
+                      支出 ID
+                      <RequiredMark />
+                    </span>
+                    <input
+                      required
+                      readOnly={
+                        !!row &&
+                        !!readRows(book, "支出明細").find(
+                          (item) => item["公積金交易ID"] === row["交易ID"],
+                        )
+                      }
+                      value={expense["支出ID"]}
+                      onChange={(event) =>
+                        setExpense((current) => ({
+                          ...current,
+                          支出ID: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                )}
                 <label>
                   <span>
                     分類
@@ -1084,26 +1087,28 @@ export function TripForm({
                       }
                     />
                   </label>
-                  <label>
-                    <span>
-                      收款明細 ID
-                      <RequiredMark />
-                    </span>
-                    <input
-                      required
-                      readOnly={allocation.locked === true}
-                      value={allocation.id}
-                      onChange={(event) =>
-                        setAllocations((current) =>
-                          current.map((item, i) =>
-                            i === index
-                              ? { ...item, id: event.target.value }
-                              : item,
-                          ),
-                        )
-                      }
-                    />
-                  </label>
+                  {canEditIds && (
+                    <label>
+                      <span>
+                        收款明細 ID
+                        <RequiredMark />
+                      </span>
+                      <input
+                        required
+                        readOnly={allocation.locked === true}
+                        value={allocation.id}
+                        onChange={(event) =>
+                          setAllocations((current) =>
+                            current.map((item, i) =>
+                              i === index
+                                ? { ...item, id: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                  )}
                   <button
                     type="button"
                     className="quiet-button delete-button"

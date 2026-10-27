@@ -9,7 +9,7 @@ import {
 } from "./portal.ts";
 import type { Trip, TripSheetName, Workbook, Row } from "./portal.ts";
 import type { GuideConfig, GuideSession } from "./guide-auth.ts";
-import { assertGuideSession, WRITE_SCOPE } from "./guide-auth.ts";
+import { assertGuideSession, isSuperUser, WRITE_SCOPE } from "./guide-auth.ts";
 import {
   assertRecordId,
   nextRecordId,
@@ -89,6 +89,52 @@ export function mutationScope(mutation: TripMutation): EditorScope {
         ? "accounting"
         : "itinerary"
     : "accounting";
+}
+export function automaticTripIds(
+  book: Workbook,
+  mutation: TripMutation,
+): TripMutation {
+  const next = structuredClone(mutation);
+  if (next.mode === "delete") return next;
+  const kind =
+    next.kind === "record"
+      ? kinds[next.sheet]
+      : next.kind === "receipt"
+        ? "batch"
+        : next.kind;
+  const rule = rules[kind];
+  next.values[rule.column] =
+    next.mode === "add"
+      ? nextRecordIdFromRows(kind, book[rule.table])
+      : next.id || "";
+  if (next.kind === "fund" && next.values["類型"] === "支出") {
+    const linked = readRows(book, "支出明細").find(
+      (row) => row["公積金交易ID"] === next.id,
+    );
+    next.expense["支出ID"] =
+      linked?.["支出ID"] || nextRecordIdFromRows("expense", book["支出明細"]);
+  }
+  if (next.kind === "receipt") {
+    const existing =
+      next.mode === "edit"
+        ? readRows(book, "收款明細").filter(
+            (row) => row["收款批次ID"] === next.id,
+          )
+        : [];
+    const used = readRows(book, "收款明細").map((row) => row["收款明細ID"]);
+    for (const allocation of next.allocations) {
+      allocation.id =
+        existing.find((row) => row["收款明細ID"] === allocation.id)?.[
+          "收款明細ID"
+        ] ||
+        existing.find((row) => row["支出ID"] === allocation.expenseId)?.[
+          "收款明細ID"
+        ] ||
+        nextRecordId("receipt", used);
+      used.push(allocation.id);
+    }
+  }
+  return next;
 }
 export function readRows(book: Workbook, sheet: TripSheetName): Row[] {
   const headers = book[sheet]?.[0]?.map((value) => String(value).trim()) || [];
@@ -679,7 +725,13 @@ export function createTripEditor(
         );
         book = { ...book, ...refs };
       }
-      const next = mutateTripBook(trip, book, mutation),
+      const next = mutateTripBook(
+          trip,
+          book,
+          isSuperUser(session, config)
+            ? mutation
+            : automaticTripIds(book, mutation),
+        ),
         requests = buildCellUpdates(book, next, current.grids);
       if (requests.length) {
         try {

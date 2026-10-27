@@ -220,3 +220,18 @@ describe("new file sharing", () => {
     await assert.rejects(shareTripFile(session, config, "../bad", fetcher));
   });
 });
+it("blocks ordinary guides from creating Google trip files before sending a request", async () => {
+  const roles = readGuideConfig({
+    VITE_GOOGLE_CLIENT_ID: "client",
+    VITE_GUIDE_EMAILS: '["owner@example.com","guide@example.com"]',
+  });
+  let calls = 0;
+  await assert.rejects(
+    createTripFile(session, roles, options, async () => {
+      calls++;
+      return Response.json({ spreadsheetId: "must-not-exist" });
+    }),
+    /非管理員/,
+  );
+  assert.equal(calls, 0);
+});

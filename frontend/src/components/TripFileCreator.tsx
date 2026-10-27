@@ -1,4 +1,5 @@
 import { RequiredMark } from "./RequiredMark";
+import { syncGuideEditors } from "../data/guide-sharing";
 import { useRef, useState } from "react";
 import { DRIVE_FILE_SCOPE } from "../data/guide-auth";
 import type { GuideSession } from "../data/guide-auth";
@@ -51,6 +52,8 @@ export function TripFileCreator({
   const [created, setCreated] = useState<CreatedTripFile | null>(null);
   const [shared, setShared] = useState(false);
   const [prepared, setPrepared] = useState(false);
+  const [guidesShared, setGuidesShared] = useState(false);
+  const guidesSharedRef = useRef(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const active = useRef(false);
@@ -79,7 +82,7 @@ export function TripFileCreator({
       (creating && (createdRef.current || spreadsheetId.trim()))
     )
       return;
-    if (shouldShare && !canShare) {
+    if (!canShare) {
       setError("請先重新登入並同意 Google Drive 檔案授權。");
       return;
     }
@@ -108,6 +111,12 @@ export function TripFileCreator({
         await prepareTripFile(session, guideConfig, file.id);
         preparedRef.current = true;
         setPrepared(true);
+      }
+      if (file && !guidesSharedRef.current) {
+        stage = "導遊編輯權設定";
+        await syncGuideEditors(session, guideConfig, file.id);
+        guidesSharedRef.current = true;
+        setGuidesShared(true);
       }
       if (file && shouldShare) {
         stage = "共用設定";
@@ -138,6 +147,7 @@ export function TripFileCreator({
           <>
             <p className="muted">
               建立 11 個分頁與全部欄位，並自動填入旅程設定。建立後旅程 ID 固定。
+              系統會將目前設定的導遊加入為編輯者。
             </p>
             <CountrySearch
               selected={country}
@@ -324,6 +334,7 @@ export function TripFileCreator({
           <div role="status" className="created-file">
             <p>
               檔案已建立，ID 已填入表單。
+              {guidesShared ? "導遊編輯權已同步。" : "導遊編輯權尚未完成。"}
               {shared
                 ? "已開放連結檢視。"
                 : publish
@@ -348,7 +359,7 @@ export function TripFileCreator({
             {error}
           </p>
         )}
-        {!canShare && (publish || created) && (
+        {!canShare && (
           <button
             type="button"
             className="button secondary"
@@ -368,20 +379,24 @@ export function TripFileCreator({
             {busy ? "建立中…" : "建立並填入 ID"}
           </button>
         ) : (
-          !shared && (
+          (!shared || !prepared || !guidesShared) && (
             <button
               type="button"
               className="button secondary"
-              onClick={() => void run(prepared ? "share" : "resume")}
+              onClick={() =>
+                void run(prepared && guidesShared ? "share" : "resume")
+              }
               disabled={busy || loginBusy || !session}
             >
               {busy
                 ? "設定中…"
                 : !prepared
                   ? "完成試算表設定"
-                  : publish
-                    ? "重新設定共用"
-                    : "開放連結檢視"}
+                  : !guidesShared
+                    ? "完成導遊編輯權設定"
+                    : publish
+                      ? "重新設定共用"
+                      : "開放連結檢視"}
             </button>
           )
         )}

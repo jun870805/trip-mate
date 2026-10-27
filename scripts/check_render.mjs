@@ -27,6 +27,9 @@ try {
         import { TimeWheel } from './src/components/TimeWheel'
         import { PdfExportDialog } from './src/components/PdfExportDialog'
         import { TripHeaderActions } from './src/components/TripHeaderActions'
+        import { CloseButton } from './src/components/CloseButton'
+        import { GuideSharing } from './src/components/GuideSharing'
+        import { DRIVE_FILE_SCOPE } from './src/data/guide-auth'
         import bookingStyles from './src/components/BookingCards.module.css'
         import demo from './src/data/demo.json'
         const trip = parseCatalog(demo['旅程清單'])[0]
@@ -73,6 +76,15 @@ try {
           if(target.trip && !target.remove) assert.ok(form.includes('value="2027/05/01"'), 'Editable date inputs must display slash-separated dates')
           if (!target.trip) assert.ok(form.includes('搜尋國家／地區') && form.includes('role="combobox"'), 'New file creation must offer country search')
         }
+        const manager={...session,email:'manager@example.com'}
+        for(const target of [{trip:null},{trip,remove:true}]) {
+          const denied=renderToStaticMarkup(createElement(CatalogEditor,{target,catalogId:'catalog',before:demo['旅程清單'],session:manager,loginBusy:false,authError:'',...handlers}))
+          assert.ok(denied.includes('非管理員') && denied.includes('只有超級使用者') && !denied.includes('name="tripName"'))
+          assert.ok(!denied.includes('建立並填入 ID') && denied.includes('disabled=""'))
+        }
+        const allowedEdit=renderToStaticMarkup(createElement(CatalogEditor,{target:{trip},catalogId:'catalog',before:demo['旅程清單'],session:manager,loginBusy:false,authError:'',...handlers}))
+        assert.ok(allowedEdit.includes('name="tripName"') && !allowedEdit.includes('非管理員') && !allowedEdit.includes('旅程 ID'))
+        for(const text of ['旅程試算表 ID 或網址','檢查公開讀取','同步導遊編輯權','建立空白旅程試算表']) assert.ok(!allowedEdit.includes(text), 'Ordinary guides must not see the spreadsheet settings block')
         for (const [component, text] of [[Overview, '旅程總覽'], [Itinerary, '匯出 PDF'], [Fund, '公共餘款'], [Expenses, '行前收款狀況'], [Tasks, '開團進度']]) {
           const html = renderToStaticMarkup(createElement(component, { data, routeRoot: '/demo/T001' }))
           assert.ok(html.includes(text), text)
@@ -119,6 +131,16 @@ try {
         assert.ok(noSelection.includes('disabled=""') && noSelection.includes('請至少選擇一個日期'))
         const noDates=renderToStaticMarkup(createElement(PdfExportDialog,{dates:[],initialDates:[],onClose(){},onConfirm(){}}))
         assert.ok(noDates.includes('尚無每日行程') && !noDates.includes('disabled=""'))
+        const sharingProps={spreadsheetId:'sheet-id',loginBusy:false,onBusy(){},onLogin(){},onExpired(){}}
+        assert.equal(renderToStaticMarkup(createElement(GuideSharing,{...sharingProps,session:null})), '')
+        assert.equal(renderToStaticMarkup(createElement(GuideSharing,{...sharingProps,session:manager})), '')
+        const sharing=renderToStaticMarkup(createElement(GuideSharing,{...sharingProps,session:{...session,scopes:[DRIVE_FILE_SCOPE]}}))
+        assert.ok(sharing.includes('同步導遊編輯權') && !sharing.includes(session.token))
+        const needsScope=renderToStaticMarkup(createElement(GuideSharing,{...sharingProps,session}))
+        assert.ok(needsScope.includes('授權同步導遊編輯權'))
+        const closeButton=renderToStaticMarkup(createElement(CloseButton,{label:'關閉編輯',disabled:true,onClick(){}}))
+        assert.ok(closeButton.includes('aria-label="關閉編輯"') && closeButton.includes('<svg') && closeButton.includes('disabled=""'))
+        assert.ok(!closeButton.includes('>關閉'))
         const actions=renderToStaticMarkup(createElement(TripHeaderActions,{busy:false,onRefresh(){}}))
         assert.ok(actions.includes('所有旅程') && actions.includes('aria-label="重新讀取旅程"') && actions.includes('class="icon-button"'))
         assert.ok(!actions.includes('<time') && !actions.includes('更新資料'))
@@ -137,7 +159,7 @@ try {
         const editingTools = renderToStaticMarkup(createElement(TripEditing, {trip,tab:'overview',session,loginBusy:false,...editingHandlers}))
         for(const label of ['編輯進度','編輯行程','編輯帳務']) assert.ok(editingTools.includes(label))
         for(const entity of ['團員','開團待辦','每日行程','航班','飯店','公積金','行前費用','收款']) {
-          const form = renderToStaticMarkup(createElement(TripForm,{trip,book:demo,entity,row:null,busy:false,...editingHandlers}))
+          const form = renderToStaticMarkup(createElement(TripForm,{trip,book:demo,entity,row:null,busy:false,canEditIds:true,...editingHandlers}))
           assert.ok(form.includes('儲存') && form.includes('取消'))
           for (const label of form.matchAll(/<label[^>]*>(.*?)<[/]label>/g)) {
             if (/<(?:input|select|textarea)[^>]*required=/.test(label[1])) assert.ok(label[1].includes('class="required-mark"'), entity+' required fields must show an asterisk')
@@ -155,13 +177,23 @@ try {
         }
         for(const [entity,sheet] of [['團員','團員'],['開團待辦','開團待辦'],['每日行程','每日行程'],['航班','航班'],['飯店','飯店'],['公積金','公積金交易'],['行前費用','支出明細'],['收款','收款明細']]) {
           const headers = demo[sheet][0], row=Object.fromEntries(headers.map((key,index)=>[key,String(demo[sheet][1][index]??'')]))
-          const form = renderToStaticMarkup(createElement(TripForm,{trip,book:demo,entity,row,busy:false,...editingHandlers}))
+          const form = renderToStaticMarkup(createElement(TripForm,{trip,book:demo,entity,row,busy:false,canEditIds:true,...editingHandlers}))
           assert.ok(form.includes('readOnly') || form.includes('readonly'))
           assert.ok(!form.includes('undefined') && !form.includes('NaN'))
           const dateKey = {開團待辦:'截止日期',每日行程:'日期',飯店:'入住日期',公積金:'日期',行前費用:'日期',收款:'收款日期',航班:'出發時間'}[entity]
           if(dateKey && row[dateKey]) assert.ok(form.includes('value="'+pickerInputDisplay(entity==='航班'?row[dateKey].slice(0,16):row[dateKey])+'"'), 'Editing must preserve the existing date')
           if(entity==='公積金'||entity==='行前費用'){ assert.ok(!/<label>金額<input/.test(form)); assert.ok(form.includes('pattern="-?[0-9]+"')); assert.ok(form.includes('aria-label=')); }
         }
+        for(const entity of ['團員','開團待辦','每日行程','航班','飯店','公積金','行前費用','收款']) {
+          const form=renderToStaticMarkup(createElement(TripForm,{trip,book:demo,entity,row:null,busy:false,canEditIds:false,...editingHandlers}))
+          assert.ok(!form.includes(' ID') && !form.includes('（A001）') && !form.includes('（H001）') && !form.includes('（M001）'), entity+' should hide internal identifiers')
+          assert.ok(form.includes('儲存') && form.includes('取消'))
+        }
+        assert.ok(!expenseHtml.includes('收款批次：'))
+        const superExpenses=renderToStaticMarkup(createElement(Expenses,{data,showIds:true}))
+        assert.ok(superExpenses.includes('收款批次：B001'))
+        const managerTools=renderToStaticMarkup(createElement(GuideTools,{session:manager,sampleHref:'/demo/T001'}))
+        assert.ok(managerTools.includes('查看範例') && !managerTools.includes('試算表範本與設定方式') && !managerTools.includes('網站設定教學'))
         const picker = renderToStaticMarkup(createElement(DatePicker,{label:'日期',value:'',start:trip.start,onChange(){throw new Error('Opening must never set a value')}}))
         assert.ok(picker.includes('value=""') && picker.includes('aria-label="'+trip.start.replaceAll('-','/')+'"'))
         assert.ok(picker.includes('popover="auto"') && picker.includes('取消'))
@@ -196,7 +228,7 @@ try {
     bundle: true,
     platform: "node",
     format: "cjs",
-    define: { "import.meta.env": JSON.stringify({ BASE_URL: "/" }) },
+    define: { "import.meta.env": JSON.stringify({ BASE_URL: "/",VITE_GOOGLE_CLIENT_ID:"test-client",VITE_GUIDE_EMAILS:'["guide@example.com","manager@example.com"]' }) },
   });
   await import(pathToFileURL(path.join(target, "check.cjs")).href);
 } finally {

@@ -84,10 +84,17 @@ with sync_playwright() as p:
             if route.request.method == 'OPTIONS':
                 route.fulfill(status=204, headers=headers)
                 return
-            assert json.loads(route.request.post_data) == {'type': 'anyone', 'role': 'reader', 'allowFileDiscovery': False}
-            state['share_count'] += 1
-            route.fulfill(status=403 if state['share_count'] == 1 else 200, headers=headers, json={})
-        page.route('https://www.googleapis.com/drive/v3/files/**/permissions', sharing)
+            url = urlparse(route.request.url)
+            assert route.request.headers.get('authorization') == 'Bearer mock-guide-token'
+            if '/permissions' not in url.path:
+                route.fulfill(headers=headers,json={'mimeType':'application/vnd.google-apps.spreadsheet','capabilities':{'canShare':True}})
+            elif route.request.method == 'GET':
+                route.fulfill(headers=headers,json={'permissions':[{'id':'owner','type':'user','role':'owner','emailAddress':'guide@example.com'}]})
+            else:
+                assert json.loads(route.request.post_data) == {'type': 'anyone', 'role': 'reader', 'allowFileDiscovery': False}
+                state['share_count'] += 1
+                route.fulfill(status=403 if state['share_count'] == 1 else 200, headers=headers, json={})
+        page.route('https://www.googleapis.com/drive/v3/files/**', sharing)
         page.goto(args.url)
         page.wait_for_load_state('networkidle')
         expect(page.get_by_role('button', name='新增旅程', exact=True)).to_have_count(0)
@@ -104,6 +111,8 @@ with sync_playwright() as p:
         page.get_by_role('button', name='編輯', exact=True).first.click()
         dialog = page.get_by_role('dialog', name='編輯旅程')
         expect(dialog.get_by_label('旅程 ID', exact=False)).to_have_attribute('readonly', '')
+        dialog.get_by_role('button', name='同步導遊編輯權', exact=True).click()
+        expect(dialog.get_by_role('status')).to_contain_text('指定導遊的編輯權已同步')
         dialog.get_by_label('旅程名稱', exact=True).fill('測試更名')
         dialog.get_by_role('button', name='儲存', exact=True).click()
         expect(page.get_by_role('heading', name='測試更名', exact=True)).to_be_visible()

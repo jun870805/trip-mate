@@ -2,7 +2,11 @@ import { normalizeTimezone, timezoneForSheets } from "./timezone.ts";
 import schema from "./schema.json" with { type: "json" };
 import { tripSheets, precision } from "./portal.ts";
 import { assertRecordId } from "./record-id.ts";
-import { assertGuideSession, DRIVE_FILE_SCOPE } from "./guide-auth.ts";
+import {
+  assertGuideSession,
+  assertSuperUser,
+  DRIVE_FILE_SCOPE,
+} from "./guide-auth.ts";
 import type { GuideConfig, GuideSession } from "./guide-auth.ts";
 
 export interface TripFileOptions {
@@ -90,7 +94,7 @@ export async function createTripFile(
   options: TripFileOptions,
   fetcher: typeof fetch = fetch,
 ): Promise<CreatedTripFile> {
-  assertGuideSession(session, config);
+  assertSuperUser(session, config);
   const resource = buildTripFile(options);
   let result: Response;
   try {

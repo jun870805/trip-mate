@@ -5,6 +5,8 @@ import {
   authorizeGuide,
   assertGuideSession,
   GUIDE_SCOPES,
+  isSuperUser,
+  assertSuperUser,
 } from "./guide-auth.ts";
 
 const env = {
@@ -116,4 +118,35 @@ describe("verified Google account session", () => {
     await assert.rejects(authorizeGuide(token, readGuideConfig({}), fetcher));
     assert.throws(() => assertGuideSession(null, readGuideConfig(env)));
   });
+});
+
+it("uses only the first normalized email as super user without changing guide access", () => {
+  const config = readGuideConfig(env),
+    now = 1000;
+  const primary = { email: "me@example.com", token: "t", expiresAt: 2000 };
+  const secondary = { ...primary, email: "other@example.com" };
+  assert.equal(isSuperUser(primary, config, now), true);
+  assert.equal(isSuperUser(secondary, config, now), false);
+  assert.doesNotThrow(() => assertGuideSession(secondary, config, now));
+  assert.throws(() => assertSuperUser(secondary, config, now), /非管理員/);
+  assert.doesNotThrow(() => assertSuperUser(primary, config, now));
+  assert.equal(isSuperUser(null, config, now), false);
+  assert.equal(
+    isSuperUser({ ...primary, expiresAt: 1000 }, config, now),
+    false,
+  );
+  assert.equal(
+    isSuperUser(
+      primary,
+      readGuideConfig({ ...env, VITE_GUIDE_EMAILS: "[]" }),
+      now,
+    ),
+    false,
+  );
+  const reordered = readGuideConfig({
+    ...env,
+    VITE_GUIDE_EMAILS: '["other@example.com","me@example.com"]',
+  });
+  assert.equal(isSuperUser(primary, reordered, now), false);
+  assert.equal(isSuperUser(secondary, reordered, now), true);
 });

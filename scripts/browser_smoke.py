@@ -63,7 +63,7 @@ with sync_playwright() as p:
         page.get_by_label('團員', exact=True).select_option('M001')
         expect(page.locator('.collection-card')).to_have_count(2)
         page.locator('.collection-card summary').first.click()
-        expect(page.get_by_text('收款批次：B001', exact=False).first).to_be_visible()
+        expect(page.get_by_text('本批次合計', exact=False).first).to_be_visible()
         nav.get_by_role('link', name='進度', exact=True).click()
         page.get_by_role('button', name='已完成', exact=True).click()
         expect(page.locator('.task-card')).to_have_count(2)

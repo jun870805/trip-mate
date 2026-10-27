@@ -264,3 +264,82 @@ describe("catalog-only writes", () => {
     }
   });
 });
+
+it("allows ordinary guide edits but blocks trip creation and deletion before any API request", async () => {
+  const roles = readGuideConfig({
+    VITE_GOOGLE_CLIENT_ID: "client",
+    VITE_GUIDE_EMAILS: '["owner@example.com","me@example.com"]',
+  });
+  let calls = 0;
+  const blocked = createCatalogEditor("catalog", roles, async () => {
+    calls++;
+    throw new Error("must not call");
+  });
+  await assert.rejects(
+    blocked.save(session, [headers, row], {
+      kind: "add",
+      draft: { ...draft, 旅程ID: "T002" },
+    }),
+    /非管理員/,
+  );
+  await assert.rejects(
+    blocked.save(session, [headers, row], { kind: "delete", id: "T001" }),
+    /非管理員/,
+  );
+  assert.equal(calls, 0);
+  const api = mockApi([headers, row]);
+  await createCatalogEditor("catalog", roles, api.fetcher).save(
+    session,
+    [headers, row],
+    { kind: "edit", id: "T001", draft: { ...draft, 旅程名稱: "管理者更名" } },
+  );
+  assert.equal(api.writes.length, 1);
+});
+it("protects the trip spreadsheet ID from ordinary guides without blocking other edits", async () => {
+  const roles = readGuideConfig({
+    VITE_GOOGLE_CLIENT_ID: "client",
+    VITE_GUIDE_EMAILS: '["owner@example.com","me@example.com"]',
+  });
+  let calls = 0;
+  await assert.rejects(
+    createCatalogEditor("catalog", roles, async () => {
+      calls++;
+      throw new Error("must not call");
+    }).save(session, [headers, row], {
+      kind: "edit",
+      id: "T001",
+      draft: { ...draft, 試算表ID: "different-sheet" },
+    }),
+    /試算表.*只有超級|只有超級.*試算表/,
+  );
+  assert.equal(calls, 0);
+  const api = mockApi([headers, row]);
+  const result = await createCatalogEditor("catalog", roles, api.fetcher).save(
+    session,
+    [headers, row],
+    {
+      kind: "edit",
+      id: "T001",
+      draft: { ...draft, 旅程名稱: "一般管理者更名" },
+    },
+  );
+  const body = JSON.parse(String(api.writes[0].options?.body));
+  const protectedCol = headers.indexOf("試算表ID");
+  const protectedRange =
+    "'旅程清單'!" + String.fromCharCode(65 + protectedCol) + "2";
+  assert.ok(
+    body.data.every((item: { range: string }) => item.range !== protectedRange),
+  );
+  assert.equal(result[1][protectedCol], row[protectedCol]);
+  const ownerApi = mockApi([headers, row]);
+  const changed = await createCatalogEditor(
+    "catalog",
+    roles,
+    ownerApi.fetcher,
+  ).save({ ...session, email: "owner@example.com" }, [headers, row], {
+    kind: "edit",
+    id: "T001",
+    draft: { ...draft, 試算表ID: "owner-changed-sheet" },
+  });
+  assert.equal(changed[1][protectedCol], "owner-changed-sheet");
+});
