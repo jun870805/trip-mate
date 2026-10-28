@@ -144,3 +144,25 @@ export function writeReorderPreference(
     return false;
   }
 }
+
+export function itineraryTags(rows: Row[]): string[] {
+  return [
+    ...new Set(rows.map((row) => (row["類型"] || "").trim()).filter(Boolean)),
+  ];
+}
+export function matchesItineraryTag(row: Row, tag: string): boolean {
+  return !tag || (row["類型"] || "").trim() === tag;
+}
+export function tripDayNumber(date: string, start: string): number | null {
+  const current = new Date(date + "T00:00:00Z"),
+    first = new Date(start + "T00:00:00Z");
+  if (
+    !Number.isFinite(current.getTime()) ||
+    !Number.isFinite(first.getTime()) ||
+    current.toISOString().slice(0, 10) !== date ||
+    first.toISOString().slice(0, 10) !== start
+  )
+    return null;
+  const day = (current.getTime() - first.getTime()) / 86400000 + 1;
+  return day >= 1 ? day : null;
+}

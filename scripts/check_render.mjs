@@ -117,6 +117,11 @@ try {
             assert.ok(html.includes('<strong>'+airport+'</strong>'+terminalRow+'<b>'+time.slice(11,16)), 'Keep both terminal rows when either terminal is present; omit both when neither is present')
           }
         }
+        const tagSelect=itineraryHtml.match(/<select aria-label="行程標籤"[^>]*>(.*?)<[/]select>/)?.[1]
+        assert.ok(tagSelect && tagSelect.includes('全部標籤'))
+        for(const tag of ['交通','住宿','景點','自由活動']) assert.ok(tagSelect.includes('value="'+tag+'"'), 'Tag choices include every itinerary date')
+        assert.ok(itineraryHtml.includes('>DAY 1</span><h3>05/01 (六)</h3>') && itineraryHtml.includes('>DAY 3</span><h3>05/03 (一)</h3>'))
+        assert.ok(itineraryHtml.includes('DAY 1 2027/05/01'))
         const sharedMetadata=renderToStaticMarkup(createElement(TripMetadata,{data}))
         assert.ok(itineraryHtml.includes(sharedMetadata), 'PDF header must reuse the website metadata component')
         assert.ok(sharedMetadata.includes('匯率：1 TWD = 4.5 JPY') && sharedMetadata.includes('時差：+1 小時'))
@@ -138,6 +143,16 @@ try {
         assert.ok(!escapedNotes.includes('<script>') && escapedNotes.includes('&lt;script&gt;'))
         const itineraryList=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:data.tables['每日行程'],day:trip.start,busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
         assert.ok(itineraryList.includes('調整「搭機出發」順序') && itineraryList.includes('編輯行程日期'))
+        const hiddenEditNotes=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:[{...data.tables['每日行程'][0],說明:'編輯卡片不顯示這段備註',地點:'隱藏地點預覽',地圖網址:'https://maps.app.goo.gl/hidden'}],day:trip.start,busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
+        assert.ok(!hiddenEditNotes.includes('編輯卡片不顯示這段備註') && !hiddenEditNotes.includes('隱藏地點預覽') && !hiddenEditNotes.includes('maps.app.goo.gl/hidden'))
+        assert.equal((hiddenEditNotes.match(/data-no-drag="true"/g)||[]).length,2, 'Only edit and delete buttons are excluded from mobile card dragging')
+        const moveControls=[...itineraryList.matchAll(/<button[^>]*aria-label="(?:上移|下移)[^"]*"[^>]*>/g)].map(match=>match[0])
+        assert.equal(moveControls.length,4)
+        assert.ok(moveControls[0].includes('disabled') && !moveControls[1].includes('disabled') && !moveControls[2].includes('disabled') && moveControls[3].includes('disabled'), 'Disable up on first row and down on last row')
+        const onlyOne=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:[data.tables['每日行程'][0]],day:trip.start,busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
+        const singleMoves=[...onlyOne.matchAll(/<button[^>]*aria-label="(?:上移|下移)[^"]*"[^>]*>/g)]
+        assert.equal(singleMoves.length,2)
+        assert.ok(singleMoves.every(match=>match[0].includes('disabled')), 'A single itinerary has no adjacent rows')
         assert.ok(!itineraryList.replace(/<[^>]*>/g,'').includes('I001') && !itineraryList.includes('行程ID'))
         assert.ok(!itineraryHtml.includes('出發航廈：') && !itineraryHtml.includes('抵達航廈：'))
         assert.ok(itineraryHtml.includes('class="'+bookingStyles['booking-stack']+'"') && !itineraryHtml.includes('class="two-column"'))
@@ -247,7 +262,7 @@ try {
           for(const input of form.matchAll(/<input[^>]*aria-haspopup="dialog"[^>]*>/g)) assert.ok(input[0].includes('value=""'), entity+' must not prefill date/time inputs')
           if(entity==='開團待辦') assert.ok(form.includes('負責人') && form.includes('<select'))
           if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址') && form.includes('訂房網站') && form.includes('價格') && form.includes('副標題'))
-          if(entity==='每日行程') { for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','內容','備註','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('2027/05/03')); }
+          if(entity==='每日行程') { const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','內容','備註','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('2027/05/03')); }
           if(entity==='航班') {assert.ok(form.includes('出發航廈') && form.includes('抵達航廈'));assert.ok(form.includes('出發當地時間') && form.includes('抵達當地時間'));assert.ok(!form.includes('時差'));}
           if(entity==='公積金') assert.ok(form.includes('個人金額') && form.includes('checkbox'))
           if(entity==='行前費用') assert.ok(form.includes('實際刷卡金額') && form.includes('TWD'))

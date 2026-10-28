@@ -6,7 +6,7 @@
 }
 .cards {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   align-items: start;
 }
 .page {

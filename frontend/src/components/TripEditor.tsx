@@ -379,7 +379,7 @@ export function TripEditor({
                   <>
                     <div className="editor-list-toolbar">
                       <label>
-                        資料類型
+                        <span className="sr-only">資料類型</span>
                         <select
                           value={entity}
                           disabled={busy}
@@ -434,7 +434,9 @@ export function TripEditor({
                         onReorder={(mutation) => void save(mutation)}
                       />
                     ) : (
-                      <div className="editor-records">
+                      <div
+                        className={`editor-records${entity === "航班" || entity === "飯店" ? ` ${bookingStyles["booking-records"]}` : ""}`}
+                      >
                         {items(snapshot.book, entity).map((row) => (
                           <article
                             className={`editor-record${entity === "航班" || entity === "飯店" ? ` ${bookingStyles["booking-card"]}` : ""}`}
@@ -752,7 +754,6 @@ export function TripForm({
         ) : type === "date" || type === "datetime-local" || type === "time" ? (
           <DatePicker
             type={type}
-            wheelOnly={entity === "每日行程" && type === "time"}
             label={label}
             value={values[key] || ""}
             start={

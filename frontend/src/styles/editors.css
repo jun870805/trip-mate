@@ -27,6 +27,7 @@
   font-size: 13px;
 }
 .catalog-dialog {
+  --card-padding: 8px;
   width: min(600px, calc(100% - 32px));
   max-height: 90dvh;
   overflow-y: auto;
@@ -45,7 +46,7 @@
 }
 .dialog-heading {
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 .dialog-heading h2 {
   font-size: 22px;

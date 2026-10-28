@@ -54,7 +54,7 @@
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   align-items: start;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 .booking-section > h3 {
@@ -82,11 +82,17 @@
 }
 .booking-card {
   min-width: 0;
-  padding: 12px;
+  padding: var(--card-padding);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--paper);
   break-inside: avoid;
+}
+:global(.editor-records).booking-records {
+  gap: 8px;
+}
+.booking-records > .booking-card {
+  padding: 8px;
 }
 
 .flight-card-heading {

@@ -89,7 +89,7 @@
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 24px;
+  padding: var(--card-padding);
 }
 .text-link {
   color: #8c4f2d;
@@ -133,7 +133,7 @@
     flex-shrink: 0;
   }
   .panel {
-    padding: 20px;
+    padding: var(--card-padding);
   }
   .error-box {
     padding: 18px;

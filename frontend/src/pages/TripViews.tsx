@@ -2,7 +2,12 @@ import { groupFlights } from "../data/flight-groups";
 import { FlightPages } from "../components/FlightPages";
 import { TripMetadata } from "../components/TripMetadata";
 import { IconTextLink } from "../components/IconTextLink";
-import { tripDates } from "../data/itinerary";
+import {
+  tripDates,
+  itineraryTags,
+  matchesItineraryTag,
+  tripDayNumber,
+} from "../data/itinerary";
 import { ItineraryNotes, MapLink } from "../components/ItineraryNotes";
 import { flushSync } from "react-dom";
 import { PdfExportDialog } from "../components/PdfExportDialog";
@@ -129,6 +134,13 @@ export function Itinerary({ data }: { data: TripData }) {
   const [day, setDay] = useState(() =>
     today >= data.trip.start && today <= data.trip.end ? today : "all",
   );
+  const [tag, setTag] = useState("");
+  const tags = itineraryTags(data.tables["每日行程"]);
+  const activeTag = tags.includes(tag) ? tag : "";
+  const dayPrefix = (date: string) => {
+    const number = tripDayNumber(date, data.trip.start);
+    return number === null ? "" : `DAY ${number} `;
+  };
   const [printDates, setPrintDates] = useState<string[] | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const dates = [
@@ -363,46 +375,79 @@ export function Itinerary({ data }: { data: TripData }) {
         </div>
       </div>
       {dates.length > 0 && (
-        <label className={itineraryStyles.dateSelect}>
-          日期
-          <select
-            aria-label="行程日期"
-            value={day}
-            onChange={(event) => setDay(event.target.value)}
-          >
-            <option value="all">全部日期</option>
-            {dates.map((date) => (
-              <option key={date} value={date}>
-                {displayDate(date)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className={itineraryStyles.filters}>
+          <label className={itineraryStyles.dateSelect}>
+            <span className="sr-only">日期</span>
+            <select
+              aria-label="行程日期"
+              value={day}
+              onChange={(event) => setDay(event.target.value)}
+            >
+              <option value="all">全部日期</option>
+              {dates.map((date) => (
+                <option key={date} value={date}>
+                  {dayPrefix(date)}
+                  {displayDate(date)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={itineraryStyles.dateSelect}>
+            <span className="sr-only">行程標籤</span>
+            <select
+              aria-label="行程標籤"
+              value={activeTag}
+              onChange={(event) => setTag(event.target.value)}
+            >
+              <option value="">全部標籤</option>
+              {tags.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       )}
 
       {dates.length ? (
         dates.map((date) => (
           <section
-            className={`day-group ${day !== "all" && day !== date ? "screen-hidden" : ""} ${printDates !== null && !printDates.includes(date) ? "print-excluded" : ""}`}
+            className={`day-group ${day !== "all" && day !== date ? "screen-hidden" : ""} ${activeTag && day === "all" && !data.tables["每日行程"].some((row) => row["日期"] === date && matchesItineraryTag(row, activeTag)) ? itineraryStyles.filteredDay : ""} ${printDates !== null && !printDates.includes(date) ? "print-excluded" : ""}`}
             key={date}
           >
             <div className="day-label">
-              <span>{date.slice(5).replace("-", "/")}</span>
+              {dayPrefix(date) && <span>{dayPrefix(date).trim()}</span>}
               <h3>
-                {new Intl.DateTimeFormat("zh-TW", {
-                  weekday: "long",
-                  timeZone: "UTC",
-                }).format(new Date(date))}
+                {date.slice(5).replace("-", "/")} (
+                {
+                  ["日", "一", "二", "三", "四", "五", "六"][
+                    new Date(`${date}T00:00:00Z`).getUTCDay()
+                  ]
+                }
+                )
               </h3>
             </div>
             {!data.tables["每日行程"].some((row) => row["日期"] === date) && (
-              <Empty>尚未安排當日行程。</Empty>
+              <div
+                className={activeTag ? itineraryStyles.filteredDay : undefined}
+              >
+                <Empty>尚未安排當日行程。</Empty>
+              </div>
             )}
+            {activeTag &&
+              !data.tables["每日行程"].some(
+                (row) =>
+                  row["日期"] === date && matchesItineraryTag(row, activeTag),
+              ) && <p className={`empty no-print`}>沒有符合標籤的行程。</p>}
             <div className="timeline">
               {data.tables["每日行程"]
                 .filter((row) => row["日期"] === date)
                 .map((row) => (
-                  <article className="timeline-item" key={row["行程ID"]}>
+                  <article
+                    className={`timeline-item ${matchesItineraryTag(row, activeTag) ? "" : itineraryStyles.filteredItem}`}
+                    key={row["行程ID"]}
+                  >
                     <div className="timeline-time">{row["開始時間"] || ""}</div>
                     <div className="timeline-card">
                       <div className="spread">
@@ -519,7 +564,7 @@ export function Fund({ data }: { data: TripData }) {
       <div className="section-heading">
         <h3>收支明細</h3>
         <label className="filter-label">
-          團員
+          <span className="sr-only">團員</span>
           <select
             value={memberId}
             onChange={(e) => setMemberId(e.target.value)}
@@ -679,7 +724,7 @@ export function Expenses({
           </p>
         </div>
         <label className="filter-label">
-          團員
+          <span className="sr-only">團員</span>
           <select
             value={memberId}
             onChange={(e) => setMemberId(e.target.value)}

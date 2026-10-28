@@ -47,3 +47,27 @@ it("accepts directly typed slash dates and strict 24-hour times without timezone
   assert.ok(pickerInputError("2027-04-21", "date", "2027-04-22"));
   assert.equal(pickerInputError("2027-04-22", "date", "2027-04-22"), "");
 });
+it("pads a single-digit hour on complete typed times and flight date-times", () => {
+  for (const [text, expected] of [
+    ["9:30", "09:30"],
+    ["1:05", "01:05"],
+    ["0:00", "00:00"],
+    ["11:30", "11:30"],
+    ["12:00", "12:00"],
+    ["23:59", "23:59"],
+    ["2027/04/22 9:30", "2027-04-22T09:30"],
+    ["2027-04-22T7:05", "2027-04-22T07:05"],
+  ]) {
+    const value = pickerInputValue(text);
+    assert.equal(value, expected);
+    assert.equal(
+      pickerInputError(value, value.includes("T") ? "datetime-local" : "time"),
+      "",
+    );
+  }
+  for (const partial of ["9", "9:", "9:3", "9:60", "24:00", "123:30", ""])
+    assert.equal(pickerInputValue(partial), partial);
+  assert.ok(pickerInputError(pickerInputValue("9:60"), "time"));
+  assert.equal(pickerInputError(pickerInputValue("9:30"), "time", "08:00"), "");
+  assert.ok(pickerInputError(pickerInputValue("7:30"), "time", "08:00"));
+});

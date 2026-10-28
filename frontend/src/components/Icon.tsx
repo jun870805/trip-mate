@@ -43,6 +43,8 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
     close: <path d="m6 6 12 12M18 6 6 18" />,
     arrow: <path d="M5 12h14m-5-5 5 5-5 5" />,
     forward: <path d="m10 6 6 6-6 6" />,
+    up: <path d="m6 14 6-6 6 6" />,
+    down: <path d="m6 10 6 6 6-6" />,
     back: <path d="m14 6-6 6 6 6" />,
     pin: (
       <>

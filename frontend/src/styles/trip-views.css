@@ -8,7 +8,7 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--paper);
-  padding: 23px 21px;
+  padding: var(--card-padding);
 }
 .stat > p {
   font-size: 13px;
@@ -111,14 +111,14 @@
 }
 .timeline-item {
   display: grid;
-  grid-template-columns: 76px 1fr;
-  gap: 18px;
-  padding-bottom: 16px;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+  padding-bottom: 8px;
 }
 .timeline-time {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  padding-top: 20px;
+  align-self: center;
   font-variant-numeric: tabular-nums;
   color: var(--brown);
 }
@@ -132,11 +132,7 @@
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 20px;
-}
-.timeline-card > p {
-  font-size: 13px;
-  margin-top: 9px;
+  padding: var(--card-padding);
 }
 .timeline-card .text-link {
   display: inline-block;
@@ -156,7 +152,7 @@
   gap: 14px;
   background: var(--paper);
   border: 1px solid var(--line);
-  padding: 12px 14px;
+  padding: var(--card-padding);
   border-radius: 8px;
   text-align: left;
   font-size: 13px;
@@ -201,7 +197,7 @@
 .ledger {
   display: grid;
   gap: 28px;
-  padding: 22px;
+  padding: var(--card-padding);
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
@@ -341,7 +337,7 @@ progress::-webkit-progress-value {
     margin: 20px 0 24px;
   }
   .stat {
-    padding: 18px 15px;
+    padding: var(--card-padding);
   }
   .stat:first-child {
     grid-column: 1/-1;
@@ -359,7 +355,7 @@ progress::-webkit-progress-value {
     font-size: 10px;
   }
   .feature-link {
-    padding: 20px;
+    padding: var(--card-padding);
   }
   .feature-link h3 {
     font-size: 16px;
@@ -372,7 +368,7 @@ progress::-webkit-progress-value {
     grid-template-columns: 1fr;
   }
   .member-card {
-    padding: 12px 14px;
+    padding: var(--card-padding);
   }
   .member-card > span:last-child {
     flex: 1;
@@ -392,15 +388,8 @@ progress::-webkit-progress-value {
     align-items: flex-start;
     gap: 4px;
   }
-  .timeline-item {
-    grid-template-columns: 58px 1fr;
-    gap: 10px;
-  }
-  .timeline-time {
-    font-size: 12px;
-  }
   .timeline-card {
-    padding: 16px;
+    padding: var(--card-padding);
   }
   .timeline-card .spread {
     align-items: flex-start;
@@ -413,7 +402,7 @@ progress::-webkit-progress-value {
     padding: 4px 7px;
   }
   .ledger {
-    padding: 18px 15px;
+    padding: var(--card-padding);
     gap: 24px;
   }
   .ledger-main {
@@ -454,11 +443,8 @@ progress::-webkit-progress-value {
   .day-group {
     margin: 24px 0;
   }
-  .timeline-item {
-    grid-template-columns: 60px 1fr;
-  }
   .timeline-card {
-    padding: 13px;
+    padding: var(--card-padding);
   }
   .itinerary-section .section-heading {
     margin: 20px 0 10px;

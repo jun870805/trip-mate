@@ -34,7 +34,7 @@
   object-fit: cover;
 }
 .trip-card-body {
-  padding: 24px;
+  padding: var(--card-padding);
 }
 .destination {
   display: flex;
@@ -92,7 +92,7 @@
     grid-template-columns: 1fr;
   }
   .trip-card-body {
-    padding: 22px;
+    padding: var(--card-padding);
   }
   .trip-card h3 {
     font-size: 23px;

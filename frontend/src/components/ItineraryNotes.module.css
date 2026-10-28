@@ -3,5 +3,5 @@ p.notes {
   color: var(--muted);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  margin-top: 8px;
+  margin-top: 4px;
 }

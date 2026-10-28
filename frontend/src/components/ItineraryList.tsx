@@ -9,9 +9,8 @@ import {
   writeReorderPreference,
 } from "../data/itinerary";
 import { displayDate } from "../data/display-date";
-import { Badge, Empty, Icon } from "./ui";
+import { Empty, Icon } from "./ui";
 import { CloseButton } from "./CloseButton";
-import { ItineraryNotes } from "./ItineraryNotes";
 import styles from "./ItineraryList.module.css";
 
 type Move = { row: Row; ids: string[]; conflict: boolean };
@@ -31,7 +30,7 @@ function ConflictDialog({
   return (
     <dialog
       ref={ref}
-      className="catalog-dialog no-print"
+      className={`catalog-dialog no-print ${styles.conflictDialog}`}
       aria-labelledby="reorder-title"
       onCancel={(event) => {
         event.preventDefault();
@@ -100,6 +99,7 @@ export function ItineraryList({
   const list = useRef<HTMLDivElement>(null);
   const drag = useRef<{
     id: string;
+    pointerId: number;
     from: number;
     to: number;
     startY: number;
@@ -140,6 +140,8 @@ export function ItineraryList({
     if (
       busy ||
       pending ||
+      index < 0 ||
+      index >= entries.length ||
       entries.findIndex((row) => row["行程ID"] === id) === index
     )
       return;
@@ -164,7 +166,7 @@ export function ItineraryList({
   return (
     <>
       <label className={styles.date}>
-        日期
+        <span className="sr-only">日期</span>
         <select
           aria-label="編輯行程日期"
           value={day}
@@ -179,7 +181,8 @@ export function ItineraryList({
         </select>
       </label>
       <p className={styles.hint}>
-        拖曳把手調整順序，也可選取把手後按上下方向鍵。
+        <span className={styles.mobileHint}>拖曳卡片調整順序。</span>
+        <span className={styles.desktopHint}>使用上下箭頭調整順序。</span>
       </p>
       {notice && (
         <p role="status" className="form-error">
@@ -192,7 +195,96 @@ export function ItineraryList({
             key={row["行程ID"]}
             data-itinerary-id={row["行程ID"]}
             className={`${styles.row} ${hover === row["行程ID"] ? styles.target : ""}`}
+            onPointerDown={(event) => {
+              if (
+                busy ||
+                pending ||
+                !window.matchMedia("(max-width: 700px)").matches ||
+                (event.target instanceof Element &&
+                  event.target.closest("[data-no-drag]")) ||
+                event.button !== 0 ||
+                !event.isPrimary ||
+                drag.current
+              )
+                return;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              drag.current = {
+                id: row["行程ID"],
+                pointerId: event.pointerId,
+                from: index,
+                to: index,
+                startY: event.clientY,
+                moved: false,
+              };
+            }}
+            onPointerMove={(event) => {
+              const active = drag.current;
+              if (!active || active.pointerId !== event.pointerId) return;
+              if (Math.abs(event.clientY - active.startY) > 5)
+                active.moved = true;
+              if (!active.moved) return;
+              const cards = Array.from(
+                list.current?.querySelectorAll<HTMLElement>(
+                  "[data-itinerary-id]",
+                ) || [],
+              );
+              let target = cards.length - 1;
+              for (let i = 0; i < cards.length; i++) {
+                const rect = cards[i].getBoundingClientRect();
+                if (event.clientY < rect.top + rect.height / 2) {
+                  target = i;
+                  break;
+                }
+              }
+              active.to = target;
+              setHover(cards[target]?.dataset.itineraryId || null);
+              const scroll = list.current?.closest("dialog");
+              if (scroll) {
+                const rect = scroll.getBoundingClientRect();
+                if (event.clientY < rect.top + 60) scroll.scrollTop -= 12;
+                else if (event.clientY > rect.bottom - 60)
+                  scroll.scrollTop += 12;
+              }
+            }}
+            onPointerUp={(event) => {
+              const active = drag.current;
+              if (!active || active.pointerId !== event.pointerId) return;
+              if (active.moved) event.preventDefault();
+              drag.current = null;
+              setHover(null);
+              if (active?.moved) move(active.id, active.to);
+            }}
+            onPointerCancel={(event) => {
+              if (drag.current?.pointerId !== event.pointerId) return;
+              drag.current = null;
+              setHover(null);
+            }}
+            onLostPointerCapture={(event) => {
+              if (drag.current?.pointerId !== event.pointerId) return;
+              drag.current = null;
+              setHover(null);
+            }}
           >
+            <div className={styles.moveButtons}>
+              <button
+                type="button"
+                aria-label={`上移「${row["標題"]}」`}
+                title="上移"
+                disabled={busy || !!pending || index === 0}
+                onClick={() => move(row["行程ID"], index - 1)}
+              >
+                <Icon name="up" size={16} />
+              </button>
+              <button
+                type="button"
+                aria-label={`下移「${row["標題"]}」`}
+                title="下移"
+                disabled={busy || !!pending || index === entries.length - 1}
+                onClick={() => move(row["行程ID"], index + 1)}
+              >
+                <Icon name="down" size={16} />
+              </button>
+            </div>
             <button
               type="button"
               className={styles.handle}
@@ -207,81 +299,19 @@ export function ItineraryList({
                     move(row["行程ID"], next);
                 }
               }}
-              onPointerDown={(event) => {
-                if (event.button !== 0 || !event.isPrimary || drag.current)
-                  return;
-                event.currentTarget.setPointerCapture(event.pointerId);
-                drag.current = {
-                  id: row["行程ID"],
-                  from: index,
-                  to: index,
-                  startY: event.clientY,
-                  moved: false,
-                };
-              }}
-              onPointerMove={(event) => {
-                const active = drag.current;
-                if (!active) return;
-                if (Math.abs(event.clientY - active.startY) > 5)
-                  active.moved = true;
-                if (!active.moved) return;
-                const cards = Array.from(
-                  list.current?.querySelectorAll<HTMLElement>(
-                    "[data-itinerary-id]",
-                  ) || [],
-                );
-                let target = cards.length - 1;
-                for (let i = 0; i < cards.length; i++) {
-                  const rect = cards[i].getBoundingClientRect();
-                  if (event.clientY < rect.top + rect.height / 2) {
-                    target = i;
-                    break;
-                  }
-                }
-                active.to = target;
-                setHover(cards[target]?.dataset.itineraryId || null);
-                const scroll = list.current?.closest("dialog");
-                if (scroll) {
-                  const rect = scroll.getBoundingClientRect();
-                  if (event.clientY < rect.top + 60) scroll.scrollTop -= 12;
-                  else if (event.clientY > rect.bottom - 60)
-                    scroll.scrollTop += 12;
-                }
-              }}
-              onPointerUp={() => {
-                const active = drag.current;
-                drag.current = null;
-                setHover(null);
-                if (active?.moved) move(active.id, active.to);
-              }}
-              onPointerCancel={() => {
-                drag.current = null;
-                setHover(null);
-              }}
-              onLostPointerCapture={() => {
-                drag.current = null;
-                setHover(null);
-              }}
             >
               <Icon name="grip" size={18} />
             </button>
             <div className={styles.content}>
               <div className={styles.heading}>
                 {row["開始時間"] && <time>{row["開始時間"]}</time>}
-                <strong>{row["標題"]}</strong>
-                {row["類型"] && <Badge soft>{row["類型"]}</Badge>}
+                <strong title={row["標題"]}>{row["標題"]}</strong>
               </div>
-              {(row["說明"] || row["地點"] || row["地圖網址"]) && (
-                <ItineraryNotes
-                  note={[row["說明"], row["地點"], row["地圖網址"]]
-                    .filter(Boolean)
-                    .join("\n")}
-                />
-              )}
             </div>
             <div className={styles.actions}>
               <button
                 type="button"
+                data-no-drag="true"
                 className="quiet-button"
                 disabled={busy || !!pending}
                 onClick={() => onEdit(row)}
@@ -290,6 +320,7 @@ export function ItineraryList({
               </button>
               <button
                 type="button"
+                data-no-drag="true"
                 className="quiet-button delete-button"
                 disabled={busy || !!pending}
                 onClick={() => onRemove(row)}

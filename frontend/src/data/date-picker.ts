@@ -35,7 +35,10 @@ export function monthDays(date: string): (string | null)[] {
 }
 
 export function pickerInputValue(text: string): string {
-  return text.replaceAll("/", "-").replace(" ", "T");
+  return text
+    .replaceAll("/", "-")
+    .replace(" ", "T")
+    .replace(/(^|T)([0-9]):([0-5][0-9])$/, "$10$2:$3");
 }
 export function pickerInputDisplay(value: string): string {
   return value.replaceAll("-", "/").replace("T", " ");

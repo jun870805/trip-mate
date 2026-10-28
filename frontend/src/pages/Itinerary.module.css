@@ -13,21 +13,37 @@
 .exportTrigger:hover {
   background: #eee3d5;
 }
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
 .dateSelect {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 12px 0;
+  min-width: 0;
+  max-width: 100%;
   font-size: 13px;
 }
 .dateSelect select {
+  min-width: 0;
+  max-width: 100%;
   padding: 6px 40px 6px 10px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background-color: var(--paper);
 }
 @media print {
-  .dateSelect {
+  .filters {
+    display: none;
+  }
+}
+@media screen {
+  .filteredDay,
+  .filteredItem:global(.timeline-item) {
     display: none;
   }
 }

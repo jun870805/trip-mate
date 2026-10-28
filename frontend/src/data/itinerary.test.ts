@@ -2,6 +2,9 @@ import { it } from "node:test";
 import assert from "node:assert/strict";
 import {
   tripDates,
+  itineraryTags,
+  matchesItineraryTag,
+  tripDayNumber,
   orderedItinerary,
   insertItinerary,
   moveItinerary,
@@ -143,4 +146,27 @@ it("persists only the do-not-remind preference, scoped to deployment and tolerat
   };
   assert.equal(readReorderPreference(blocked, "/"), false);
   assert.equal(writeReorderPreference(blocked, "/", true), false);
+});
+
+it("lists tags from all dates without duplicates or empty tags and filters exact values", () => {
+  const rows = [
+    { 類型: "交通", 日期: "2027-05-01" },
+    { 類型: " 景點 ", 日期: "2027-05-02" },
+    { 類型: "交通", 日期: "2027-05-03" },
+    { 類型: "", 日期: "2027-05-03" },
+  ];
+  assert.deepEqual(itineraryTags(rows), ["交通", "景點"]);
+  assert.equal(matchesItineraryTag(rows[1], "景點"), true);
+  assert.equal(matchesItineraryTag(rows[0], "景點"), false);
+  assert.equal(matchesItineraryTag(rows[3], ""), true);
+  assert.equal(matchesItineraryTag({ 類型: "交通餐飲" }, "交通"), false);
+});
+it("numbers trip days from the start date across months and leap years independently of filters", () => {
+  assert.equal(tripDayNumber("2027-05-01", "2027-05-01"), 1);
+  assert.equal(tripDayNumber("2027-05-03", "2027-05-01"), 3);
+  assert.equal(tripDayNumber("2028-03-01", "2028-02-28"), 3);
+  assert.equal(tripDayNumber("2028-01-01", "2027-12-31"), 2);
+  assert.equal(tripDayNumber("2027-04-30", "2027-05-01"), null);
+  assert.equal(tripDayNumber("bad", "2027-05-01"), null);
+  assert.equal(tripDayNumber("2027-02-30", "2027-02-01"), null);
 });

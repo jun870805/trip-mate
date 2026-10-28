@@ -205,7 +205,7 @@ export default function App() {
               </div>
               <div className="catalog-filters no-print">
                 <label>
-                  搜尋旅程
+                  <span className="sr-only">搜尋旅程</span>
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
@@ -213,7 +213,7 @@ export default function App() {
                   />
                 </label>
                 <label>
-                  旅程狀態
+                  <span className="sr-only">旅程狀態</span>
                   <select
                     value={tripFilter}
                     onChange={(event) => setTripFilter(event.target.value)}
