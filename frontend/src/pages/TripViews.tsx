@@ -275,9 +275,9 @@ export function Itinerary({ data }: { data: TripData }) {
                     <strong className={bookingStyles["hotel-name"]}>
                       {row["飯店名稱"]}
                     </strong>
-                    {row["備註"] && (
+                    {row["副標題"] && (
                       <p className={bookingStyles["hotel-subtitle"]}>
-                        {row["備註"]}
+                        {row["副標題"]}
                       </p>
                     )}
                     <div
@@ -315,6 +315,12 @@ export function Itinerary({ data }: { data: TripData }) {
                         <p>
                           <small>價格</small>
                           <span>{row["價格"]}</span>
+                        </p>
+                      )}
+                      {row["備註"] && (
+                        <p>
+                          <small>備註</small>
+                          <span>{row["備註"]}</span>
                         </p>
                       )}
                     </div>

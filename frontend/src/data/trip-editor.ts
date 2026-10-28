@@ -193,7 +193,14 @@ function put(book: Workbook, sheet: TripSheetName, values: Row, index: number) {
   if (sheet === "航班" || sheet === "飯店") {
     for (const field of sheet === "航班"
       ? ["出發航廈", "抵達航廈"]
-      : ["入住時間", "退房時間", "飯店圖片網址", "訂房網站網址", "價格"])
+      : [
+          "入住時間",
+          "退房時間",
+          "飯店圖片網址",
+          "訂房網站網址",
+          "價格",
+          "副標題",
+        ])
       if (!book[sheet][0].some((value) => String(value).trim() === field))
         book[sheet][0].push(field);
   }

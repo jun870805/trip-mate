@@ -527,6 +527,7 @@ const fields: Record<BasicSheet, Field[]> = {
   ],
   飯店: [
     { key: "飯店名稱", required: true },
+    { key: "副標題" },
     { key: "飯店圖片網址", type: "url" },
     { key: "入住日期", type: "date", required: true },
     { key: "入住時間", type: "time" },

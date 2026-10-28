@@ -175,11 +175,15 @@ try {
         }
         assert.ok(bookingHtml.includes('>Osaka</span></a>') && bookingHtml.indexOf('>Osaka</span></a>')<bookingHtml.indexOf('>訂房網站</span></a>'))
         assert.ok(!itineraryHtml.includes('>訂房網站</span></a>'), 'Empty booking URLs should not create a link')
-        const hotelDetails={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,電話:'+81 6 1234 5678',價格:'每晚 ¥12,000／含早餐'}))}}
+        const hotelDetails={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,電話:'+81 6 1234 5678',價格:'每晚 ¥12,000／含早餐',副標題:'車站步行 5 分鐘',備註:'入住時出示護照'}))}}
         const hotelDetailsHtml=renderToStaticMarkup(createElement(Itinerary,{data:hotelDetails}))
         assert.ok(hotelDetailsHtml.includes('<small>地址</small><span>日本大阪（範例地址）</span>'))
         assert.ok(hotelDetailsHtml.includes('<small>電話</small><a href="tel:+81612345678">+81 6 1234 5678</a>'))
         assert.ok(hotelDetailsHtml.includes('<small>價格</small><span>每晚 ¥12,000／含早餐</span>'))
+        assert.ok(hotelDetailsHtml.includes('class="'+bookingStyles['hotel-subtitle']+'">車站步行 5 分鐘</p>'))
+        assert.ok(hotelDetailsHtml.includes('<small>備註</small><span>入住時出示護照</span>'))
+        assert.ok(hotelDetailsHtml.indexOf('<small>價格</small>')<hotelDetailsHtml.indexOf('<small>備註</small><span>入住時出示護照'))
+        assert.ok(!itineraryHtml.includes('class="'+bookingStyles['hotel-subtitle']+'"'), 'Existing notes must not become the subtitle')
         assert.ok(!itineraryHtml.includes('<small>價格</small>'))
         const shortHotelMap={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,地圖網址:'https://maps.app.goo.gl/example'}))}}
         assert.ok(renderToStaticMarkup(createElement(Itinerary,{data:shortHotelMap})).includes('>Google Maps</span></a>'))
@@ -242,7 +246,7 @@ try {
           assert.ok(!form.includes(session.token) && !form.includes('草稿'))
           for(const input of form.matchAll(/<input[^>]*aria-haspopup="dialog"[^>]*>/g)) assert.ok(input[0].includes('value=""'), entity+' must not prefill date/time inputs')
           if(entity==='開團待辦') assert.ok(form.includes('負責人') && form.includes('<select'))
-          if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址') && form.includes('訂房網站') && form.includes('價格'))
+          if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址') && form.includes('訂房網站') && form.includes('價格') && form.includes('副標題'))
           if(entity==='每日行程') { for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','內容','備註','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('2027/05/03')); }
           if(entity==='航班') {assert.ok(form.includes('出發航廈') && form.includes('抵達航廈'));assert.ok(form.includes('出發當地時間') && form.includes('抵達當地時間'));assert.ok(!form.includes('時差'));}
           if(entity==='公積金') assert.ok(form.includes('個人金額') && form.includes('checkbox'))

@@ -129,6 +129,7 @@ function table(book: Workbook, name: SheetName): Row[] {
             "飯店圖片網址",
             "訂房網站網址",
             "價格",
+            "副標題",
           ].includes(header)),
       `${name}：缺少欄位「${header}」。`,
     );

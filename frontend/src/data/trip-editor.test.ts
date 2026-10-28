@@ -1120,3 +1120,24 @@ it("stores a free-text hotel price and adds its column to legacy sheets", () => 
     summarize(parseTrip(trip, book)),
   );
 });
+it("adds a separate hotel subtitle without migrating or overwriting existing notes", () => {
+  const book = structuredClone(demo),
+    col = book["飯店"][0].indexOf("副標題");
+  if (col >= 0) for (const cells of book["飯店"]) cells.splice(col, 1);
+  assert.doesNotThrow(() => parseTrip(trip, book));
+  const row = readRows(book, "飯店")[0];
+  const next = mutateTripBook(trip, book, {
+    kind: "record",
+    mode: "edit",
+    sheet: "飯店",
+    id: row["住宿ID"],
+    values: { ...row, 副標題: "車站步行 5 分鐘" },
+  });
+  const hotel = parseTrip(trip, next).tables["飯店"][0];
+  assert.equal(hotel["副標題"], "車站步行 5 分鐘");
+  assert.equal(hotel["備註"], row["備註"]);
+  assert.deepEqual(
+    next["飯店"][1].slice(0, book["飯店"][0].length),
+    book["飯店"][1],
+  );
+});
