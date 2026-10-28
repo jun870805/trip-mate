@@ -1,5 +1,6 @@
 .row {
-  display: flex;
+  /* Temporarily hidden while reviewing the trip header layout. */
+  display: none;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
