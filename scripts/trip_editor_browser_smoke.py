@@ -199,14 +199,22 @@ with sync_playwright() as p:
         card.get_by_role('button', name='編輯', exact=True).click()
         expect(dialog.get_by_label('備註', exact=True)).to_have_value('集合餐廳 https://maps.app.goo.gl/example')
         dialog.get_by_role('button', name='取消', exact=True).click()
-        handle = card.get_by_role('button', name='調整「新增景點測試」順序', exact=True)
         previous_writes = len(writes)
-        source = card.get_by_text('新增景點測試', exact=True).bounding_box()
-        destination = dialog.locator('[data-itinerary-id]').first.bounding_box()
+        handle=card.get_by_role('button', name='調整「新增景點測試」順序', exact=True)
+        expect(handle).to_be_visible()
+        expect(card.get_by_role('button', name='上移「新增景點測試」', exact=True)).not_to_be_visible()
+        assert handle.evaluate('(node)=>getComputedStyle(node).touchAction') == 'none'
+        assert card.evaluate('(node)=>getComputedStyle(node).touchAction') == 'auto'
+        source=handle.bounding_box()
+        destination=dialog.locator('[data-itinerary-id]').first.bounding_box()
+        before_top=card.bounding_box()['y']
         assert source and destination
-        page.mouse.move(source['x'] + source['width']/2, source['y'] + source['height']/2)
+        page.mouse.move(source['x']+source['width']/2,source['y']+source['height']/2)
         page.mouse.down()
-        page.mouse.move(destination['x'] + destination['width']/2, destination['y'] + 4, steps=15)
+        page.mouse.move(destination['x']+destination['width']/2,destination['y']+4,steps=15)
+        expect(card).to_have_attribute('data-dragging','true')
+        assert card.bounding_box()['y'] < before_top, 'The card should follow the pointer before release'
+        assert len(writes) == previous_writes, 'Dragging must not write data before release'
         page.mouse.up()
         conflict = page.get_by_role('dialog', name='調整行程順序', exact=True)
         expect(conflict).to_be_visible()
@@ -214,7 +222,6 @@ with sync_playwright() as p:
         assert len(writes) == previous_writes
         expect(dialog).to_be_visible()
         page.set_viewport_size({'width': 1280, 'height': 900})
-        expect(handle).not_to_be_visible()
         expect(dialog.locator('[data-itinerary-id]').first.get_by_role('button', name='上移「搭機出發」', exact=True)).to_be_disabled()
         expect(card.get_by_role('button', name='下移「新增景點測試」', exact=True)).to_be_disabled()
         card.get_by_role('button', name='上移「新增景點測試」', exact=True).click()

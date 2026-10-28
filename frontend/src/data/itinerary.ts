@@ -1,4 +1,5 @@
 import type { Row } from "./portal.ts";
+import { safeUrl } from "./portal.ts";
 
 export function tripDates(start: string, end: string): string[] {
   const date = new Date(start + "T00:00:00Z");
@@ -67,6 +68,7 @@ export function moveItinerary(
 export interface NotePart {
   text: string;
   url?: string;
+  kind?: "map" | "external";
 }
 function mapName(value: string): string | undefined {
   try {
@@ -100,22 +102,28 @@ function mapName(value: string): string | undefined {
   }
 }
 export function mapNotes(note: string): NotePart[] {
+  return splitNoteLinks(note, false);
+}
+export function noteLinks(note: string): NotePart[] {
+  return splitNoteLinks(note, true);
+}
+function splitNoteLinks(note: string, includeExternal: boolean): NotePart[] {
   const parts: NotePart[] = [];
   let last = 0;
   for (const match of note.matchAll(/https?:\/\/[^\s<>「」『』，。；）]+/g)) {
-    const name = mapName(match[0]);
-    if (!name) continue;
+    const url = match[0].replace(/[.,;!?]+$/, "");
+    const name = mapName(url);
+    if (!name && (!includeExternal || !safeUrl(url))) continue;
     const before = note.slice(last, match.index);
-    const label =
-      name === "Google Maps" &&
-      before.trim() &&
-      !before.trim().includes("\n") &&
-      before.trim().length <= 60
-        ? before.trim()
-        : name;
-    if (before && label === name) parts.push({ text: before });
-    parts.push({ text: label, url: match[0] });
-    last = match.index + match[0].length;
+    if (before) parts.push({ text: before });
+    parts.push({
+      text: name || "開啟連結",
+      url,
+      ...(includeExternal
+        ? { kind: name ? ("map" as const) : ("external" as const) }
+        : {}),
+    });
+    last = match.index + url.length;
   }
   if (last < note.length) parts.push({ text: note.slice(last) });
   return parts;

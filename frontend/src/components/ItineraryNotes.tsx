@@ -1,4 +1,4 @@
-import { mapNotes } from "../data/itinerary";
+import { mapNotes, noteLinks } from "../data/itinerary";
 import { IconTextLink } from "./IconTextLink";
 import styles from "./ItineraryNotes.module.css";
 
@@ -17,10 +17,14 @@ export function MapLink({ url }: { url: string }) {
 export function ItineraryNotes({ note }: { note: string }) {
   return (
     <p className={styles.notes}>
-      {mapNotes(note).map((part, index) =>
+      {noteLinks(note).map((part, index) =>
         part.url ? (
-          <IconTextLink key={index} href={part.url} icon="pin">
-            {part.text}
+          <IconTextLink
+            key={index}
+            href={part.url}
+            icon={part.kind === "map" ? "pin" : "external"}
+          >
+            {part.kind === "map" ? "Google Maps" : "開啟連結"}
           </IconTextLink>
         ) : (
           <span key={index}>{part.text}</span>

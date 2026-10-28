@@ -40,6 +40,7 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
       />
     ),
     home: <path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8" />,
+    external: <path d="M14 3h7v7M21 3 10 14M10 3H3v18h18v-7" />,
     close: <path d="m6 6 12 12M18 6 6 18" />,
     arrow: <path d="M5 12h14m-5-5 5 5-5 5" />,
     forward: <path d="m10 6 6 6-6 6" />,

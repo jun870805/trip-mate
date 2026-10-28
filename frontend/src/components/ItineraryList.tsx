@@ -1,3 +1,4 @@
+import { useItineraryDrag } from "../hooks/useItineraryDrag";
 import { useEffect, useRef, useState } from "react";
 import type { Row, Trip } from "../data/portal";
 import type { TripMutation } from "../data/trip-editor";
@@ -96,18 +97,19 @@ export function ItineraryList({
     ]),
   ].sort();
   const entries = orderedItinerary(rows.filter((row) => row["日期"] === day));
-  const list = useRef<HTMLDivElement>(null);
-  const drag = useRef<{
-    id: string;
-    pointerId: number;
-    from: number;
-    to: number;
-    startY: number;
-    moved: boolean;
-  } | null>(null);
-  const [hover, setHover] = useState<string | null>(null);
   const [pending, setPending] = useState<Move | null>(null);
   const [notice, setNotice] = useState("");
+  const revision = JSON.stringify([
+    day,
+    entries.map((row) => [row["行程ID"], row["排序"], row["開始時間"]]),
+  ]);
+  const drag = useItineraryDrag({
+    revision,
+    disabled: busy || !!pending,
+    onDrop: move,
+  });
+  const dragging = !!drag.preview?.dragging;
+
   function commit(move: Move, skip = false) {
     if (skip) {
       try {
@@ -144,7 +146,7 @@ export function ItineraryList({
       index >= entries.length ||
       entries.findIndex((row) => row["行程ID"] === id) === index
     )
-      return;
+      return false;
     const result = moveItinerary(entries, id, index);
     const value = {
       row: entries.find((row) => row["行程ID"] === id)!,
@@ -162,6 +164,7 @@ export function ItineraryList({
     }
     if (value.conflict && !skip) setPending(value);
     else commit(value);
+    return true;
   }
   return (
     <>
@@ -170,7 +173,7 @@ export function ItineraryList({
         <select
           aria-label="編輯行程日期"
           value={day}
-          disabled={busy}
+          disabled={busy || dragging}
           onChange={(event) => onDay(event.target.value)}
         >
           {dates.map((date) => (
@@ -181,7 +184,7 @@ export function ItineraryList({
         </select>
       </label>
       <p className={styles.hint}>
-        <span className={styles.mobileHint}>拖曳卡片調整順序。</span>
+        <span className={styles.mobileHint}>按住拖曳圖示調整順序。</span>
         <span className={styles.desktopHint}>使用上下箭頭調整順序。</span>
       </p>
       {notice && (
@@ -189,81 +192,24 @@ export function ItineraryList({
           {notice}
         </p>
       )}
-      <div ref={list} className={styles.list}>
+      <div ref={drag.list} className={styles.list}>
         {entries.map((row, index) => (
           <article
             key={row["行程ID"]}
             data-itinerary-id={row["行程ID"]}
-            className={`${styles.row} ${hover === row["行程ID"] ? styles.target : ""}`}
-            onPointerDown={(event) => {
-              if (
-                busy ||
-                pending ||
-                !window.matchMedia("(max-width: 700px)").matches ||
-                (event.target instanceof Element &&
-                  event.target.closest("[data-no-drag]")) ||
-                event.button !== 0 ||
-                !event.isPrimary ||
-                drag.current
-              )
-                return;
-              event.currentTarget.setPointerCapture(event.pointerId);
-              drag.current = {
-                id: row["行程ID"],
-                pointerId: event.pointerId,
-                from: index,
-                to: index,
-                startY: event.clientY,
-                moved: false,
-              };
-            }}
-            onPointerMove={(event) => {
-              const active = drag.current;
-              if (!active || active.pointerId !== event.pointerId) return;
-              if (Math.abs(event.clientY - active.startY) > 5)
-                active.moved = true;
-              if (!active.moved) return;
-              const cards = Array.from(
-                list.current?.querySelectorAll<HTMLElement>(
-                  "[data-itinerary-id]",
-                ) || [],
-              );
-              let target = cards.length - 1;
-              for (let i = 0; i < cards.length; i++) {
-                const rect = cards[i].getBoundingClientRect();
-                if (event.clientY < rect.top + rect.height / 2) {
-                  target = i;
-                  break;
-                }
-              }
-              active.to = target;
-              setHover(cards[target]?.dataset.itineraryId || null);
-              const scroll = list.current?.closest("dialog");
-              if (scroll) {
-                const rect = scroll.getBoundingClientRect();
-                if (event.clientY < rect.top + 60) scroll.scrollTop -= 12;
-                else if (event.clientY > rect.bottom - 60)
-                  scroll.scrollTop += 12;
-              }
-            }}
-            onPointerUp={(event) => {
-              const active = drag.current;
-              if (!active || active.pointerId !== event.pointerId) return;
-              if (active.moved) event.preventDefault();
-              drag.current = null;
-              setHover(null);
-              if (active?.moved) move(active.id, active.to);
-            }}
-            onPointerCancel={(event) => {
-              if (drag.current?.pointerId !== event.pointerId) return;
-              drag.current = null;
-              setHover(null);
-            }}
-            onLostPointerCapture={(event) => {
-              if (drag.current?.pointerId !== event.pointerId) return;
-              drag.current = null;
-              setHover(null);
-            }}
+            className={`${styles.row} ${drag.preview ? styles.sorting : ""} ${drag.preview?.dragging && drag.preview.id === row["行程ID"] ? styles.dragging : ""}`}
+            style={
+              drag.preview
+                ? {
+                    transform: `translate3d(0, ${drag.preview.shifts[index]}px, 0)`,
+                  }
+                : undefined
+            }
+            data-dragging={
+              drag.preview?.dragging && drag.preview.id === row["行程ID"]
+                ? "true"
+                : undefined
+            }
           >
             <div className={styles.moveButtons}>
               <button
@@ -288,15 +234,24 @@ export function ItineraryList({
             <button
               type="button"
               className={styles.handle}
-              disabled={busy || !!pending}
+              data-drag-handle="true"
               aria-label={`調整「${row["標題"]}」順序`}
-              aria-describedby="itinerary-drag-help"
+              aria-pressed={
+                drag.preview?.dragging && drag.preview.id === row["行程ID"]
+              }
+              disabled={busy || !!pending || entries.length < 2}
+              onPointerDown={(event) => drag.start(event, row["行程ID"], index)}
+              onPointerMove={drag.update}
+              onPointerUp={drag.end}
+              onPointerCancel={drag.interrupted}
+              onLostPointerCapture={drag.interrupted}
               onKeyDown={(event) => {
                 if (event.key === "ArrowUp" || event.key === "ArrowDown") {
                   event.preventDefault();
-                  const next = index + (event.key === "ArrowUp" ? -1 : 1);
-                  if (next >= 0 && next < entries.length)
-                    move(row["行程ID"], next);
+                  move(
+                    row["行程ID"],
+                    index + (event.key === "ArrowUp" ? -1 : 1),
+                  );
                 }
               }}
             >
@@ -311,18 +266,16 @@ export function ItineraryList({
             <div className={styles.actions}>
               <button
                 type="button"
-                data-no-drag="true"
                 className="quiet-button"
-                disabled={busy || !!pending}
+                disabled={busy || !!pending || dragging}
                 onClick={() => onEdit(row)}
               >
                 編輯
               </button>
               <button
                 type="button"
-                data-no-drag="true"
                 className="quiet-button delete-button"
-                disabled={busy || !!pending}
+                disabled={busy || !!pending || dragging}
                 onClick={() => onRemove(row)}
               >
                 刪除
@@ -332,12 +285,12 @@ export function ItineraryList({
         ))}
         {!entries.length && <Empty>尚未安排當日行程。</Empty>}
       </div>
-      <span id="itinerary-drag-help" className="sr-only">
-        按上下方向鍵移動一個位置，或拖曳至同一天的其他位置。
-      </span>
       {pending && (
         <ConflictDialog
-          onCancel={() => setPending(null)}
+          onCancel={() => {
+            setPending(null);
+            drag.cancel();
+          }}
           onConfirm={(skip) => commit(pending, skip)}
         />
       )}

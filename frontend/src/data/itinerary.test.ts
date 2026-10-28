@@ -9,6 +9,7 @@ import {
   insertItinerary,
   moveItinerary,
   mapNotes,
+  noteLinks,
   reorderPreferenceKey,
   readReorderPreference,
   writeReorderPreference,
@@ -86,7 +87,8 @@ it("extracts safe Google Maps links and names, retains surrounding notes and ign
     "Google Maps",
   );
   assert.deepEqual(mapNotes("集合餐廳 https://maps.app.goo.gl/example"), [
-    { text: "集合餐廳", url: "https://maps.app.goo.gl/example" },
+    { text: "集合餐廳 " },
+    { text: "Google Maps", url: "https://maps.app.goo.gl/example" },
   ]);
   assert.deepEqual(mapNotes(""), []);
   assert.deepEqual(mapNotes("備註"), [{ text: "備註" }]);
@@ -169,4 +171,41 @@ it("numbers trip days from the start date across months and leap years independe
   assert.equal(tripDayNumber("2027-04-30", "2027-05-01"), null);
   assert.equal(tripDayNumber("bad", "2027-05-01"), null);
   assert.equal(tripDayNumber("2027-02-30", "2027-02-01"), null);
+});
+
+it("renders other web URLs separately from surrounding text and distinguishes Google Maps", () => {
+  const parts = noteLinks(
+    "店家 https://example.com/menu。集合 https://maps.app.goo.gl/example 備註",
+  );
+  assert.deepEqual(parts, [
+    { text: "店家 " },
+    { text: "開啟連結", url: "https://example.com/menu", kind: "external" },
+    { text: "。集合 " },
+    {
+      text: "Google Maps",
+      url: "https://maps.app.goo.gl/example",
+      kind: "map",
+    },
+    { text: " 備註" },
+  ]);
+  assert.deepEqual(noteLinks("網站 https://example.com. 下一段"), [
+    { text: "網站 " },
+    { text: "開啟連結", url: "https://example.com", kind: "external" },
+    { text: ". 下一段" },
+  ]);
+  assert.deepEqual(noteLinks("javascript:alert(1)"), [
+    { text: "javascript:alert(1)" },
+  ]);
+  assert.deepEqual(noteLinks("網址 https://%invalid"), [
+    { text: "網址 https://%invalid" },
+  ]);
+  assert.deepEqual(noteLinks(""), []);
+  assert.equal(
+    noteLinks("https://google.com.evil.test/maps/place/a")[0].kind,
+    "external",
+  );
+  assert.equal(
+    noteLinks("https://www.google.com/maps/place/大阪/")[0].kind,
+    "map",
+  );
 });
