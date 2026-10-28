@@ -161,6 +161,7 @@
   white-space: nowrap;
 }
 .booking-details small {
+  padding-top: 0.05px;
   white-space: nowrap;
   color: var(--muted);
   font-size: 12px;
