@@ -1,0 +1,96 @@
+.date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin: 12px 0 8px;
+}
+.date select {
+  padding: 6px 40px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background-color: var(--paper);
+}
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.list {
+  display: grid;
+  gap: 12px;
+}
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 8px;
+  background: var(--paper);
+  border-radius: 8px;
+}
+.target {
+  background: #eee3d5;
+}
+.handle {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  min-height: 40px;
+  padding: 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--brown);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.handle:active {
+  cursor: grabbing;
+}
+.content {
+  flex: 1;
+  min-width: 0;
+}
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 40px;
+  overflow-wrap: anywhere;
+}
+.heading time {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.confirm {
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+  max-width: 460px;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.checkbox input {
+  width: auto;
+}
+@media (max-width: 520px) {
+  .row {
+    flex-wrap: wrap;
+  }
+  .row > .actions {
+    margin-left: auto;
+    width: 100%;
+  }
+}

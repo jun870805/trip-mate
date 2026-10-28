@@ -13,3 +13,21 @@
 .exportTrigger:hover {
   background: #eee3d5;
 }
+.dateSelect {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.dateSelect select {
+  padding: 6px 40px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background-color: var(--paper);
+}
+@media print {
+  .dateSelect {
+    display: none;
+  }
+}

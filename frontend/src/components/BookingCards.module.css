@@ -6,10 +6,6 @@
 .detail-item > p {
   margin-top: 8px;
 }
-.detail-item :global(.text-link) {
-  display: inline-block;
-  margin-top: 10px;
-}
 .flight-route {
   display: grid;
   grid-template-columns: 1fr 24px 1fr;
@@ -21,6 +17,7 @@
   text-align: right;
 }
 .flight-route strong {
+  display: block;
   font-size: 15px;
 }
 .flight-route p {
@@ -28,11 +25,13 @@
   color: var(--muted);
 }
 .flight-route b {
+  display: block;
   font-size: 22px;
   font-variant-numeric: tabular-nums;
 }
 .flight-route small {
   display: block;
+  min-height: 1lh;
   color: var(--muted);
 }
 @media print {
@@ -44,19 +43,45 @@
   }
 }
 
+.booking-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
 .booking-section {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
+  align-items: start;
   gap: 12px;
   min-width: 0;
 }
 .booking-section > h3 {
   margin: 0;
+  grid-column: 1 / -1;
+  break-after: avoid;
+}
+.booking-section > :global(.empty) {
+  grid-column: 1 / -1;
+}
+@media screen and (min-width: 701px) {
+  .booking-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+}
+@media print {
+  .booking-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
 }
 .booking-card.detail-item {
   margin: 0;
 }
 .booking-card {
+  min-width: 0;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -91,6 +116,7 @@
 .hotel-name {
   display: block;
   font-size: 20px;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 .hotel-content {
@@ -106,16 +132,46 @@
 .hotel-info > p {
   margin-top: 8px;
 }
-.hotel-dates {
+.hotel-info > .hotel-subtitle {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.booking-details {
   display: grid;
   gap: 4px;
   margin-top: 12px;
+  font-size: 13px;
 }
-.hotel-dates p {
+.hotel-dates p:nth-child(-n + 2) {
   white-space: nowrap;
 }
-.hotel-dates small {
+.booking-details p {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: start;
+  line-height: 19.2px;
+}
+.booking-details p > span {
+  min-width: 0;
+  white-space: pre-wrap;
+}
+.hotel-dates p:nth-child(-n + 2) > span {
+  white-space: nowrap;
+}
+.booking-details small {
+  white-space: nowrap;
   color: var(--muted);
+  font-size: 12px;
+  line-height: inherit;
+}
+.hotel-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
 }
 .hotel-photo {
   aspect-ratio: 1;

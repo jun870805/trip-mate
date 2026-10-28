@@ -1,8 +1,9 @@
+import { IconTextLink } from "./IconTextLink";
 import { displayDate } from "../data/display-date";
 import { appHref } from "../hooks/useRoute";
 import type { Trip } from "../data/portal";
 import type { GuideSession } from "../data/guide-auth";
-import { Icon, ErrorBox, GuideTools } from "./ui";
+import { ErrorBox, GuideTools } from "./ui";
 
 export function TripReadFailure({
   trip,
@@ -20,10 +21,11 @@ export function TripReadFailure({
   return (
     <>
       <section className="trip-heading no-print">
-        <a className="back-link" href={appHref()}>
-          <Icon name="back" size={16} />
-          所有旅程
-        </a>
+        <div className="back-link">
+          <IconTextLink href={appHref()} icon="back" external={false}>
+            所有旅程
+          </IconTextLink>
+        </div>
         <h1>{trip.name}</h1>
         <p className="trip-meta">
           <span>{trip.destination}</span>

@@ -16,6 +16,11 @@ try {
         import { renderToStaticMarkup } from 'react-dom/server'
         import { Overview, Itinerary, Fund, Expenses, Tasks } from './src/pages/TripViews'
         import App from './src/App'
+        import { ItineraryList } from './src/components/ItineraryList'
+        import { ItineraryNotes } from './src/components/ItineraryNotes'
+        import { TripMetadata } from './src/components/TripMetadata'
+        import { FlightPages } from './src/components/FlightPages'
+        import flightPageStyles from './src/components/FlightPages.module.css'
         import { TripFacts } from './src/components/TripFacts'
         import { TripEditing, TripForm } from './src/components/TripEditor'
         import { CatalogEditor } from './src/components/CatalogEditor'
@@ -27,6 +32,8 @@ try {
         import { TimeWheel } from './src/components/TimeWheel'
         import { PdfExportDialog } from './src/components/PdfExportDialog'
         import { TripHeaderActions } from './src/components/TripHeaderActions'
+        import { IconTextLink } from './src/components/IconTextLink'
+        import iconLinkStyles from './src/components/IconTextLink.module.css'
         import { CloseButton } from './src/components/CloseButton'
         import { GuideSharing } from './src/components/GuideSharing'
         import { DRIVE_FILE_SCOPE } from './src/data/guide-auth'
@@ -90,7 +97,7 @@ try {
           assert.ok(html.includes(text), text)
           assert.ok(!html.includes('NaN') && !html.includes('undefined'), 'Unexpected invalid value')
           assert.ok(!html.includes('—') && !html.includes('–'), 'Date/time ranges must use a half-width hyphen')
-          assert.ok(!/2027-[0-9]{2}-[0-9]{2}/.test(html), 'Dates in reading views must use slashes')
+          assert.ok(!/2027-[0-9]{2}-[0-9]{2}/.test(html.replace(/<[^>]*>/g,'')), 'Dates in reading views must use slashes')
         }
         const partial = {...data, sectionErrors:{accounting:'bad amount',tasks:'bad task'}}
         const partialOverview = renderToStaticMarkup(createElement(Overview, {data:partial,routeRoot:'/trip/T001'}))
@@ -102,17 +109,82 @@ try {
         assert.ok(expenseHtml.includes('團員收款摘要') && expenseHtml.includes('只看未收齊'))
         const itineraryHtml = renderToStaticMarkup(createElement(Itinerary, {data}))
         assert.ok(itineraryHtml.includes('<small>T1</small>') && itineraryHtml.includes('<small>T2</small>'))
+        for (const [departure, arrival] of [['', 'T2'], ['T1', ''], ['', '']]) {
+          const flight = {...data.tables['航班'][0], 出發航廈:departure, 抵達航廈:arrival}
+          const html = renderToStaticMarkup(createElement(Itinerary, {data:{...data,tables:{...data.tables,航班:[flight]}}}))
+          for (const [airport, terminal, time] of [[flight['出發機場'], departure, flight['出發時間']], [flight['抵達機場'], arrival, flight['抵達時間']]]) {
+            const terminalRow = departure || arrival ? '<small>'+terminal+'</small>' : ''
+            assert.ok(html.includes('<strong>'+airport+'</strong>'+terminalRow+'<b>'+time.slice(11,16)), 'Keep both terminal rows when either terminal is present; omit both when neither is present')
+          }
+        }
+        const sharedMetadata=renderToStaticMarkup(createElement(TripMetadata,{data}))
+        assert.ok(itineraryHtml.includes(sharedMetadata), 'PDF header must reuse the website metadata component')
+        assert.ok(sharedMetadata.includes('匯率：1 TWD = 4.5 JPY') && sharedMetadata.includes('時差：+1 小時'))
+        assert.ok(sharedMetadata.includes('日本・大阪') && sharedMetadata.includes('2027/05/01 - 2027/05/03'))
+        const emptyDays = {...data,tables:{...data.tables,每日行程:[]}}
+        const emptyDaysHtml=renderToStaticMarkup(createElement(Itinerary,{data:emptyDays}))
+        for(const date of ['2027/05/01','2027/05/02','2027/05/03']) assert.ok(emptyDaysHtml.includes(date), 'Date selector must include every trip day even without entries')
+        assert.ok(emptyDaysHtml.includes('尚未安排當日行程'))
+        const sharedLink=renderToStaticMarkup(createElement(IconTextLink,{href:'https://example.com',icon:'home'},'訂房網站'))
+        assert.ok(sharedLink.includes('class="'+iconLinkStyles.link+'"') && sharedLink.includes('width="14"'))
+        assert.ok(sharedLink.includes('rel="noopener noreferrer"') && sharedLink.includes('target="_blank"'))
+        assert.ok(!sharedLink.includes('text-link') && !sharedLink.includes('button'))
+        assert.equal(renderToStaticMarkup(createElement(IconTextLink,{href:'javascript:alert(1)',icon:'home'},'無效連結')), '')
+        const internalLink=renderToStaticMarkup(createElement(IconTextLink,{href:'/trip/T001',icon:'back',external:false},'所有旅程'))
+        assert.ok(internalLink.includes('href="/trip/T001"') && !internalLink.includes('target='))
+        const simpleNotes=renderToStaticMarkup(createElement(ItineraryNotes,{note:'餐廳 https://maps.app.goo.gl/example'}))
+        assert.ok(simpleNotes.includes('<svg') && simpleNotes.includes('>餐廳</span></a>') && simpleNotes.includes('rel="noopener noreferrer"'))
+        const escapedNotes=renderToStaticMarkup(createElement(ItineraryNotes,{note:'<script>alert(1)</script>'}))
+        assert.ok(!escapedNotes.includes('<script>') && escapedNotes.includes('&lt;script&gt;'))
+        const itineraryList=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:data.tables['每日行程'],day:trip.start,busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
+        assert.ok(itineraryList.includes('調整「搭機出發」順序') && itineraryList.includes('編輯行程日期'))
+        assert.ok(!itineraryList.replace(/<[^>]*>/g,'').includes('I001') && !itineraryList.includes('行程ID'))
         assert.ok(!itineraryHtml.includes('出發航廈：') && !itineraryHtml.includes('抵達航廈：'))
+        assert.ok(itineraryHtml.includes('class="'+bookingStyles['booking-stack']+'"') && !itineraryHtml.includes('class="two-column"'))
+        const manyBookings={...data,tables:{...data.tables,航班:Array.from({length:3},(_,i)=>({...data.tables['航班'][0],航班ID:'A00'+(i+1)})),飯店:Array.from({length:3},(_,i)=>({...data.tables['飯店'][0],住宿ID:'H00'+(i+1)}))}}
+        const manyBookingsHtml=renderToStaticMarkup(createElement(Itinerary,{data:manyBookings}))
+        assert.ok(!itineraryHtml.includes('aria-label="航班切換"'), 'A single flight must not show pagination')
+        assert.ok(manyBookingsHtml.includes('1/3') && manyBookingsHtml.includes('2/3') && manyBookingsHtml.includes('3/3'))
+        assert.ok(manyBookingsHtml.indexOf('aria-label="航班切換"')<manyBookingsHtml.indexOf('</article>'), 'Pagination belongs inside the flight card')
+        assert.ok(/aria-label="上一班航班"[^>]*disabled/.test(manyBookingsHtml))
+        assert.ok(/aria-label="下一班航班"[^>]*disabled/.test(manyBookingsHtml))
+        assert.ok(!manyBookingsHtml.includes('Page 1'))
+        assert.equal(manyBookingsHtml.split(flightPageStyles.hidden).length-1,2, 'Only the first card is shown on screen; retain others for printing')
+        assert.equal(renderToStaticMarkup(createElement(FlightPages,{rows:[],children:()=>null})), '')
+        assert.equal(manyBookingsHtml.split(bookingStyles['detail-item']+' '+bookingStyles['booking-card']).length-1,6)
+        assert.equal(manyBookingsHtml.split('class="'+bookingStyles['booking-section']+'"').length-1,2)
+        assert.ok(manyBookingsHtml.indexOf('<h3>航班資訊</h3>')<manyBookingsHtml.indexOf('<h3>住宿資訊</h3>'))
         assert.equal(itineraryHtml.split(bookingStyles['detail-item']+' '+bookingStyles['booking-card']).length-1,data.tables['航班'].length+data.tables['飯店'].length)
         assert.ok(itineraryHtml.includes('class="'+bookingStyles['hotel-name']+'">範例飯店</strong>'))
-        assert.ok(itineraryHtml.includes('class="'+bookingStyles['hotel-dates']+'"><p><small>入住</small> 2027/05/01 15:00</p><p><small>退房</small> 2027/05/03 12:00</p>'))
+        assert.ok(itineraryHtml.includes('class="'+bookingStyles['booking-details']+' '+bookingStyles['hotel-dates']+'"><p><small>入住</small><span>2027/05/01 15:00</span></p><p><small>退房</small><span>2027/05/03 12:00</span></p>'))
         const legacyStay={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,入住時間:'',退房時間:''}))}}
         const legacyStayHtml=renderToStaticMarkup(createElement(Itinerary,{data:legacyStay}))
-        assert.ok(!legacyStayHtml.includes('undefined') && legacyStayHtml.includes('<small>入住</small> 2027/05/01</p>'))
+        assert.ok(!legacyStayHtml.includes('undefined') && legacyStayHtml.includes('<small>入住</small><span>2027/05/01</span></p>'))
         assert.ok(itineraryHtml.includes('class="'+bookingStyles['hotel-photo']+'"></div>'), 'Missing hotel photos should leave an empty reserved space')
         const withPhoto={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,飯店圖片網址:'https://example.com/hotel.jpg'}))}}
         const photoHtml=renderToStaticMarkup(createElement(Itinerary,{data:withPhoto}))
         assert.ok(photoHtml.includes('src="https://example.com/hotel.jpg"') && photoHtml.includes('alt="範例飯店照片"'))
+        const withBooking={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,訂房網站網址:'https://www.booking.com/hotel/example.html'}))}}
+        const bookingHtml=renderToStaticMarkup(createElement(Itinerary,{data:withBooking}))
+        assert.ok(bookingHtml.includes('href="https://www.booking.com/hotel/example.html"') && bookingHtml.includes('>訂房網站</span></a>'))
+        const hotelIconLinks=[...bookingHtml.matchAll(/<a([ ][^>]*)>(.*?)<[/]a>/g)].filter(match=>match[2].includes('>訂房網站</span>')||match[2].includes('>Osaka</span>'))
+        assert.equal(hotelIconLinks.length,2)
+        for(const link of hotelIconLinks) {
+          assert.ok(link[1].includes('class="'+iconLinkStyles.link+'"') && !link[1].includes('text-link'), link[1])
+          assert.ok(link[2].includes('width="14"') && link[2].includes('<span>'))
+        }
+        assert.ok(bookingHtml.includes('>Osaka</span></a>') && bookingHtml.indexOf('>Osaka</span></a>')<bookingHtml.indexOf('>訂房網站</span></a>'))
+        assert.ok(!itineraryHtml.includes('>訂房網站</span></a>'), 'Empty booking URLs should not create a link')
+        const hotelDetails={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,電話:'+81 6 1234 5678',價格:'每晚 ¥12,000／含早餐'}))}}
+        const hotelDetailsHtml=renderToStaticMarkup(createElement(Itinerary,{data:hotelDetails}))
+        assert.ok(hotelDetailsHtml.includes('<small>地址</small><span>日本大阪（範例地址）</span>'))
+        assert.ok(hotelDetailsHtml.includes('<small>電話</small><a href="tel:+81612345678">+81 6 1234 5678</a>'))
+        assert.ok(hotelDetailsHtml.includes('<small>價格</small><span>每晚 ¥12,000／含早餐</span>'))
+        assert.ok(!itineraryHtml.includes('<small>價格</small>'))
+        const shortHotelMap={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,地圖網址:'https://maps.app.goo.gl/example'}))}}
+        assert.ok(renderToStaticMarkup(createElement(Itinerary,{data:shortHotelMap})).includes('>Google Maps</span></a>'))
+        const unsafeBooking={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,訂房網站網址:'javascript:alert(1)'}))}}
+        assert.ok(!renderToStaticMarkup(createElement(Itinerary,{data:unsafeBooking})).includes('>訂房網站</span></a>'))
         const invalidPhoto={...data,tables:{...data.tables,飯店:data.tables['飯店'].map(row=>({...row,飯店圖片網址:'javascript:alert(1)'}))}}
         assert.ok(!renderToStaticMarkup(createElement(Itinerary,{data:invalidPhoto})).includes('javascript:'))
         const overnight = {...data,tables:{...data.tables,航班:[{...data.tables['航班'][0],出發時間:'2027-12-31T23:00',抵達時間:'2028-01-02T16:34'}]}}
@@ -120,9 +192,11 @@ try {
         assert.ok(overnightHtml.includes('class="'+bookingStyles['flight-card-heading']+'"><span>2027/12/31</span><span>範例航空 範例航班</span>'))
         assert.ok(overnightHtml.includes('16:34<span class="'+bookingStyles['flight-day-offset']+'"> (+2)</span>'))
         assert.ok(!itineraryHtml.includes(bookingStyles['flight-day-offset']) && !overnightHtml.includes('2028/01/02'))
+        const flightDetails=renderToStaticMarkup(createElement(Itinerary,{data:{...data,tables:{...data.tables,航班:[{...data.tables['航班'][0],行李說明:'托運 20kg',備註:'請提早集合'}]}}}))
+        assert.ok(flightDetails.includes('class="'+bookingStyles['booking-details']+'"><p><small>行李</small><span>托運 20kg</span></p><p><small>備註</small><span>請提早集合</span></p>'))
         const legacyFlights = {...data,tables:{...data.tables,航班:data.tables['航班'].map(row=>({...row,出發航廈:'',抵達航廈:'',航廈:'舊航廈 T3'}))}}
         assert.ok(renderToStaticMarkup(createElement(Itinerary,{data:legacyFlights})).includes('既有航廈資訊：舊航廈 T3'))
-        assert.ok(itineraryHtml.includes('aria-label="匯出 PDF"') && itineraryHtml.includes('aria-pressed'))
+        assert.ok(itineraryHtml.includes('aria-label="匯出 PDF"') && itineraryHtml.includes('aria-label="行程日期"'))
         assert.ok(!itineraryHtml.includes('另存為 PDF') && !itineraryHtml.includes('匯出範圍'), 'Export options and hints belong in the dialog')
         const exportDialog=renderToStaticMarkup(createElement(PdfExportDialog,{dates:['2027-05-01','2027-05-02'],initialDates:['2027-05-02'],onClose(){},onConfirm(){}}))
         assert.ok(exportDialog.includes('2027/05/01') && exportDialog.includes('2027/05/02') && exportDialog.includes('另存為 PDF'))
@@ -142,7 +216,7 @@ try {
         assert.ok(closeButton.includes('aria-label="關閉編輯"') && closeButton.includes('<svg') && closeButton.includes('disabled=""'))
         assert.ok(!closeButton.includes('>關閉'))
         const actions=renderToStaticMarkup(createElement(TripHeaderActions,{busy:false,onRefresh(){}}))
-        assert.ok(actions.includes('所有旅程') && actions.includes('aria-label="重新讀取旅程"') && actions.includes('class="icon-button"'))
+        assert.ok(actions.includes('所有旅程') && actions.includes('aria-label="重新讀取旅程"') && actions.includes('class="icon-button"') && actions.includes('class="'+iconLinkStyles.link+'"'))
         assert.ok(!actions.includes('<time') && !actions.includes('更新資料'))
         const busyActions=renderToStaticMarkup(createElement(TripHeaderActions,{busy:true,onRefresh(){}}))
         assert.ok(busyActions.includes('disabled=""'))
@@ -168,8 +242,8 @@ try {
           assert.ok(!form.includes(session.token) && !form.includes('草稿'))
           for(const input of form.matchAll(/<input[^>]*aria-haspopup="dialog"[^>]*>/g)) assert.ok(input[0].includes('value=""'), entity+' must not prefill date/time inputs')
           if(entity==='開團待辦') assert.ok(form.includes('負責人') && form.includes('<select'))
-          if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址'))
-          if(entity==='每日行程') { assert.ok(form.includes('關聯航班') && form.includes('關聯飯店')); assert.ok(!form.includes('時區（選填')); }
+          if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址') && form.includes('訂房網站') && form.includes('價格'))
+          if(entity==='每日行程') { for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','內容','備註','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('2027/05/03')); }
           if(entity==='航班') {assert.ok(form.includes('出發航廈') && form.includes('抵達航廈'));assert.ok(form.includes('出發當地時間') && form.includes('抵達當地時間'));assert.ok(!form.includes('時差'));}
           if(entity==='公積金') assert.ok(form.includes('個人金額') && form.includes('checkbox'))
           if(entity==='行前費用') assert.ok(form.includes('實際刷卡金額') && form.includes('TWD'))
@@ -181,7 +255,7 @@ try {
           assert.ok(form.includes('readOnly') || form.includes('readonly'))
           assert.ok(!form.includes('undefined') && !form.includes('NaN'))
           const dateKey = {開團待辦:'截止日期',每日行程:'日期',飯店:'入住日期',公積金:'日期',行前費用:'日期',收款:'收款日期',航班:'出發時間'}[entity]
-          if(dateKey && row[dateKey]) assert.ok(form.includes('value="'+pickerInputDisplay(entity==='航班'?row[dateKey].slice(0,16):row[dateKey])+'"'), 'Editing must preserve the existing date')
+          if(dateKey && row[dateKey]) assert.ok(form.includes('value="'+(entity==='每日行程'?row[dateKey]:pickerInputDisplay(entity==='航班'?row[dateKey].slice(0,16):row[dateKey]))+'"'), 'Editing must preserve the existing date')
           if(entity==='公積金'||entity==='行前費用'){ assert.ok(!/<label>金額<input/.test(form)); assert.ok(form.includes('pattern="-?[0-9]+"')); assert.ok(form.includes('aria-label=')); }
         }
         for(const entity of ['團員','開團待辦','每日行程','航班','飯店','公積金','行前費用','收款']) {

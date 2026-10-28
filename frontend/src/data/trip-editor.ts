@@ -1,4 +1,9 @@
 import schema from "./schema.json" with { type: "json" };
+import {
+  insertItinerary,
+  moveItinerary,
+  orderedItinerary,
+} from "./itinerary.ts";
 import rules from "./id-rules.json" with { type: "json" };
 import {
   parseTrip,
@@ -33,7 +38,14 @@ export interface ReceiptInput {
   id: string;
 }
 export type TripMutation =
-  | { kind: "record"; mode: Mode; sheet: BasicSheet; id?: string; values: Row }
+  | {
+      kind: "record";
+      mode: Mode;
+      sheet: BasicSheet;
+      id?: string;
+      values: Row;
+      itineraryOrder?: string[];
+    }
   | {
       kind: "fund";
       mode: Mode;
@@ -181,7 +193,7 @@ function put(book: Workbook, sheet: TripSheetName, values: Row, index: number) {
   if (sheet === "航班" || sheet === "飯店") {
     for (const field of sheet === "航班"
       ? ["出發航廈", "抵達航廈"]
-      : ["入住時間", "退房時間", "飯店圖片網址"])
+      : ["入住時間", "退房時間", "飯店圖片網址", "訂房網站網址", "價格"])
       if (!book[sheet][0].some((value) => String(value).trim() === field))
         book[sheet][0].push(field);
   }
@@ -306,6 +318,59 @@ export function mutateTripBook(
       erase(book, sheet, (row) => row[key] === id);
     } else {
       const values = { ...mutation.values, [key]: id };
+      if (sheet === "每日行程") {
+        check(
+          values["日期"] >= trip.start && values["日期"] <= trip.end,
+          "請選擇旅程日期範圍內的日期。",
+        );
+        const existing = readRows(book, sheet);
+        const previous = existing.find((row) => row[key] === id);
+        const sameDay = existing.filter(
+          (row) => row["日期"] === values["日期"],
+        );
+        let ordered: Row[];
+        if (mutation.itineraryOrder) {
+          const ids = mutation.itineraryOrder;
+          check(
+            mode === "edit" &&
+              previous?.["日期"] === values["日期"] &&
+              ids.length === sameDay.length &&
+              new Set(ids).size === ids.length &&
+              sameDay.every((row) => ids.includes(row[key])),
+            "行程排序資料已變更，請重新讀取。",
+          );
+          const updated = sameDay.map((row) =>
+            row[key] === id ? { ...values, 排序: row["排序"] } : row,
+          );
+          const moved = moveItinerary(updated, id, ids.indexOf(id));
+          check(
+            ids.every((item, index) => moved.rows[index][key] === item),
+            "每次只能調整一筆行程的排序。",
+          );
+          ordered = ids.map(
+            (item) => updated.find((row) => row[key] === item)!,
+          );
+          check(
+            !moved.conflict,
+            "調整後時間順序不符，請確認移除時間後再排序。",
+          );
+        } else if (
+          previous &&
+          previous["日期"] === values["日期"] &&
+          previous["開始時間"] === (values["開始時間"] || "")
+        ) {
+          ordered = orderedItinerary(
+            sameDay.map((row) => (row[key] === id ? values : row)),
+          );
+        } else {
+          ordered = insertItinerary(sameDay, values);
+        }
+        ordered.forEach((row, index) => {
+          row["排序"] = String((index + 1) * 10);
+          if (row[key] === id) values["排序"] = row["排序"];
+          else put(book, sheet, row, rowIndex(book, sheet, key, row[key]));
+        });
+      }
       for (const [field, value] of Object.entries(values))
         if (field.endsWith("網址") && value)
           check(!!safeUrl(value), `${field} 須為 http 或 https 網址。`);
@@ -564,6 +629,26 @@ export function buildCellUpdates(
         const original = String(before[sheet]?.[row]?.[col] ?? ""),
           value = String(rows[row]?.[col] ?? "");
         if (original === value) continue;
+        if (
+          sheet === "每日行程" &&
+          row > 0 &&
+          String(rows[0][col]).trim() === "類型" &&
+          value
+        ) {
+          // Legacy templates restricted this column to a fixed category list.
+          // Tags now allow any text; clear only the edited cell's validation.
+          requests.push({
+            setDataValidation: {
+              range: {
+                sheetId: grid!.sheetId,
+                startRowIndex: row,
+                endRowIndex: row + 1,
+                startColumnIndex: col,
+                endColumnIndex: col + 1,
+              },
+            },
+          });
+        }
         requests.push({
           updateCells: {
             start: { sheetId: grid!.sheetId, rowIndex: row, columnIndex: col },

@@ -1,7 +1,7 @@
 import { CloseButton } from "./components/CloseButton";
 import { TripHeaderActions } from "./components/TripHeaderActions";
 import { displayDate } from "./data/display-date";
-import { TripFacts } from "./components/TripFacts";
+import { TripMetadata } from "./components/TripMetadata";
 import { TripEditing } from "./components/TripEditor";
 import { useRoute, appHref } from "./hooks/useRoute";
 import { readTripSections } from "./data/trip-sections";
@@ -502,21 +502,7 @@ function TripLoader({
           <h1>{trip.name}</h1>
           <Badge>{trip.status}</Badge>
         </div>
-        <p className="trip-meta">
-          <span>
-            <Icon name="pin" size={16} />
-            {trip.destination}
-          </span>
-          <span>
-            <Icon name="itinerary" size={16} />
-            {displayDate(trip.start)} - {displayDate(trip.end)}
-          </span>
-        </p>
-        <TripFacts
-          timezone={data.timezone}
-          rate={data.rate}
-          currency={data.currency}
-        />
+        <TripMetadata data={data} />
       </section>
       <nav className="trip-nav no-print" aria-label="旅程功能">
         {tabs.map(([key, label]) => (

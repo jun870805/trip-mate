@@ -46,7 +46,7 @@ def workbook(path, sheets):
             }
             rules = []
             for n, header in enumerate(rows[0], 1):
-                if header in choices:
+                if header in choices and not (name == '每日行程' and header == '類型'):
                     items = ','.join(choices[header])
                     rules.append(f'<dataValidation type="list" allowBlank="1" showErrorMessage="1" errorTitle="請選擇固定選項" error="請使用下拉選單" sqref="{column(n)}2:{column(n)}1001"><formula1>"{items}"</formula1></dataValidation>')
                 if header in ID_COLUMNS:
@@ -82,7 +82,7 @@ for name in ['a', 'b', 'c']:
     demo['行前費用分攤'] += [['flight_cost', f'member_{name}', 10000], ['prehotel', f'member_{name}', 3000]]
 demo['收款明細'] += [['r1', 'batch_a', '2027-04-03', 'member_a', 'flight_cost', 10000, '機票與住宿合併收款'], ['r2', 'batch_a', '2027-04-03', 'member_a', 'prehotel', 3000, ''], ['r3', 'batch_b', '2027-04-04', 'member_b', 'flight_cost', 6000, '部分已收範例']]
 demo['航班'] += [['flight_1', '範例航空', '範例航班', '桃園 TPE', '關西 KIX', '2027-05-01T09:00:00+08:00', '2027-05-01T12:30:00+09:00', 'T1', 'T2', '請依實際訂票資訊填寫', '此航班僅供功能示範']]
-demo['飯店'] += [['hotel_1', '範例飯店', '', '2027-05-01', '15:00', '2027-05-03', '12:00', '日本大阪（範例地址）', 'https://www.google.com/maps/search/?api=1&query=Osaka', '', '到店費用由公積金支付']]
+demo['飯店'] += [['hotel_1', '範例飯店', '', '2027-05-01', '15:00', '2027-05-03', '12:00', '日本大阪（範例地址）', 'https://www.google.com/maps/search/?api=1&query=Osaka', '', '到店費用由公積金支付', '', '']]
 demo['每日行程'] += [['i1', '2027-05-01', '09:00', '', 'Asia/Taipei', '搭機出發', '交通', '桃園機場', '', '時間為出發地當地時間', 'flight_1', '', 10], ['i2', '2027-05-01', '15:00', '', '', '飯店入住', '住宿', '範例飯店', '', '集合後一同辦理入住', '', 'hotel_1', 20], ['i3', '2027-05-02', '10:00', '12:00', '', '大阪城散步', '景點', '大阪城公園', 'https://www.google.com/maps/search/?api=1&query=Osaka+Castle', '範例行程，時間可自行調整', '', '', 10], ['i4', '2027-05-03', '', '', '', '自由活動與返程', '自由活動', '', '', '範例行程', '', '', 10]]
 demo['開團待辦'] += [['task1', '確認旅遊日期', '其他', '已完成', '2027-03-01', '2027-02-28', 'member_a', '', 10], ['task2', '訂購機票', '航班', '已完成', '2027-04-01', '2027-03-20', 'member_a', '', 20], ['task3', '確認行前收款', '其他', '進行中', '2027-04-20', '', 'member_b', '', 30], ['task4', '確認機場接送', '交通', '待辦', '2027-04-25', '', 'member_c', '', 40]]
 aliases = {
@@ -122,7 +122,7 @@ function createTripMateTemplates() {
       sheet.getRange(1, 1, sheet.getMaxRows(), headers.length).createFilter();
       const choices = {旅程狀態:['規劃中','即將出發','旅途中','已結束'],類型:name === '公積金交易' ? ['儲值','支出','退款','調整'] : ['景點','餐飲','交通','住宿','自由活動','其他'],狀態:['待辦','進行中','已完成','已取消'],支付方式:['行前收款','公積金']};
       headers.forEach(function(header, i) {
-        if (choices[header]) sheet.getRange(2, i + 1, sheet.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(choices[header], true).setAllowInvalid(false).build());
+        if (choices[header] && !(name === '每日行程' && header === '類型')) sheet.getRange(2, i + 1, sheet.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(choices[header], true).setAllowInvalid(false).build());
         if (idPrefixes[header]) {
           const cell = String.fromCharCode(65 + i) + '2';
           const number = 'VALUE(MID(' + cell + ',2,4))';

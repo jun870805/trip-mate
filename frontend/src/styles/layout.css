@@ -47,11 +47,6 @@
   padding: 28px 0 22px;
 }
 .back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  color: var(--muted);
   margin-bottom: 16px;
 }
 .trip-heading .spread {

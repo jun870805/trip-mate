@@ -1,3 +1,9 @@
+import { groupFlights } from "../data/flight-groups";
+import { FlightPages } from "../components/FlightPages";
+import { TripMetadata } from "../components/TripMetadata";
+import { IconTextLink } from "../components/IconTextLink";
+import { tripDates } from "../data/itinerary";
+import { ItineraryNotes, MapLink } from "../components/ItineraryNotes";
 import { flushSync } from "react-dom";
 import { PdfExportDialog } from "../components/PdfExportDialog";
 import itineraryStyles from "./Itinerary.module.css";
@@ -13,7 +19,7 @@ import {
   taskProgress,
 } from "../data/portal";
 import type { TripData } from "../data/portal";
-import { Icon, Empty, Badge, Stat, ExternalLink } from "../components/ui";
+import { Icon, Empty, Badge, Stat } from "../components/ui";
 const tabs = [
   ["overview", "總覽"],
   ["itinerary", "行程"],
@@ -121,27 +127,25 @@ export function Overview({
 export function Itinerary({ data }: { data: TripData }) {
   const today = useTripToday(data.timezone);
   const [day, setDay] = useState(() =>
-    today >= data.trip.start &&
-    today <= data.trip.end &&
-    data.tables["每日行程"].some((row) => row["日期"] === today)
-      ? today
-      : "all",
+    today >= data.trip.start && today <= data.trip.end ? today : "all",
   );
   const [printDates, setPrintDates] = useState<string[] | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const dates = [
-    ...new Set(data.tables["每日行程"].map((r) => r["日期"])),
+    ...new Set([
+      ...tripDates(data.trip.start, data.trip.end),
+      ...data.tables["每日行程"].map((row) => row["日期"]),
+    ]),
   ].sort();
   return (
     <section className="itinerary-section">
       <div className="print-heading">
         <h1>{data.trip.name}</h1>
-        <p>
-          {data.trip.destination} - {displayDate(data.trip.start)} -{" "}
-          {displayDate(data.trip.end)}
-        </p>
+        <TripMetadata data={data} />
         {printDates && printDates.length < dates.length && (
-          <p>日期：{printDates.map(displayDate).join("、")}</p>
+          <p className="export-dates">
+            日期：{printDates.map(displayDate).join("、")}
+          </p>
         )}
       </div>
       <div className="section-heading no-print">
@@ -172,54 +176,83 @@ export function Itinerary({ data }: { data: TripData }) {
           }}
         />
       )}
-      <div className="two-column">
+      <div className={bookingStyles["booking-stack"]}>
         <section className={bookingStyles["booking-section"]}>
           <h3>航班資訊</h3>
           {data.tables["航班"].length ? (
-            data.tables["航班"].map((row) => (
-              <article
-                className={
-                  bookingStyles["detail-item"] +
-                  " " +
-                  bookingStyles["booking-card"]
-                }
-                key={row["航班ID"]}
-              >
-                <div className={bookingStyles["flight-card-heading"]}>
-                  <span>{displayDate(row["出發時間"].slice(0, 10))}</span>
-                  <span>
-                    {row["航空公司"]} {row["航班編號"]}
-                  </span>
-                </div>
-                <div className={bookingStyles["flight-route"]}>
-                  <div>
-                    <strong>{row["出發機場"]}</strong>
-                    {row["出發航廈"] && <small>{row["出發航廈"]}</small>}
-                    <b>{row["出發時間"].slice(11, 16)}</b>
-                  </div>
-                  <Icon name="arrow" />
-                  <div>
-                    <strong>{row["抵達機場"]}</strong>
-                    {row["抵達航廈"] && <small>{row["抵達航廈"]}</small>}
-                    <b>
-                      {row["抵達時間"].slice(11, 16)}
-                      {flightDayOffset(row["出發時間"], row["抵達時間"]) && (
-                        <span className={bookingStyles["flight-day-offset"]}>
-                          {" "}
-                          {flightDayOffset(row["出發時間"], row["抵達時間"])}
-                        </span>
-                      )}
-                    </b>
-                  </div>
-                </div>
-                {row["航廈"] && !row["出發航廈"] && !row["抵達航廈"] && (
-                  <p>既有航廈資訊：{row["航廈"]}</p>
+            groupFlights(data.tables["航班"]).map((group) => (
+              <FlightPages key={group.key} rows={group.flights}>
+                {(row, controls) => (
+                  <article
+                    className={
+                      bookingStyles["detail-item"] +
+                      " " +
+                      bookingStyles["booking-card"]
+                    }
+                    key={row["航班ID"]}
+                  >
+                    <div className={bookingStyles["flight-card-heading"]}>
+                      <span>{displayDate(row["出發時間"].slice(0, 10))}</span>
+                      <span>
+                        {row["航空公司"]} {row["航班編號"]}
+                      </span>
+                    </div>
+                    <div className={bookingStyles["flight-route"]}>
+                      <div>
+                        <strong>{row["出發機場"]}</strong>
+                        {(row["出發航廈"] || row["抵達航廈"]) && (
+                          <small>{row["出發航廈"]}</small>
+                        )}
+                        <b>{row["出發時間"].slice(11, 16)}</b>
+                      </div>
+                      <Icon name="arrow" />
+                      <div>
+                        <strong>{row["抵達機場"]}</strong>
+                        {(row["出發航廈"] || row["抵達航廈"]) && (
+                          <small>{row["抵達航廈"]}</small>
+                        )}
+                        <b>
+                          {row["抵達時間"].slice(11, 16)}
+                          {flightDayOffset(
+                            row["出發時間"],
+                            row["抵達時間"],
+                          ) && (
+                            <span
+                              className={bookingStyles["flight-day-offset"]}
+                            >
+                              {" "}
+                              {flightDayOffset(
+                                row["出發時間"],
+                                row["抵達時間"],
+                              )}
+                            </span>
+                          )}
+                        </b>
+                      </div>
+                    </div>
+                    {row["航廈"] && !row["出發航廈"] && !row["抵達航廈"] && (
+                      <p>既有航廈資訊：{row["航廈"]}</p>
+                    )}
+                    {(row["行李說明"] || row["備註"]) && (
+                      <div className={bookingStyles["booking-details"]}>
+                        {row["行李說明"] && (
+                          <p>
+                            <small>行李</small>
+                            <span>{row["行李說明"]}</span>
+                          </p>
+                        )}
+                        {row["備註"] && (
+                          <p>
+                            <small>備註</small>
+                            <span>{row["備註"]}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {controls}
+                  </article>
                 )}
-                {row["行李說明"] && (
-                  <p className="muted">行李：{row["行李說明"]}</p>
-                )}
-                {row["備註"] && <p className="muted">{row["備註"]}</p>}
-              </article>
+              </FlightPages>
             ))
           ) : (
             <Empty>尚未填寫航班資訊。</Empty>
@@ -242,30 +275,58 @@ export function Itinerary({ data }: { data: TripData }) {
                     <strong className={bookingStyles["hotel-name"]}>
                       {row["飯店名稱"]}
                     </strong>
-                    <div className={bookingStyles["hotel-dates"]}>
-                      <p>
-                        <small>入住</small> {displayDate(row["入住日期"])}
-                        {row["入住時間"] && ` ${row["入住時間"]}`}
-                      </p>
-                      <p>
-                        <small>退房</small> {displayDate(row["退房日期"])}
-                        {row["退房時間"] && ` ${row["退房時間"]}`}
-                      </p>
-                    </div>
-                    <p className="muted">{row["地址"]}</p>
-                    {row["電話"] && (
-                      <p>
-                        電話：
-                        <a
-                          className="text-link"
-                          href={`tel:${row["電話"].replace(/[^+0-9,;#*]/g, "")}`}
-                        >
-                          {row["電話"]}
-                        </a>
+                    {row["備註"] && (
+                      <p className={bookingStyles["hotel-subtitle"]}>
+                        {row["備註"]}
                       </p>
                     )}
-                    {row["備註"] && <p className="muted">{row["備註"]}</p>}
-                    <ExternalLink url={row["地圖網址"]}>開啟地圖</ExternalLink>
+                    <div
+                      className={`${bookingStyles["booking-details"]} ${bookingStyles["hotel-dates"]}`}
+                    >
+                      <p>
+                        <small>入住</small>
+                        <span>
+                          {displayDate(row["入住日期"])}
+                          {row["入住時間"] && ` ${row["入住時間"]}`}
+                        </span>
+                      </p>
+                      <p>
+                        <small>退房</small>
+                        <span>
+                          {displayDate(row["退房日期"])}
+                          {row["退房時間"] && ` ${row["退房時間"]}`}
+                        </span>
+                      </p>
+                      <p>
+                        <small>地址</small>
+                        <span>{row["地址"]}</span>
+                      </p>
+                      {row["電話"] && (
+                        <p>
+                          <small>電話</small>
+                          <a
+                            href={`tel:${row["電話"].replace(/[^+0-9,;#*]/g, "")}`}
+                          >
+                            {row["電話"]}
+                          </a>
+                        </p>
+                      )}
+                      {row["價格"] && (
+                        <p>
+                          <small>價格</small>
+                          <span>{row["價格"]}</span>
+                        </p>
+                      )}
+                    </div>
+                    {(safeUrl(row["地圖網址"]) ||
+                      safeUrl(row["訂房網站網址"])) && (
+                      <div className={bookingStyles["hotel-links"]}>
+                        <MapLink url={row["地圖網址"]} />
+                        <IconTextLink href={row["訂房網站網址"]} icon="home">
+                          訂房網站
+                        </IconTextLink>
+                      </div>
+                    )}
                   </div>
                   <div className={bookingStyles["hotel-photo"]}>
                     {safeUrl(row["飯店圖片網址"] || "") && (
@@ -296,28 +357,23 @@ export function Itinerary({ data }: { data: TripData }) {
         </div>
       </div>
       {dates.length > 0 && (
-        <div className="day-tabs no-print" aria-label="行程日期">
-          <button
-            aria-pressed={day === "all"}
-            className={day === "all" ? "active" : ""}
-            onClick={() => {
-              setDay("all");
-            }}
+        <label className={itineraryStyles.dateSelect}>
+          日期
+          <select
+            aria-label="行程日期"
+            value={day}
+            onChange={(event) => setDay(event.target.value)}
           >
-            全部日期
-          </button>
-          {dates.map((date) => (
-            <button
-              key={date}
-              aria-pressed={day === date}
-              className={day === date ? "active" : ""}
-              onClick={() => setDay(date)}
-            >
-              {date.slice(5).replace("-", "/")}
-            </button>
-          ))}
-        </div>
+            <option value="all">全部日期</option>
+            {dates.map((date) => (
+              <option key={date} value={date}>
+                {displayDate(date)}
+              </option>
+            ))}
+          </select>
+        </label>
       )}
+
       {dates.length ? (
         dates.map((date) => (
           <section
@@ -333,45 +389,27 @@ export function Itinerary({ data }: { data: TripData }) {
                 }).format(new Date(date))}
               </h3>
             </div>
+            {!data.tables["每日行程"].some((row) => row["日期"] === date) && (
+              <Empty>尚未安排當日行程。</Empty>
+            )}
             <div className="timeline">
               {data.tables["每日行程"]
                 .filter((row) => row["日期"] === date)
                 .map((row) => (
                   <article className="timeline-item" key={row["行程ID"]}>
-                    <div className="timeline-time">
-                      {row["開始時間"] || "時間彈性"}
-                      {row["結束時間"] && <small>- {row["結束時間"]}</small>}
-                    </div>
+                    <div className="timeline-time">{row["開始時間"] || ""}</div>
                     <div className="timeline-card">
                       <div className="spread">
                         <h4>{row["標題"]}</h4>
-                        <Badge soft>{row["類型"]}</Badge>
+                        {row["類型"] && <Badge soft>{row["類型"]}</Badge>}
                       </div>
-                      {row["地點"] && <p className="muted">{row["地點"]}</p>}
-                      {row["說明"] && <p>{row["說明"]}</p>}
-                      {row["航班ID"] && (
-                        <p className="muted">
-                          航班：
-                          {
-                            data.tables["航班"].find(
-                              (f) => f["航班ID"] === row["航班ID"],
-                            )?.["航班編號"]
-                          }
-                        </p>
+                      {(row["說明"] || row["地點"] || row["地圖網址"]) && (
+                        <ItineraryNotes
+                          note={[row["說明"], row["地點"], row["地圖網址"]]
+                            .filter(Boolean)
+                            .join("\n")}
+                        />
                       )}
-                      {row["住宿ID"] && (
-                        <p className="muted">
-                          住宿：
-                          {
-                            data.tables["飯店"].find(
-                              (h) => h["住宿ID"] === row["住宿ID"],
-                            )?.["飯店名稱"]
-                          }
-                        </p>
-                      )}
-                      <ExternalLink url={row["地圖網址"]}>
-                        開啟地圖
-                      </ExternalLink>
                     </div>
                   </article>
                 ))}

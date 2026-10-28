@@ -22,6 +22,7 @@ export function DatePicker({
   disabled,
   min,
   label,
+  wheelOnly = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -31,6 +32,7 @@ export function DatePicker({
   disabled?: boolean;
   min?: string;
   label: string;
+  wheelOnly?: boolean;
 }) {
   const id = useId();
   const panel = useRef<HTMLSpanElement>(null);
@@ -87,6 +89,8 @@ export function DatePicker({
       <input
         ref={trigger}
         type="text"
+        readOnly={wheelOnly}
+        onClick={wheelOnly ? show : undefined}
         value={pickerInputDisplay(value)}
         placeholder={
           type === "date"
@@ -110,7 +114,8 @@ export function DatePicker({
         onKeyDown={(event) => {
           if (
             (event.key === "ArrowDown" && event.altKey) ||
-            event.key === "F4"
+            event.key === "F4" ||
+            (wheelOnly && (event.key === "Enter" || event.key === " "))
           ) {
             event.preventDefault();
             show();

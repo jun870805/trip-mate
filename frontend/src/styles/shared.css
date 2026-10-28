@@ -155,13 +155,13 @@
     display: block !important;
   }
   .print-heading {
-    margin-bottom: 24px;
-    padding-bottom: 15px;
+    margin-bottom: 12px;
+    padding-bottom: 0;
   }
   .print-heading h1 {
     font-size: 23pt;
   }
-  .print-heading p {
+  .print-heading > .export-dates {
     font-size: 10pt;
     margin-top: 8px;
   }

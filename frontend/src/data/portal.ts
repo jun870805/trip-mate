@@ -123,7 +123,13 @@ function table(book: Workbook, name: SheetName): Row[] {
       headers.includes(header) ||
         (name === "航班" && ["出發航廈", "抵達航廈"].includes(header)) ||
         (name === "飯店" &&
-          ["入住時間", "退房時間", "飯店圖片網址"].includes(header)),
+          [
+            "入住時間",
+            "退房時間",
+            "飯店圖片網址",
+            "訂房網站網址",
+            "價格",
+          ].includes(header)),
       `${name}：缺少欄位「${header}」。`,
     );
   return cells
@@ -469,7 +475,7 @@ export function parseTrip(trip: Trip, book: Workbook): TripData {
     ensure(row["退房日期"] > row["入住日期"], "退房日期必須晚於入住日期。");
   }
   for (const row of tables["每日行程"]) {
-    required(row, ["日期", "標題", "類型", "排序"], "每日行程");
+    required(row, ["日期", "標題", "排序"], "每日行程");
     ensure(Number.isFinite(Number(row["排序"])), "行程排序必須是數字。");
     if (row["時區"])
       row["時區"] = atField(row, "時區", () => normalizeTimezone(row["時區"]));

@@ -1,0 +1,51 @@
+.group {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.cards {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+.page {
+  min-width: 0;
+}
+.pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.pages button {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--brown);
+  background: transparent;
+}
+.pages button:hover:not(:disabled) {
+  background: #eee3d5;
+}
+.pages button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.pages output {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  min-width: 3ch;
+  text-align: center;
+}
+@media screen {
+  .hidden {
+    display: none;
+  }
+}

@@ -422,8 +422,10 @@ function fakeApi() {
           (request: {
             updateCells?: { fields: string };
             appendDimension?: unknown;
+            setDataValidation?: unknown;
           }) =>
             request.appendDimension ||
+            request.setDataValidation ||
             request.updateCells?.fields === "userEnteredValue",
         ),
       );
@@ -863,4 +865,258 @@ it("keeps defaults for expenses, linked fund records and deletions without chang
     allocations: [{ id: "R001", expenseId: "E005", amount: "100" }],
   });
   assert.equal(receipt.kind === "receipt" && receipt.allocations[0].id, "R001");
+});
+it("simplifies itinerary fields and automatically inserts timed additions", () => {
+  const next = mutateTripBook(trip, demo, {
+    kind: "record",
+    mode: "add",
+    sheet: "每日行程",
+    values: {
+      行程ID: "I010",
+      日期: "2027-05-01",
+      開始時間: "12:00",
+      標題: "午餐",
+    },
+  });
+  const rows = parseTrip(trip, next).tables["每日行程"].filter(
+    (r) => r["日期"] === "2027-05-01",
+  );
+  assert.deepEqual(
+    rows.map((r) => r["開始時間"]),
+    ["09:00", "12:00", "15:00"],
+  );
+  assert.equal(rows[1]["類型"], "");
+  assert.throws(
+    () =>
+      mutateTripBook(trip, demo, {
+        kind: "record",
+        mode: "add",
+        sheet: "每日行程",
+        values: { 行程ID: "I010", 日期: "2027-06-01", 標題: "超出日期" },
+      }),
+    /旅程日期/,
+  );
+});
+it("persists manual itinerary order atomically and refuses invalid or conflicting order", () => {
+  const rows = readRows(demo, "每日行程").filter(
+    (r) => r["日期"] === "2027-05-01",
+  );
+  const ids = rows.map((r) => r["行程ID"]).reverse();
+  const moved = rows[1];
+  const mutation = {
+    kind: "record" as const,
+    mode: "edit" as const,
+    sheet: "每日行程" as const,
+    id: moved["行程ID"],
+    values: { ...moved, 開始時間: "", 結束時間: "" },
+    itineraryOrder: ids,
+  };
+  const next = mutateTripBook(trip, demo, mutation);
+  assert.deepEqual(
+    parseTrip(trip, next)
+      .tables["每日行程"].filter((r) => r["日期"] === moved["日期"])
+      .map((r) => r["行程ID"]),
+    ids,
+  );
+  assert.equal(
+    readRows(next, "每日行程").find((r) => r["行程ID"] === rows[0]["行程ID"])?.[
+      "開始時間"
+    ],
+    "09:00",
+  );
+  assert.throws(
+    () => mutateTripBook(trip, demo, { ...mutation, values: moved }),
+    /時間/,
+  );
+  assert.throws(
+    () =>
+      mutateTripBook(trip, demo, {
+        ...mutation,
+        itineraryOrder: [ids[0], ids[0]],
+      }),
+    /排序/,
+  );
+  assert.throws(
+    () =>
+      mutateTripBook(trip, demo, {
+        ...mutation,
+        itineraryOrder: ["I999", ids[1]],
+      }),
+    /排序/,
+  );
+});
+it("writes reordered itinerary through one authorized batch, preserves other cells and rejects stale snapshots", async () => {
+  const api = fakeApi(),
+    editor = createTripEditor(trip, "itinerary", config, api.fetcher);
+  const before = await editor.read(session);
+  const rows = readRows(before.book, "每日行程").filter(
+    (r) => r["日期"] === "2027-05-01",
+  );
+  const moved = rows[1];
+  const mutation = {
+    kind: "record" as const,
+    mode: "edit" as const,
+    sheet: "每日行程" as const,
+    id: moved["行程ID"],
+    values: { ...moved, 開始時間: "", 結束時間: "", 類型: "午餐集合" },
+    itineraryOrder: rows.map((r) => r["行程ID"]).reverse(),
+  };
+  const result = await editor.save(session, before, mutation);
+  assert.equal(api.writes, 1);
+  const parsed = validateEditorBook(trip, result.book, "itinerary");
+  assert.equal(parsed.tables["每日行程"][0]["行程ID"], moved["行程ID"]);
+  assert.equal(parsed.tables["每日行程"][0]["類型"], "午餐集合");
+  assert.deepEqual(result.book["航班"], before.book["航班"]);
+  assert.deepEqual(result.book["飯店"], before.book["飯店"]);
+  const updates = buildCellUpdates(before.book, result.book, before.grids) as {
+    setDataValidation?: {
+      range: { startRowIndex: number; endRowIndex: number };
+    };
+  }[];
+  const cleared = updates.filter((r) => r.setDataValidation);
+  assert.equal(cleared.length, 1);
+  assert.equal(
+    cleared[0].setDataValidation!.range.endRowIndex -
+      cleared[0].setDataValidation!.range.startRowIndex,
+    1,
+  );
+  api.change();
+  await assert.rejects(
+    editor.save(session, before, mutation),
+    /已在其他地方更新/,
+  );
+  assert.equal(api.writes, 1);
+});
+it("keeps manual position for content edits and reinserts changed times or dates", () => {
+  const inserted = mutateTripBook(trip, demo, {
+    kind: "record",
+    mode: "add",
+    sheet: "每日行程",
+    values: { 行程ID: "I010", 日期: "2027-05-01", 標題: "彈性活動" },
+  });
+  const row = readRows(inserted, "每日行程").find(
+    (r) => r["行程ID"] === "I010",
+  )!;
+  const renamed = mutateTripBook(trip, inserted, {
+    kind: "record",
+    mode: "edit",
+    sheet: "每日行程",
+    id: "I010",
+    values: { ...row, 標題: "修改內容" },
+  });
+  assert.equal(
+    parseTrip(trip, renamed)
+      .tables["每日行程"].filter((r) => r["日期"] === "2027-05-01")
+      .at(-1)?.["標題"],
+    "修改內容",
+  );
+  const changed = mutateTripBook(trip, inserted, {
+    kind: "record",
+    mode: "edit",
+    sheet: "每日行程",
+    id: "I010",
+    values: { ...row, 開始時間: "08:00" },
+  });
+  assert.equal(
+    parseTrip(trip, changed).tables["每日行程"][0]["行程ID"],
+    "I010",
+  );
+  const changedDate = mutateTripBook(trip, inserted, {
+    kind: "record",
+    mode: "edit",
+    sheet: "每日行程",
+    id: "I010",
+    values: { ...row, 日期: "2027-05-02", 開始時間: "09:00" },
+  });
+  assert.equal(
+    parseTrip(trip, changedDate).tables["每日行程"].filter(
+      (r) => r["日期"] === "2027-05-02",
+    )[0]["行程ID"],
+    "I010",
+  );
+  const sameDay = readRows(inserted, "每日行程").filter(
+    (r) => r["日期"] === "2027-05-01",
+  );
+  assert.throws(
+    () =>
+      mutateTripBook(trip, inserted, {
+        kind: "record",
+        mode: "edit",
+        sheet: "每日行程",
+        id: "I010",
+        values: row,
+        itineraryOrder: [sameDay[1]["行程ID"], sameDay[0]["行程ID"], "I010"],
+      }),
+    /只能調整一筆/,
+  );
+});
+it("adds an optional booking website to legacy hotel sheets without changing existing cells", () => {
+  const book = structuredClone(demo);
+  const index = book["飯店"][0].indexOf("訂房網站網址");
+  if (index >= 0) for (const cells of book["飯店"]) cells.splice(index, 1);
+  assert.doesNotThrow(() => parseTrip(trip, book));
+  const row = readRows(book, "飯店")[0];
+  const mutation = {
+    kind: "record" as const,
+    mode: "edit" as const,
+    sheet: "飯店" as const,
+    id: row["住宿ID"],
+    values: {
+      ...row,
+      訂房網站網址: "https://www.booking.com/hotel/example.html",
+    },
+  };
+  const next = mutateTripBook(trip, book, mutation);
+  assert.equal(
+    readRows(next, "飯店")[0]["訂房網站網址"],
+    mutation.values["訂房網站網址"],
+  );
+  assert.deepEqual(
+    next["飯店"][1].slice(0, book["飯店"][0].length),
+    book["飯店"][1],
+  );
+  assert.throws(
+    () =>
+      mutateTripBook(trip, book, {
+        ...mutation,
+        values: { ...mutation.values, 訂房網站網址: "javascript:alert(1)" },
+      }),
+    /http/,
+  );
+  assert.equal(
+    readRows(
+      mutateTripBook(trip, next, {
+        ...mutation,
+        values: { ...mutation.values, 訂房網站網址: "" },
+      }),
+      "飯店",
+    )[0]["訂房網站網址"],
+    "",
+  );
+});
+it("stores a free-text hotel price and adds its column to legacy sheets", () => {
+  const book = structuredClone(demo),
+    col = book["飯店"][0].indexOf("價格");
+  if (col >= 0) for (const cells of book["飯店"]) cells.splice(col, 1);
+  assert.doesNotThrow(() => parseTrip(trip, book));
+  const row = readRows(book, "飯店")[0];
+  const next = mutateTripBook(trip, book, {
+    kind: "record",
+    mode: "edit",
+    sheet: "飯店",
+    id: row["住宿ID"],
+    values: { ...row, 價格: "每晚 ¥12,000／含早餐，現場付款" },
+  });
+  assert.equal(
+    parseTrip(trip, next).tables["飯店"][0]["價格"],
+    "每晚 ¥12,000／含早餐，現場付款",
+  );
+  assert.deepEqual(
+    next["飯店"][1].slice(0, book["飯店"][0].length),
+    book["飯店"][1],
+  );
+  assert.deepEqual(
+    summarize(parseTrip(trip, next)),
+    summarize(parseTrip(trip, book)),
+  );
 });

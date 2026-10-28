@@ -1,0 +1,23 @@
+.link {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  vertical-align: middle;
+  color: var(--brown);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.link span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

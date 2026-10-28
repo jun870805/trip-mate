@@ -1,3 +1,4 @@
+import { IconTextLink } from "./IconTextLink";
 import { appHref } from "../hooks/useRoute";
 import { Icon } from "./ui";
 import styles from "./TripHeaderActions.module.css";
@@ -11,10 +12,11 @@ export function TripHeaderActions({
 }) {
   return (
     <div className={styles.row}>
-      <a className="back-link" href={appHref()}>
-        <Icon name="back" size={16} />
-        所有旅程
-      </a>
+      <div className="back-link">
+        <IconTextLink href={appHref()} icon="back" external={false}>
+          所有旅程
+        </IconTextLink>
+      </div>
       <button
         type="button"
         className="icon-button"

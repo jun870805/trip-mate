@@ -1,3 +1,4 @@
+import { ItineraryList } from "./ItineraryList";
 import { CloseButton } from "./CloseButton";
 import bookingStyles from "./BookingCards.module.css";
 import { displayDate, displayDateTime } from "../data/display-date";
@@ -13,6 +14,7 @@ import type { RecordKind } from "../data/record-id";
 import { normalizeLocalDateTime } from "../data/timezone";
 import { DatePicker } from "./DatePicker";
 import { RequiredMark } from "./RequiredMark";
+import { tripDates } from "../data/itinerary";
 import {
   createTripEditor,
   readRows,
@@ -211,6 +213,7 @@ export function TripEditor({
     [needsReload, setNeedsReload] = useState(false),
     [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState("");
+  const [itineraryDay, setItineraryDay] = useState(trip.start);
   const active = useRef(false);
   useEffect(() => {
     const element = dialog.current!;
@@ -365,6 +368,9 @@ export function TripEditor({
                     entity={target.entity}
                     row={target.row}
                     busy={busy}
+                    initialDate={
+                      target.entity === "每日行程" ? itineraryDay : undefined
+                    }
                     canEditIds={isSuperUser(session, guideConfig)}
                     onCancel={() => setTarget(null)}
                     onSave={(mutation) => void save(mutation)}
@@ -413,57 +419,73 @@ export function TripEditor({
                         新增{names[entity]}
                       </button>
                     </div>
-                    <div className="editor-records">
-                      {items(snapshot.book, entity).map((row) => (
-                        <article
-                          className={`editor-record${entity === "航班" || entity === "飯店" ? ` ${bookingStyles["booking-card"]}` : ""}`}
-                          key={itemId(entity, row)}
-                        >
-                          <div>
-                            <strong>
-                              {itemLabel(entity, row, snapshot.book)}
-                            </strong>
-                            {itemAmount(entity, row, snapshot.book) && (
-                              <span className="editor-record-amount">
-                                {itemAmount(entity, row, snapshot.book)}
-                              </span>
-                            )}
-                            <small>
-                              {displayDateTime(
-                                row["日期"] ||
-                                  row["截止日期"] ||
-                                  row["入住日期"] ||
-                                  row["出發時間"] ||
-                                  "",
-                              )}{" "}
-                              {row["類型"] || row["狀態"] || ""}
-                            </small>
-                          </div>
-                          <div className="editor-row-actions">
-                            <button
-                              className="quiet-button"
-                              disabled={busy}
-                              onClick={() => {
-                                setNotice("");
-                                setTarget({ entity, row });
-                              }}
-                            >
-                              編輯
-                            </button>
-                            <button
-                              className="quiet-button delete-button"
-                              disabled={busy}
-                              onClick={() => remove(row)}
-                            >
-                              刪除
-                            </button>
-                          </div>
-                        </article>
-                      ))}
-                      {!items(snapshot.book, entity).length && (
-                        <p className="muted">尚無{names[entity]}。</p>
-                      )}
-                    </div>
+                    {entity === "每日行程" ? (
+                      <ItineraryList
+                        trip={trip}
+                        rows={items(snapshot.book, entity)}
+                        day={itineraryDay}
+                        onDay={setItineraryDay}
+                        busy={busy}
+                        onEdit={(row) => {
+                          setNotice("");
+                          setTarget({ entity, row });
+                        }}
+                        onRemove={remove}
+                        onReorder={(mutation) => void save(mutation)}
+                      />
+                    ) : (
+                      <div className="editor-records">
+                        {items(snapshot.book, entity).map((row) => (
+                          <article
+                            className={`editor-record${entity === "航班" || entity === "飯店" ? ` ${bookingStyles["booking-card"]}` : ""}`}
+                            key={itemId(entity, row)}
+                          >
+                            <div>
+                              <strong>
+                                {itemLabel(entity, row, snapshot.book)}
+                              </strong>
+                              {itemAmount(entity, row, snapshot.book) && (
+                                <span className="editor-record-amount">
+                                  {itemAmount(entity, row, snapshot.book)}
+                                </span>
+                              )}
+                              <small>
+                                {displayDateTime(
+                                  row["日期"] ||
+                                    row["截止日期"] ||
+                                    row["入住日期"] ||
+                                    row["出發時間"] ||
+                                    "",
+                                )}{" "}
+                                {row["類型"] || row["狀態"] || ""}
+                              </small>
+                            </div>
+                            <div className="editor-row-actions">
+                              <button
+                                className="quiet-button"
+                                disabled={busy}
+                                onClick={() => {
+                                  setNotice("");
+                                  setTarget({ entity, row });
+                                }}
+                              >
+                                編輯
+                              </button>
+                              <button
+                                className="quiet-button delete-button"
+                                disabled={busy}
+                                onClick={() => remove(row)}
+                              >
+                                刪除
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                        {!items(snapshot.book, entity).length && (
+                          <p className="muted">尚無{names[entity]}。</p>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </>
@@ -512,7 +534,9 @@ const fields: Record<BasicSheet, Field[]> = {
     { key: "退房時間", type: "time" },
     { key: "地址", required: true },
     { key: "電話" },
+    { key: "價格" },
     { key: "地圖網址", type: "url" },
+    { key: "訂房網站網址", label: "訂房網站", type: "url" },
     { key: "備註", type: "textarea" },
   ],
   航班: [
@@ -540,16 +564,10 @@ const fields: Record<BasicSheet, Field[]> = {
   ],
   每日行程: [
     { key: "日期", type: "date", required: true },
-    { key: "開始時間", type: "time" },
-    { key: "結束時間", type: "time", startKey: "開始時間" },
-    { key: "標題", required: true },
-    { key: "類型", required: true },
-    { key: "地點" },
-    { key: "地圖網址", type: "url" },
-    { key: "航班ID", label: "關聯航班", relation: "航班" },
-    { key: "住宿ID", label: "關聯飯店", relation: "飯店" },
-    { key: "排序", type: "number", required: true },
-    { key: "說明", type: "textarea" },
+    { key: "開始時間", label: "時間", type: "time" },
+    { key: "標題", label: "內容", required: true },
+    { key: "說明", label: "備註", type: "textarea" },
+    { key: "類型", label: "標籤" },
   ],
 };
 function defaultValues(book: Workbook, entity: Entity, row: Row | null): Row {
@@ -565,6 +583,10 @@ function defaultValues(book: Workbook, entity: Entity, row: Row | null): Row {
     if (entity === "公積金") value["類型"] = "儲值";
     if (entity === "開團待辦") value["狀態"] = "待辦";
   }
+  if (entity === "每日行程" && row)
+    value["說明"] = [row["說明"], row["地點"], row["地圖網址"]]
+      .filter(Boolean)
+      .join("\n");
   if (entity === "公積金" && row && row["類型"] !== "調整")
     value["記帳金額"] = row["記帳金額"].replace(/^-/, "");
   if (entity === "航班" && row)
@@ -582,6 +604,7 @@ export function TripForm({
   onCancel,
   onSave,
   canEditIds = false,
+  initialDate,
 }: {
   trip: Trip;
   book: Workbook;
@@ -589,12 +612,16 @@ export function TripForm({
   row: Row | null;
   busy: boolean;
   canEditIds?: boolean;
+  initialDate?: string;
   onCancel: () => void;
   onSave: (mutation: TripMutation) => void;
 }) {
-  const [values, setValues] = useState<Row>(() =>
-    defaultValues(book, entity, row),
-  );
+  const [values, setValues] = useState<Row>(() => ({
+    ...defaultValues(book, entity, row),
+    ...(!row && entity === "每日行程" && initialDate
+      ? { 日期: initialDate }
+      : {}),
+  }));
   const kind = entityKind[entity],
     idKey = rules[kind].column;
   const members = readRows(book, "團員"),
@@ -679,7 +706,20 @@ export function TripForm({
           {label}
           {isRequired && <RequiredMark />}
         </span>
-        {relation ? (
+        {entity === "每日行程" && key === "日期" ? (
+          <select
+            required
+            value={values[key] || ""}
+            onChange={(event) => field(key, event.target.value)}
+          >
+            <option value="">選擇日期</option>
+            {tripDates(trip.start, trip.end).map((date) => (
+              <option key={date} value={date}>
+                {displayDate(date)}
+              </option>
+            ))}
+          </select>
+        ) : relation ? (
           <select
             value={values[key] || ""}
             required={isRequired}
@@ -711,6 +751,7 @@ export function TripForm({
         ) : type === "date" || type === "datetime-local" || type === "time" ? (
           <DatePicker
             type={type}
+            wheelOnly={entity === "每日行程" && type === "time"}
             label={label}
             value={values[key] || ""}
             start={
@@ -776,6 +817,11 @@ export function TripForm({
         };
       else {
         const clean = { ...values };
+        if (entity === "每日行程") {
+          clean["結束時間"] = "";
+          clean["地點"] = "";
+          clean["地圖網址"] = "";
+        }
         if (entity === "航班")
           for (const prefix of ["出發", "抵達"]) {
             const original = row?.[prefix + "時間"];
