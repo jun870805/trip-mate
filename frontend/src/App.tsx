@@ -173,8 +173,10 @@ export default function App() {
         ) : (
           <>
             <section aria-labelledby="trips-title">
-              <div className="section-heading">
-                <div>
+              <div
+                className={`section-heading catalog-toolbar${guide.session && catalogRows ? " catalog-toolbar--with-add" : ""}`}
+              >
+                <div className="catalog-title">
                   <h1 id="trips-title" className="page-title">
                     選擇旅程
                   </h1>
@@ -192,7 +194,7 @@ export default function App() {
                     </button>
                   )}
                   <button
-                    className="icon-button"
+                    className="icon-button catalog-refresh"
                     aria-label="重新讀取旅程"
                     disabled={loading || !configured || writing}
                     onClick={() => setRevision((n) => n + 1)}
