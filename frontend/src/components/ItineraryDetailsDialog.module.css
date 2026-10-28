@@ -1,0 +1,28 @@
+.dialog:global(.catalog-dialog) {
+  width: min(640px, calc(100% - 32px));
+}
+.content {
+  padding: 24px;
+  min-width: 0;
+}
+.heading:global(.dialog-heading) {
+  margin-bottom: 0;
+  align-items: center;
+}
+.heading h2 {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.tag {
+  margin-top: 8px;
+}
+.body {
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .content {
+    padding: 20px;
+  }
+}

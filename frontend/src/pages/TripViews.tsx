@@ -1,9 +1,15 @@
+import { displayMultiline } from "../data/display-text";
+import { ItineraryDetailsDialog } from "../components/ItineraryDetailsDialog";
+import { MarkdownContent } from "../components/MarkdownContent";
+import { TextLinkButton } from "../components/IconTextLink";
 import { groupFlights } from "../data/flight-groups";
 import { FlightPages } from "../components/FlightPages";
 import { TripMetadata } from "../components/TripMetadata";
 import { IconTextLink } from "../components/IconTextLink";
 import {
   tripDates,
+  itinerarySubtitle,
+  hasItineraryBody,
   itineraryTags,
   matchesItineraryTag,
   tripDayNumber,
@@ -141,6 +147,10 @@ export function Itinerary({ data }: { data: TripData }) {
     const number = tripDayNumber(date, data.trip.start);
     return number === null ? "" : `DAY ${number} `;
   };
+  const [detailsId, setDetailsId] = useState<string | null>(null);
+  const detailRow = data.tables["每日行程"].find(
+    (row) => row["行程ID"] === detailsId,
+  );
   const [printDates, setPrintDates] = useState<string[] | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const dates = [
@@ -410,6 +420,13 @@ export function Itinerary({ data }: { data: TripData }) {
         </div>
       )}
 
+      {detailRow && (
+        <ItineraryDetailsDialog
+          row={detailRow}
+          subtitle={itinerarySubtitle(detailRow)}
+          onClose={() => setDetailsId(null)}
+        />
+      )}
       {dates.length ? (
         dates.map((date) => (
           <section
@@ -451,15 +468,37 @@ export function Itinerary({ data }: { data: TripData }) {
                     <div className="timeline-time">{row["開始時間"] || ""}</div>
                     <div className="timeline-card">
                       <div className="spread">
-                        <h4>{row["標題"]}</h4>
+                        <h4 className={itineraryStyles.title}>
+                          {displayMultiline(row["標題"])}
+                        </h4>
                         {row["類型"] && <Badge soft>{row["類型"]}</Badge>}
                       </div>
-                      {(row["說明"] || row["地點"] || row["地圖網址"]) && (
-                        <ItineraryNotes
-                          note={[row["說明"], row["地點"], row["地圖網址"]]
-                            .filter(Boolean)
-                            .join("\n")}
-                        />
+                      {(itinerarySubtitle(row) || hasItineraryBody(row)) && (
+                        <div
+                          className={`${itineraryStyles.subtitleRow} ${itinerarySubtitle(row) ? "" : "no-print"}`}
+                        >
+                          {itinerarySubtitle(row) && (
+                            <ItineraryNotes note={itinerarySubtitle(row)} />
+                          )}
+                          {hasItineraryBody(row) && (
+                            <div className={`${itineraryStyles.more} no-print`}>
+                              <TextLinkButton
+                                opensDialog
+                                onClick={() => setDetailsId(row["行程ID"])}
+                                label={`查看更多：${row["標題"]}`}
+                              >
+                                查看更多
+                              </TextLinkButton>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {hasItineraryBody(row) && (
+                        <div
+                          className={`${itineraryStyles.printBody} print-only`}
+                        >
+                          <MarkdownContent text={row["內文"]} />
+                        </div>
                       )}
                     </div>
                   </article>

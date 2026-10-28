@@ -1,24 +1,26 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { dragLayout, dragScrollSpeed } from "../data/itinerary-drag";
-import type { DragRect, DragLayout } from "../data/itinerary-drag";
+import { dragDestination, dragScrollSpeed } from "../data/itinerary-drag";
 
-interface Preview extends DragLayout {
+interface Preview {
   id: string;
-  from: number;
+  date: string;
+  index: number;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
   dragging: boolean;
 }
 interface Gesture {
-  id: string;
   pointerId: number;
   handle: HTMLButtonElement;
-  from: number;
+  preview: Preview;
   startY: number;
   clientY: number;
-  startScroll: number;
+  offsetY: number;
+  moved: boolean;
   scroll: HTMLDialogElement | null;
-  cards: DragRect[];
-  gap: number;
 }
 export function useItineraryDrag({
   revision,
@@ -27,7 +29,7 @@ export function useItineraryDrag({
 }: {
   revision: string;
   disabled: boolean;
-  onDrop: (id: string, index: number) => boolean;
+  onDrop: (id: string, date: string, index: number) => boolean;
 }) {
   const list = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
@@ -55,27 +57,51 @@ export function useItineraryDrag({
     setPreview(null);
   }
   function layout(current: Gesture) {
-    return dragLayout(
-      current.cards,
-      current.from,
-      current.clientY -
-        current.startY +
-        (current.scroll?.scrollTop || 0) -
-        current.startScroll,
-      current.gap,
-    );
+    const next = { ...current.preview, top: current.clientY - current.offsetY };
+    if (!current.moved) return next;
+    const center = next.top + next.height / 2;
+    const placeholder = list.current
+      ?.querySelector<HTMLElement>("[data-drag-placeholder]")
+      ?.getBoundingClientRect();
+    // Keep a stable slot while crossing its placeholder; otherwise live layout
+    // changes could bounce the insertion point between adjacent cards.
+    if (
+      placeholder &&
+      center >= placeholder.top &&
+      center <= placeholder.bottom
+    )
+      return next;
+    const zones = Array.from(
+      list.current?.querySelectorAll<HTMLElement>("[data-drop-date]") || [],
+    ).map((group) => {
+      const rect = group.getBoundingClientRect();
+      return {
+        date: group.dataset.dropDate!,
+        top: rect.top,
+        bottom: rect.bottom,
+        cards: Array.from(
+          group.querySelectorAll<HTMLElement>("[data-itinerary-id]"),
+        ).map((card) => {
+          const bounds = card.getBoundingClientRect();
+          return {
+            id: card.dataset.itineraryId!,
+            top: bounds.top,
+            height: bounds.height,
+          };
+        }),
+      };
+    });
+    const destination = dragDestination(zones, center, next.id);
+    return destination ? { ...next, ...destination } : next;
   }
   function tick() {
     const current = gesture.current;
     if (!current) return;
-    if (
-      callbacks.current.disabled ||
-      !window.matchMedia("(max-width: 700px)").matches
-    ) {
+    if (callbacks.current.disabled) {
       cancel();
       return;
     }
-    if (current.scroll) {
+    if (current.moved && current.scroll) {
       const rect = current.scroll.getBoundingClientRect();
       current.scroll.scrollTop += dragScrollSpeed(
         current.clientY,
@@ -83,82 +109,93 @@ export function useItineraryDrag({
         Math.min(window.innerHeight, rect.bottom),
       );
     }
-    const next = layout(current);
+    current.preview = layout(current);
+    const next = current.preview;
     setPreview((previous) =>
-      previous?.dragging &&
-      previous.id === current.id &&
-      previous.offset === next.offset &&
-      previous.target === next.target
+      previous?.top === next.top &&
+      previous.date === next.date &&
+      previous.index === next.index
         ? previous
-        : { ...next, id: current.id, from: current.from, dragging: true },
+        : next,
     );
     frame.current = requestAnimationFrame(tick);
   }
   function start(
     event: ReactPointerEvent<HTMLButtonElement>,
     id: string,
-    from: number,
+    date: string,
+    index: number,
   ) {
     if (
       callbacks.current.disabled ||
       gesture.current ||
+      preview ||
       event.button !== 0 ||
       !event.isPrimary ||
-      !window.matchMedia("(max-width: 700px)").matches ||
       !list.current
     )
       return;
-    const elements = Array.from(
-      list.current.querySelectorAll<HTMLElement>("[data-itinerary-id]"),
+    const card = event.currentTarget.closest<HTMLElement>(
+      "[data-itinerary-id]",
     );
-    if (elements.length < 2) return;
+    if (!card) return;
     stop();
-    const cards = elements.map((element) => {
-      const rect = element.getBoundingClientRect();
-      return { top: rect.top, height: rect.height };
-    });
-    const scroll = list.current.closest("dialog");
+    const rect = card.getBoundingClientRect();
+    const initial: Preview = {
+      id,
+      date,
+      index,
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      dragging: true,
+    };
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    const current: Gesture = {
-      id,
-      from,
+    gesture.current = {
       pointerId: event.pointerId,
       handle: event.currentTarget,
+      preview: initial,
       startY: event.clientY,
       clientY: event.clientY,
-      scroll,
-      startScroll: scroll?.scrollTop || 0,
-      cards,
-      gap: parseFloat(getComputedStyle(list.current).rowGap) || 0,
+      offsetY: event.clientY - rect.top,
+      moved: false,
+      scroll: list.current.closest("dialog"),
     };
-    gesture.current = current;
-    setPreview({ ...layout(current), id, from, dragging: true });
+    setPreview(initial);
     frame.current = requestAnimationFrame(tick);
   }
   function update(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (gesture.current?.pointerId === event.pointerId)
-      gesture.current.clientY = event.clientY;
+    const current = gesture.current;
+    if (current?.pointerId !== event.pointerId) return;
+    current.clientY = event.clientY;
+    if (Math.abs(current.clientY - current.startY) > 4) current.moved = true;
   }
   function end(event: ReactPointerEvent<HTMLButtonElement>) {
     const current = gesture.current;
     if (!current || current.pointerId !== event.pointerId) return;
-    current.clientY = event.clientY;
+    update(event);
     const next = layout(current);
     stop();
     event.preventDefault();
-    const settled = {
-      ...next,
-      id: current.id,
-      from: current.from,
-      dragging: false,
-      offset: next.settledOffset,
-      shifts: next.shifts.map((offset, index) =>
-        index === current.from ? next.settledOffset : offset,
-      ),
-    };
-    setPreview(settled);
-    if (!callbacks.current.onDrop(current.id, next.target))
+    if (!current.moved) {
+      setPreview(null);
+      return;
+    }
+    setPreview({ ...next, dragging: false });
+    // Wait for the final placeholder to be laid out before settling the card.
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null;
+      const rect = list.current
+        ?.querySelector<HTMLElement>("[data-drag-placeholder]")
+        ?.getBoundingClientRect();
+      if (rect)
+        setPreview((previous) =>
+          previous ? { ...previous, top: rect.top, left: rect.left } : null,
+        );
+    });
+    if (!callbacks.current.onDrop(next.id, next.date, next.index))
       timer.current = setTimeout(() => setPreview(null), 160);
   }
   function interrupted(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -175,10 +212,12 @@ export function useItineraryDrag({
       if (document.hidden) cancel();
     };
     window.addEventListener("blur", cancel);
+    window.addEventListener("resize", cancel);
     document.addEventListener("visibilitychange", hidden);
     return () => {
       stop();
       window.removeEventListener("blur", cancel);
+      window.removeEventListener("resize", cancel);
       document.removeEventListener("visibilitychange", hidden);
     };
   }, []);

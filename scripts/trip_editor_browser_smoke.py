@@ -189,15 +189,17 @@ with sync_playwright() as p:
         start_time.fill('19:45')
         expect(start_time).to_have_value('19:45')
         start_time.fill('18:30')
-        dialog.get_by_label('內容', exact=True).fill('新增景點測試')
+        dialog.get_by_label('標題', exact=True).fill('新增景點測試')
         dialog.get_by_label('標籤', exact=True).fill('自訂標籤')
-        dialog.get_by_label('備註', exact=True).fill('集合餐廳 https://maps.app.goo.gl/example')
+        dialog.get_by_label('副標', exact=True).fill('[集合餐廳](https://maps.app.goo.gl/example)')
+        dialog.get_by_label('內文', exact=True).fill('## 集合細節\n\n**請準時**\n\n[官網](https://example.com/info)')
         dialog.get_by_role('button', name='儲存', exact=True).click()
         card = dialog.locator('[data-itinerary-id]').filter(has_text='新增景點測試')
         expect(card).to_be_visible()
         expect(card.get_by_role('link', name='集合餐廳')).to_have_count(0)
         card.get_by_role('button', name='編輯', exact=True).click()
-        expect(dialog.get_by_label('備註', exact=True)).to_have_value('集合餐廳 https://maps.app.goo.gl/example')
+        expect(dialog.get_by_label('副標', exact=True)).to_have_value('[集合餐廳](https://maps.app.goo.gl/example)')
+        expect(dialog.get_by_label('內文', exact=True)).to_contain_text('集合細節')
         dialog.get_by_role('button', name='取消', exact=True).click()
         previous_writes = len(writes)
         handle=card.get_by_role('button', name='調整「新增景點測試」順序', exact=True)
@@ -222,9 +224,14 @@ with sync_playwright() as p:
         assert len(writes) == previous_writes
         expect(dialog).to_be_visible()
         page.set_viewport_size({'width': 1280, 'height': 900})
-        expect(dialog.locator('[data-itinerary-id]').first.get_by_role('button', name='上移「搭機出發」', exact=True)).to_be_disabled()
-        expect(card.get_by_role('button', name='下移「新增景點測試」', exact=True)).to_be_disabled()
-        card.get_by_role('button', name='上移「新增景點測試」', exact=True).click()
+        expect(handle).to_be_visible()
+        source=handle.bounding_box()
+        destination=dialog.locator('[data-itinerary-id]').first.bounding_box()
+        page.mouse.move(source['x']+source['width']/2,source['y']+source['height']/2)
+        page.mouse.down()
+        page.mouse.move(destination['x']+destination['width']/2,destination['y']+4,steps=15)
+        assert len(writes) == previous_writes
+        page.mouse.up()
         expect(conflict).to_be_visible()
         assert conflict.evaluate('(dialog) => Math.abs(dialog.firstElementChild.getBoundingClientRect().width - dialog.clientWidth) < 1'), 'Conflict content must fill the dialog without an empty right-hand strip'
         conflict.get_by_role('checkbox', name='不再提醒', exact=True).check()
@@ -232,8 +239,53 @@ with sync_playwright() as p:
         expect(conflict).not_to_be_visible()
         expect(card.locator('time')).to_have_count(0)
         assert page.evaluate("Object.keys(localStorage).some(key => key.endsWith('reorder-no-reminder') && localStorage[key] === 'true')")
+        # Desktop and mobile use the same handle; cross-day drops save only on release.
+        dialog.get_by_label('編輯行程日期', exact=True).select_option('all')
+        destination_day = book['旅程清單'][1][book['旅程清單'][0].index('結束日期')]
+        destination_group = dialog.locator('[data-drop-date="'+destination_day+'"]')
+        destination_group.scroll_into_view_if_needed()
+        # Scroll the source back into view to capture the handle, then scroll the
+        # dialog during pointer capture, as the edge auto-scroll does in use.
+        handle.scroll_into_view_if_needed()
+        source=handle.bounding_box()
+        page.mouse.move(source['x']+source['width']/2,source['y']+source['height']/2)
+        page.mouse.down()
+        destination_group.scroll_into_view_if_needed()
+        destination=destination_group.bounding_box()
+        before_crossday=len(writes)
+        page.mouse.move(destination['x']+destination['width']/2,destination['y']+destination['height']-5,steps=15)
+        assert len(writes)==before_crossday
+        page.mouse.up()
+        expect(destination_group.locator('[data-itinerary-id]').filter(has_text='新增景點測試')).to_be_visible()
+        assert len(writes)==before_crossday+1
+        # Move it back so subsequent public detail checks still select start day.
+        dialog.get_by_label('編輯行程日期', exact=True).select_option(destination_day)
+        card.get_by_role('button', name='編輯', exact=True).click()
+        dialog.get_by_label('日期', exact=True).select_option(start)
+        dialog.get_by_role('button', name='儲存', exact=True).click()
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
         dialog.get_by_role('button', name='關閉', exact=True).click()
+        page.get_by_role('navigation', name='旅程功能').get_by_role('link', name='行程', exact=True).click()
+        page.get_by_label('行程日期', exact=True).select_option(start)
+        view_more=page.get_by_role('button', name='查看更多：新增景點測試', exact=True)
+        expect(view_more).to_be_visible()
+        view_more.click()
+        details=page.get_by_role('dialog', name='新增景點測試', exact=True)
+        expect(details).to_be_visible()
+        # Every native dialog shares one body lock; closing a nested dialog must
+        # not unlock its parent. Actual wheel/touch behavior also needs device QA.
+        assert page.locator('body').evaluate('(node)=>getComputedStyle(node).position') == 'fixed'
+        scroll_before=page.evaluate('window.scrollY')
+        page.mouse.move(2,2)
+        page.mouse.wheel(0,500)
+        page.wait_for_timeout(100)
+        assert page.evaluate('window.scrollY')==scroll_before
+
+        expect(details.get_by_role('heading', name='集合細節', exact=True)).to_be_visible()
+        expect(details.get_by_role('link', name='集合餐廳', exact=True)).to_have_attribute('href','https://maps.app.goo.gl/example')
+        expect(details.get_by_role('link', name='官網', exact=True)).to_have_attribute('href','https://example.com/info')
+        details.get_by_role('button', name='關閉', exact=True).click()
+        expect(details).not_to_be_visible()
         page.get_by_role('button', name='登出', exact=True).click()
         expect(page.get_by_role('button', name='編輯行程', exact=True)).to_have_count(0)
         assert len(writes) == previous_writes + 1, len(writes)

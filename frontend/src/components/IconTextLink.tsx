@@ -32,3 +32,27 @@ export function IconTextLink({
     </a>
   );
 }
+
+export function TextLinkButton({
+  children,
+  onClick,
+  label,
+  opensDialog = false,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  label?: string;
+  opensDialog?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`${styles.link} ${styles.button}`}
+      onClick={onClick}
+      aria-label={label}
+      aria-haspopup={opensDialog ? "dialog" : undefined}
+    >
+      <span>{children}</span>
+    </button>
+  );
+}

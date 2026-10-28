@@ -1,0 +1,114 @@
+.subtitleParagraph {
+  display: block;
+  white-space: pre-wrap;
+}
+.subtitleParagraph + .subtitleParagraph {
+  margin-top: 4px;
+}
+.body {
+  font-size: 14px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.body > * + * {
+  margin-top: 12px;
+}
+.body h1,
+.body h2,
+.body h3,
+.body h4,
+.body h5,
+.body h6 {
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: normal;
+}
+.body h1 {
+  font-size: 22px;
+}
+.body h2 {
+  font-size: 20px;
+}
+.body h3 {
+  font-size: 18px;
+}
+.body h4,
+.body h5,
+.body h6 {
+  font-size: 16px;
+}
+.body ul,
+.body ol {
+  padding-left: 24px;
+}
+.body ul {
+  list-style: disc;
+}
+.body ol {
+  list-style: decimal;
+}
+.body li + li {
+  margin-top: 4px;
+}
+.body li > * + * {
+  margin-top: 8px;
+}
+.body blockquote {
+  margin-left: 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+}
+.body pre {
+  overflow-x: auto;
+  padding: 8px;
+  border-radius: 4px;
+  background: #f3ebdf;
+}
+.body code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+.body :not(pre) > code {
+  background: #f3ebdf;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+.body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.body th,
+.body td {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.body th {
+  font-weight: 700;
+}
+.body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+.body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 12px 0;
+}
+.body input[type="checkbox"] {
+  width: auto;
+  margin-right: 4px;
+}
+@media print {
+  .body pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .body table {
+    font-size: 12px;
+  }
+}

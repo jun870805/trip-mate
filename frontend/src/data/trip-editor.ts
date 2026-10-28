@@ -1,7 +1,7 @@
 import schema from "./schema.json" with { type: "json" };
 import {
   insertItinerary,
-  moveItinerary,
+  hasItineraryTimeConflict,
   orderedItinerary,
 } from "./itinerary.ts";
 import rules from "./id-rules.json" with { type: "json" };
@@ -155,7 +155,12 @@ export function readRows(book: Workbook, sheet: TripSheetName): Row[] {
     .filter((row) => row.some((value) => String(value).trim()))
     .map((row) =>
       Object.fromEntries(
-        headers.map((key, index) => [key, String(row[index] ?? "").trim()]),
+        headers.map((key, index) => [
+          key,
+          sheet === "每日行程" && key === "內文"
+            ? String(row[index] ?? "")
+            : String(row[index] ?? "").trim(),
+        ]),
       ),
     );
 }
@@ -190,6 +195,11 @@ function rowIndex(
   );
 }
 function put(book: Workbook, sheet: TripSheetName, values: Row, index: number) {
+  if (
+    sheet === "每日行程" &&
+    !book[sheet][0].some((value) => String(value).trim() === "內文")
+  )
+    book[sheet][0].push("內文");
   if (sheet === "航班" || sheet === "飯店") {
     for (const field of sheet === "航班"
       ? ["出發航廈", "抵達航廈"]
@@ -338,29 +348,45 @@ export function mutateTripBook(
         let ordered: Row[];
         if (mutation.itineraryOrder) {
           const ids = mutation.itineraryOrder;
+          const rest = orderedItinerary(
+            sameDay.filter((row) => row[key] !== id),
+          );
           check(
             mode === "edit" &&
-              previous?.["日期"] === values["日期"] &&
-              ids.length === sameDay.length &&
+              !!previous &&
+              ids.length === rest.length + 1 &&
               new Set(ids).size === ids.length &&
-              sameDay.every((row) => ids.includes(row[key])),
+              ids.includes(id) &&
+              rest.every((row) => ids.includes(row[key])),
             "行程排序資料已變更，請重新讀取。",
           );
-          const updated = sameDay.map((row) =>
-            row[key] === id ? { ...values, 排序: row["排序"] } : row,
-          );
-          const moved = moveItinerary(updated, id, ids.indexOf(id));
           check(
-            ids.every((item, index) => moved.rows[index][key] === item),
+            ids
+              .filter((item) => item !== id)
+              .every((item, index) => rest[index][key] === item),
             "每次只能調整一筆行程的排序。",
           );
-          ordered = ids.map(
-            (item) => updated.find((row) => row[key] === item)!,
+          ordered = ids.map((item) =>
+            item === id ? values : rest.find((row) => row[key] === item)!,
           );
           check(
-            !moved.conflict,
+            !hasItineraryTimeConflict(ordered, id),
             "調整後時間順序不符，請確認移除時間後再排序。",
           );
+          if (previous!["日期"] !== values["日期"]) {
+            orderedItinerary(
+              existing.filter(
+                (row) => row["日期"] === previous!["日期"] && row[key] !== id,
+              ),
+            ).forEach((row, index) => {
+              put(
+                book,
+                sheet,
+                { ...row, 排序: String((index + 1) * 10) },
+                rowIndex(book, sheet, key, row[key]),
+              );
+            });
+          }
         } else if (
           previous &&
           previous["日期"] === values["日期"] &&

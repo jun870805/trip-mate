@@ -1,11 +1,12 @@
 import { useItineraryDrag } from "../hooks/useItineraryDrag";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { Row, Trip } from "../data/portal";
 import type { TripMutation } from "../data/trip-editor";
 import {
   tripDates,
   orderedItinerary,
-  moveItinerary,
+  moveItineraryToDay,
+  tripDayNumber,
   readReorderPreference,
   writeReorderPreference,
 } from "../data/itinerary";
@@ -96,12 +97,19 @@ export function ItineraryList({
       ...rows.map((row) => row["日期"]),
     ]),
   ].sort();
-  const entries = orderedItinerary(rows.filter((row) => row["日期"] === day));
+  const entries = orderedItinerary(
+    rows.filter((row) => day === "all" || row["日期"] === day),
+  );
   const [pending, setPending] = useState<Move | null>(null);
   const [notice, setNotice] = useState("");
   const revision = JSON.stringify([
     day,
-    entries.map((row) => [row["行程ID"], row["排序"], row["開始時間"]]),
+    entries.map((row) => [
+      row["行程ID"],
+      row["日期"],
+      row["排序"],
+      row["開始時間"],
+    ]),
   ]);
   const drag = useItineraryDrag({
     revision,
@@ -138,18 +146,26 @@ export function ItineraryList({
       itineraryOrder: move.ids,
     });
   }
-  function move(id: string, index: number) {
+  function move(id: string, date: string, index: number) {
+    if (busy || pending || date < trip.start || date > trip.end) return false;
+    const row = rows.find((row) => row["行程ID"] === id);
+    if (!row) return false;
+    const current = orderedItinerary(
+      rows.filter((row) => row["日期"] === date),
+    );
     if (
-      busy ||
-      pending ||
-      index < 0 ||
-      index >= entries.length ||
-      entries.findIndex((row) => row["行程ID"] === id) === index
+      row["日期"] === date &&
+      current.findIndex((row) => row["行程ID"] === id) === index
     )
       return false;
-    const result = moveItinerary(entries, id, index);
+    if (
+      index < 0 ||
+      index > current.filter((row) => row["行程ID"] !== id).length
+    )
+      return false;
+    const result = moveItineraryToDay(rows, id, date, index);
     const value = {
-      row: entries.find((row) => row["行程ID"] === id)!,
+      row: result.rows.find((row) => row["行程ID"] === id)!,
       ids: result.rows.map((row) => row["行程ID"]),
       conflict: result.conflict,
     };
@@ -176,6 +192,7 @@ export function ItineraryList({
           disabled={busy || dragging}
           onChange={(event) => onDay(event.target.value)}
         >
+          <option value="all">全部日期</option>
           {dates.map((date) => (
             <option key={date} value={date}>
               {displayDate(date)}
@@ -184,8 +201,7 @@ export function ItineraryList({
         </select>
       </label>
       <p className={styles.hint}>
-        <span className={styles.mobileHint}>按住拖曳圖示調整順序。</span>
-        <span className={styles.desktopHint}>使用上下箭頭調整順序。</span>
+        按住拖曳圖示調整順序；選擇全部日期可跨天移動。
       </p>
       {notice && (
         <p role="status" className="form-error">
@@ -193,97 +209,137 @@ export function ItineraryList({
         </p>
       )}
       <div ref={drag.list} className={styles.list}>
-        {entries.map((row, index) => (
-          <article
-            key={row["行程ID"]}
-            data-itinerary-id={row["行程ID"]}
-            className={`${styles.row} ${drag.preview ? styles.sorting : ""} ${drag.preview?.dragging && drag.preview.id === row["行程ID"] ? styles.dragging : ""}`}
-            style={
-              drag.preview
-                ? {
-                    transform: `translate3d(0, ${drag.preview.shifts[index]}px, 0)`,
-                  }
-                : undefined
-            }
-            data-dragging={
-              drag.preview?.dragging && drag.preview.id === row["行程ID"]
-                ? "true"
-                : undefined
-            }
-          >
-            <div className={styles.moveButtons}>
-              <button
-                type="button"
-                aria-label={`上移「${row["標題"]}」`}
-                title="上移"
-                disabled={busy || !!pending || index === 0}
-                onClick={() => move(row["行程ID"], index - 1)}
-              >
-                <Icon name="up" size={16} />
-              </button>
-              <button
-                type="button"
-                aria-label={`下移「${row["標題"]}」`}
-                title="下移"
-                disabled={busy || !!pending || index === entries.length - 1}
-                onClick={() => move(row["行程ID"], index + 1)}
-              >
-                <Icon name="down" size={16} />
-              </button>
-            </div>
-            <button
-              type="button"
-              className={styles.handle}
-              data-drag-handle="true"
-              aria-label={`調整「${row["標題"]}」順序`}
-              aria-pressed={
-                drag.preview?.dragging && drag.preview.id === row["行程ID"]
+        {(day === "all" ? dates : [day]).map((date) => {
+          const dateRows = entries.filter((row) => row["日期"] === date);
+          const remaining = dateRows.filter(
+            (row) => row["行程ID"] !== drag.preview?.id,
+          );
+          const target = drag.preview?.date === date;
+          const placeholder = (
+            <div
+              className={styles.placeholder}
+              data-drag-placeholder="true"
+              aria-hidden="true"
+              style={{ height: drag.preview?.height }}
+            />
+          );
+          return (
+            <section
+              key={date}
+              className={styles.day}
+              data-drop-date={
+                date >= trip.start && date <= trip.end ? date : undefined
               }
-              disabled={busy || !!pending || entries.length < 2}
-              onPointerDown={(event) => drag.start(event, row["行程ID"], index)}
-              onPointerMove={drag.update}
-              onPointerUp={drag.end}
-              onPointerCancel={drag.interrupted}
-              onLostPointerCapture={drag.interrupted}
-              onKeyDown={(event) => {
-                if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-                  event.preventDefault();
-                  move(
-                    row["行程ID"],
-                    index + (event.key === "ArrowUp" ? -1 : 1),
-                  );
-                }
-              }}
             >
-              <Icon name="grip" size={18} />
-            </button>
-            <div className={styles.content}>
-              <div className={styles.heading}>
-                {row["開始時間"] && <time>{row["開始時間"]}</time>}
-                <strong title={row["標題"]}>{row["標題"]}</strong>
+              {day === "all" && (
+                <h3 className={styles.dayHeading}>
+                  DAY {tripDayNumber(date, trip.start)} {displayDate(date)}
+                </h3>
+              )}
+              <div className={styles.dayRows}>
+                {dateRows.map((row, index) => (
+                  <Fragment key={row["行程ID"]}>
+                    {target &&
+                      row["行程ID"] !== drag.preview?.id &&
+                      remaining.indexOf(row) === drag.preview?.index &&
+                      placeholder}
+                    <article
+                      key={row["行程ID"]}
+                      data-itinerary-id={row["行程ID"]}
+                      className={`${styles.row} ${drag.preview?.id === row["行程ID"] ? styles.floating : ""} ${drag.preview?.dragging && drag.preview.id === row["行程ID"] ? styles.dragging : ""}`}
+                      style={
+                        drag.preview?.id === row["行程ID"]
+                          ? {
+                              position: "fixed",
+                              top: drag.preview.top,
+                              left: drag.preview.left,
+                              width: drag.preview.width,
+                              height: drag.preview.height,
+                            }
+                          : undefined
+                      }
+                      data-dragging={
+                        drag.preview?.dragging &&
+                        drag.preview.id === row["行程ID"]
+                          ? "true"
+                          : undefined
+                      }
+                    >
+                      <button
+                        type="button"
+                        className={styles.handle}
+                        data-drag-handle="true"
+                        aria-label={`調整「${row["標題"]}」順序`}
+                        aria-pressed={
+                          drag.preview?.dragging &&
+                          drag.preview.id === row["行程ID"]
+                        }
+                        disabled={
+                          busy ||
+                          !!pending ||
+                          (day !== "all" && dateRows.length < 2)
+                        }
+                        onPointerDown={(event) =>
+                          drag.start(event, row["行程ID"], date, index)
+                        }
+                        onPointerMove={drag.update}
+                        onPointerUp={drag.end}
+                        onPointerCancel={drag.interrupted}
+                        onLostPointerCapture={drag.interrupted}
+                        onKeyDown={(event) => {
+                          if (drag.preview) return;
+                          if (
+                            event.key === "ArrowUp" ||
+                            event.key === "ArrowDown"
+                          ) {
+                            event.preventDefault();
+                            move(
+                              row["行程ID"],
+                              date,
+                              index + (event.key === "ArrowUp" ? -1 : 1),
+                            );
+                          }
+                        }}
+                      >
+                        <Icon name="grip" size={18} />
+                      </button>
+                      <div className={styles.content}>
+                        <div className={styles.heading}>
+                          {row["開始時間"] && <time>{row["開始時間"]}</time>}
+                          <strong title={row["標題"]}>{row["標題"]}</strong>
+                        </div>
+                      </div>
+                      <div className={styles.actions}>
+                        <button
+                          type="button"
+                          className="quiet-button"
+                          disabled={busy || !!pending || dragging}
+                          onClick={() => onEdit(row)}
+                        >
+                          編輯
+                        </button>
+                        <button
+                          type="button"
+                          className="quiet-button delete-button"
+                          disabled={busy || !!pending || dragging}
+                          onClick={() => onRemove(row)}
+                        >
+                          刪除
+                        </button>
+                      </div>
+                    </article>
+                  </Fragment>
+                ))}
+                {target &&
+                  drag.preview?.index === remaining.length &&
+                  placeholder}
+                {!dateRows.length && !target && (
+                  <Empty>尚未安排當日行程。</Empty>
+                )}
               </div>
-            </div>
-            <div className={styles.actions}>
-              <button
-                type="button"
-                className="quiet-button"
-                disabled={busy || !!pending || dragging}
-                onClick={() => onEdit(row)}
-              >
-                編輯
-              </button>
-              <button
-                type="button"
-                className="quiet-button delete-button"
-                disabled={busy || !!pending || dragging}
-                onClick={() => onRemove(row)}
-              >
-                刪除
-              </button>
-            </div>
-          </article>
-        ))}
-        {!entries.length && <Empty>尚未安排當日行程。</Empty>}
+            </section>
+          );
+        })}
       </div>
       {pending && (
         <ConflictDialog

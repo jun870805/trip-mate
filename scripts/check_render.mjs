@@ -17,6 +17,8 @@ try {
         import { Overview, Itinerary, Fund, Expenses, Tasks } from './src/pages/TripViews'
         import App from './src/App'
         import { ItineraryList } from './src/components/ItineraryList'
+        import { MarkdownContent } from './src/components/MarkdownContent'
+        import { ItineraryDetailsDialog } from './src/components/ItineraryDetailsDialog'
         import { ItineraryNotes } from './src/components/ItineraryNotes'
         import { TripMetadata } from './src/components/TripMetadata'
         import { FlightPages } from './src/components/FlightPages'
@@ -138,28 +140,63 @@ try {
         const internalLink=renderToStaticMarkup(createElement(IconTextLink,{href:'/trip/T001',icon:'back',external:false},'所有旅程'))
         assert.ok(internalLink.includes('href="/trip/T001"') && !internalLink.includes('target='))
         const simpleNotes=renderToStaticMarkup(createElement(ItineraryNotes,{note:'餐廳 https://maps.app.goo.gl/example'}))
-        assert.ok(simpleNotes.includes('<svg') && simpleNotes.includes('>Google Maps</span></a>') && simpleNotes.includes('<span>餐廳 </span>') && simpleNotes.includes('rel="noopener noreferrer"'))
+        assert.ok(simpleNotes.includes('<svg') && simpleNotes.includes('>Google Maps</span></a>') && simpleNotes.includes('餐廳 <a ') && simpleNotes.includes('rel="noopener noreferrer"'))
         const fullMapNotes=renderToStaticMarkup(createElement(ItineraryNotes,{note:'集合 https://www.google.com/maps/place/大阪城/ 出發'}))
         assert.ok(fullMapNotes.includes('>Google Maps</span></a>') && !fullMapNotes.includes('>大阪城</span></a>'))
-        assert.ok(fullMapNotes.includes('<span>集合 </span>') && fullMapNotes.includes('<span> 出發</span>'))
+        assert.ok(fullMapNotes.includes('集合 <a ') && fullMapNotes.includes('</a> 出發'))
         const externalNotes=renderToStaticMarkup(createElement(ItineraryNotes,{note:'網站 https://example.com/menu 備註'}))
         assert.ok(externalNotes.includes('href="https://example.com/menu"') && externalNotes.includes('>開啟連結</span></a>'))
-        assert.ok(externalNotes.includes('<span>網站 </span>') && externalNotes.includes('<span> 備註</span>'))
+        assert.ok(externalNotes.includes('網站 <a ') && externalNotes.includes('</a> 備註'))
         assert.ok(!externalNotes.includes('>Google Maps</span></a>') && externalNotes.includes('rel="noopener noreferrer"'))
+        const punctuatedSubtitle=renderToStaticMarkup(createElement(ItineraryNotes,{note:'午餐 https://example.com/menu。集合'}))
+        assert.ok(punctuatedSubtitle.includes('href="https://example.com/menu"') && punctuatedSubtitle.includes('。集合'), 'Bare URL punctuation remains ordinary subtitle text')
+        const namedSubtitle=renderToStaticMarkup(createElement(ItineraryNotes,{note:'集合 [交通資訊](https://example.com/transit) 後出發'}))
+        assert.ok(namedSubtitle.includes('>交通資訊</span></a>') && namedSubtitle.includes('href="https://example.com/transit"'))
+        assert.ok(!namedSubtitle.includes('>開啟連結</span></a>') && namedSubtitle.includes('集合 <a '))
+        const namedMap=renderToStaticMarkup(createElement(ItineraryNotes,{note:'[集合地圖](https://maps.app.goo.gl/example)'}))
+        assert.ok(namedMap.includes('>集合地圖</span></a>') && !namedMap.includes('>Google Maps</span></a>') && namedMap.includes('M14 3h7v7'))
+        const blockedSubtitle=renderToStaticMarkup(createElement(ItineraryNotes,{note:'[連結文字](javascript:alert(1))'}))
+        assert.ok(blockedSubtitle.includes('連結文字') && !blockedSubtitle.includes('<a '))
+        const markdownText='# 集合資訊'+String.fromCharCode(10,10)+'**重點** 與 *提醒*'+String.fromCharCode(10,10)+'- 第一項'+String.fromCharCode(10)+'- [網站](https://example.com/info)'+String.fromCharCode(10,10)+'| 欄位 | 值 |'+String.fromCharCode(10)+'| --- | --- |'+String.fromCharCode(10)+'| A | B |'
+        const markdownHtml=renderToStaticMarkup(createElement(MarkdownContent,{text:markdownText}))
+        for(const markup of ['<h1>集合資訊</h1>','<strong>重點</strong>','<em>提醒</em>','<ul>','<table>','>網站</span></a>']) assert.ok(markdownHtml.includes(markup),markup)
+        const unsafeMarkdown=renderToStaticMarkup(createElement(MarkdownContent,{text:'[危險](javascript:alert(1)) <script>alert(1)</script>'}))
+        assert.ok(!unsafeMarkdown.includes('href="javascript:') && !unsafeMarkdown.includes('<script>'))
+        const codeMarkdown=renderToStaticMarkup(createElement(MarkdownContent,{text:'    <script>code</script>'}))
+        assert.ok(codeMarkdown.includes('<pre><code>') && codeMarkdown.includes('&lt;script&gt;') && !codeMarkdown.includes('<script>'))
+        const imageMarkdown=renderToStaticMarkup(createElement(MarkdownContent,{text:'![圖片](https://example.com/photo.jpg) ![危險](javascript:alert(1))'}))
+        assert.ok(imageMarkdown.includes('src="https://example.com/photo.jpg"') && !imageMarkdown.includes('src="javascript:'))
+        const bodyRow={...data.tables['每日行程'][0],說明:'副標 [交通](https://example.com/transit)',類型:'交通',內文:markdownText}
+        const bodyData={...data,tables:{...data.tables,每日行程:[bodyRow]}}
+        const bodyHtml=renderToStaticMarkup(createElement(Itinerary,{data:bodyData}))
+        assert.ok(bodyHtml.includes('查看更多') && bodyHtml.includes('aria-label="查看更多：搭機出發"'))
+        assert.ok(bodyHtml.includes('print-only') && bodyHtml.includes('<strong>重點</strong>'), 'PDF includes the Markdown body without opening a dialog')
+        assert.ok(!itineraryHtml.includes('查看更多'), 'Legacy entries without a body do not show a view-more button')
+        const nl=String.fromCharCode(10), escapedNl=String.fromCharCode(92)+'n'
+        const multilineRow={...bodyRow,標題:['第一行',escapedNl,'第二行',nl,'第三行'].join(''),說明:['集合',escapedNl,'[官網](https://example.com/info)',nl,'準時'].join('')}
+        const multilineHtml=renderToStaticMarkup(createElement(Itinerary,{data:{...bodyData,tables:{...bodyData.tables,每日行程:[multilineRow]}}}))
+        assert.ok(multilineHtml.includes('>'+['第一行','第二行','第三行'].join(nl)+'</h4>'), 'Itinerary titles render actual and escaped line breaks')
+        const multilineDialog=renderToStaticMarkup(createElement(ItineraryDetailsDialog,{row:multilineRow,subtitle:multilineRow['說明'],onClose(){}}))
+        assert.ok(multilineDialog.includes(['第一行','第二行','第三行'].join(nl)) && multilineDialog.includes('集合'+nl+'<a') && multilineDialog.includes('準時'), 'Details retain title and subtitle line breaks around named links')
+        const multilineSubtitle=renderToStaticMarkup(createElement(MarkdownContent,{text:multilineRow['說明'],inline:true}))
+        assert.ok(multilineSubtitle.includes('集合'+nl+'<a') && multilineSubtitle.includes('href="https://example.com/info"') && multilineSubtitle.includes('官網'), 'Normalize before parsing to preserve Markdown link source positions')
+        const detailHtml=renderToStaticMarkup(createElement(ItineraryDetailsDialog,{row:bodyRow,subtitle:bodyRow['說明'],onClose(){}}))
+        for(const value of ['搭機出發','副標','>交通</span>','<strong>重點</strong>','關閉']) assert.ok(detailHtml.includes(value),value)
         const escapedNotes=renderToStaticMarkup(createElement(ItineraryNotes,{note:'<script>alert(1)</script>'}))
         assert.ok(!escapedNotes.includes('<script>') && escapedNotes.includes('&lt;script&gt;'))
         const itineraryList=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:data.tables['每日行程'],day:trip.start,busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
-        assert.ok(itineraryList.includes('上移「搭機出發」') && itineraryList.includes('編輯行程日期'))
+        assert.ok(itineraryList.includes('調整「搭機出發」順序') && itineraryList.includes('編輯行程日期'))
         const hiddenEditNotes=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:[{...data.tables['每日行程'][0],說明:'編輯卡片不顯示這段備註',地點:'隱藏地點預覽',地圖網址:'https://maps.app.goo.gl/hidden'}],day:trip.start,busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
         assert.ok(!hiddenEditNotes.includes('編輯卡片不顯示這段備註') && !hiddenEditNotes.includes('隱藏地點預覽') && !hiddenEditNotes.includes('maps.app.goo.gl/hidden'))
-        assert.ok(!hiddenEditNotes.includes('data-no-drag') && hiddenEditNotes.includes('data-drag-handle="true"'), 'Only the mobile handle captures dragging; card bodies use native scrolling')
-        const moveControls=[...itineraryList.matchAll(/<button[^>]*aria-label="(?:上移|下移)[^"]*"[^>]*>/g)].map(match=>match[0])
-        assert.equal(moveControls.length,4)
-        assert.ok(moveControls[0].includes('disabled') && !moveControls[1].includes('disabled') && !moveControls[2].includes('disabled') && moveControls[3].includes('disabled'), 'Disable up on first row and down on last row')
+        assert.ok(!hiddenEditNotes.includes('data-no-drag') && hiddenEditNotes.includes('data-drag-handle="true"'), 'Only the handle captures dragging; card bodies use native scrolling')
+        assert.ok(itineraryList.includes('<option value="all">全部日期</option>'))
+        assert.ok(!itineraryList.includes('上移「') && !itineraryList.includes('下移「'), 'All viewports use drag handles')
+        const allDates=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:[data.tables['每日行程'][0]],day:'all',busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
+        assert.ok(allDates.includes('data-drop-date="2027-05-02"') && allDates.includes('DAY 2') && allDates.includes('尚未安排當日行程。'), 'Empty trip dates remain drop destinations')
+        const allHandle=allDates.match(/<button[^>]*data-drag-handle="true"[^>]*>/)?.[0]
+        assert.ok(allHandle && !allHandle.includes('disabled'), 'A single entry can move to another day')
         const onlyOne=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:[data.tables['每日行程'][0]],day:trip.start,busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
-        const singleMoves=[...onlyOne.matchAll(/<button[^>]*aria-label="(?:上移|下移)[^"]*"[^>]*>/g)]
-        assert.equal(singleMoves.length,2)
-        assert.ok(singleMoves.every(match=>match[0].includes('disabled')), 'A single itinerary has no adjacent rows')
+        assert.ok(onlyOne.match(/<button[^>]*data-drag-handle="true"[^>]*>/)?.[0].includes('disabled'), 'A single-day view with one entry has no other slot')
         assert.ok(!itineraryList.replace(/<[^>]*>/g,'').includes('I001') && !itineraryList.includes('行程ID'))
         assert.ok(!itineraryHtml.includes('出發航廈：') && !itineraryHtml.includes('抵達航廈：'))
         assert.ok(itineraryHtml.includes('class="'+bookingStyles['booking-stack']+'"') && !itineraryHtml.includes('class="two-column"'))
@@ -269,7 +306,7 @@ try {
           for(const input of form.matchAll(/<input[^>]*aria-haspopup="dialog"[^>]*>/g)) assert.ok(input[0].includes('value=""'), entity+' must not prefill date/time inputs')
           if(entity==='開團待辦') assert.ok(form.includes('負責人') && form.includes('<select'))
           if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址') && form.includes('訂房網站') && form.includes('價格') && form.includes('副標題'))
-          if(entity==='每日行程') { const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','內容','備註','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('2027/05/03')); }
+          if(entity==='每日行程') { const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','標題','副標','內文','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('2027/05/03')); }
           if(entity==='航班') {assert.ok(form.includes('出發航廈') && form.includes('抵達航廈'));assert.ok(form.includes('出發當地時間') && form.includes('抵達當地時間'));assert.ok(!form.includes('時差'));}
           if(entity==='公積金') assert.ok(form.includes('個人金額') && form.includes('checkbox'))
           if(entity==='行前費用') assert.ok(form.includes('實際刷卡金額') && form.includes('TWD'))

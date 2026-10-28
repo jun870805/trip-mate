@@ -178,3 +178,22 @@ select:not([multiple])[size="1"] {
     background-image: none;
   }
 }
+
+/* Prevent a dialog's edge scrolling from reaching its parent or the page. */
+dialog,
+[role="dialog"] {
+  overscroll-behavior: contain;
+}
+@media print {
+  html,
+  body {
+    overflow: visible !important;
+  }
+  body {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    width: auto !important;
+    padding-right: 0 !important;
+  }
+}

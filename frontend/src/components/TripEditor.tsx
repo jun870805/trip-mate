@@ -14,7 +14,7 @@ import type { RecordKind } from "../data/record-id";
 import { normalizeLocalDateTime } from "../data/timezone";
 import { DatePicker } from "./DatePicker";
 import { RequiredMark } from "./RequiredMark";
-import { tripDates } from "../data/itinerary";
+import { tripDates, itinerarySubtitle } from "../data/itinerary";
 import {
   createTripEditor,
   readRows,
@@ -213,7 +213,7 @@ export function TripEditor({
     [needsReload, setNeedsReload] = useState(false),
     [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState("");
-  const [itineraryDay, setItineraryDay] = useState(trip.start);
+  const [itineraryDay, setItineraryDay] = useState("all");
   const active = useRef(false);
   useEffect(() => {
     const element = dialog.current!;
@@ -369,7 +369,9 @@ export function TripEditor({
                     row={target.row}
                     busy={busy}
                     initialDate={
-                      target.entity === "每日行程" ? itineraryDay : undefined
+                      target.entity === "每日行程" && itineraryDay !== "all"
+                        ? itineraryDay
+                        : undefined
                     }
                     canEditIds={isSuperUser(session, guideConfig)}
                     onCancel={() => setTarget(null)}
@@ -568,8 +570,9 @@ const fields: Record<BasicSheet, Field[]> = {
   每日行程: [
     { key: "日期", type: "date", required: true },
     { key: "開始時間", label: "時間", type: "time" },
-    { key: "標題", label: "內容", required: true },
-    { key: "說明", label: "備註", type: "textarea" },
+    { key: "標題", required: true, type: "textarea" },
+    { key: "說明", label: "副標", type: "textarea" },
+    { key: "內文", type: "textarea" },
     { key: "類型", label: "標籤" },
   ],
 };
@@ -586,10 +589,7 @@ function defaultValues(book: Workbook, entity: Entity, row: Row | null): Row {
     if (entity === "公積金") value["類型"] = "儲值";
     if (entity === "開團待辦") value["狀態"] = "待辦";
   }
-  if (entity === "每日行程" && row)
-    value["說明"] = [row["說明"], row["地點"], row["地圖網址"]]
-      .filter(Boolean)
-      .join("\n");
+  if (entity === "每日行程" && row) value["說明"] = itinerarySubtitle(row);
   if (entity === "公積金" && row && row["類型"] !== "調整")
     value["記帳金額"] = row["記帳金額"].replace(/^-/, "");
   if (entity === "航班" && row)
@@ -772,7 +772,7 @@ export function TripForm({
             required={isRequired}
             value={values[key] || ""}
             onChange={(event) => field(key, event.target.value)}
-            rows={3}
+            rows={key === "內文" ? 8 : key === "標題" ? 2 : 3}
           />
         ) : (
           <input

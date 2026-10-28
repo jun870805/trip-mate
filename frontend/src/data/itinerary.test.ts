@@ -2,12 +2,15 @@ import { it } from "node:test";
 import assert from "node:assert/strict";
 import {
   tripDates,
+  itinerarySubtitle,
+  hasItineraryBody,
   itineraryTags,
   matchesItineraryTag,
   tripDayNumber,
   orderedItinerary,
   insertItinerary,
   moveItinerary,
+  moveItineraryToDay,
   mapNotes,
   noteLinks,
   reorderPreferenceKey,
@@ -208,4 +211,48 @@ it("renders other web URLs separately from surrounding text and distinguishes Go
     noteLinks("https://www.google.com/maps/place/大阪/")[0].kind,
     "map",
   );
+});
+
+it("preserves legacy subtitle fields independently of the optional Markdown body", () => {
+  const row = {
+    說明: "副標 [網站](https://example.com)",
+    地點: "車站",
+    地圖網址: "https://maps.app.goo.gl/example",
+    內文: "## 集合",
+  };
+  assert.equal(
+    itinerarySubtitle(row),
+    "副標 [網站](https://example.com)\n車站\nhttps://maps.app.goo.gl/example",
+  );
+  assert.equal(hasItineraryBody(row), true);
+  assert.equal(hasItineraryBody({ 內文: "  \n " }), false);
+  assert.equal(hasItineraryBody({}), false);
+  assert.equal(itinerarySubtitle({}), "");
+});
+
+it("moves across days into an exact slot, preserves content, and checks destination times", () => {
+  const rows = [
+    row("I001", "09:00", 10),
+    row("I002", "12:00", 20),
+    { ...row("I003", "11:00", 10), 日期: "2027-05-02", 內文: "  markdown\n" },
+  ];
+  const moved = moveItineraryToDay(rows, "I003", "2027-05-01", 1);
+  assert.deepEqual(
+    moved.rows.map((r) => r["行程ID"]),
+    ["I001", "I003", "I002"],
+  );
+  assert.equal(moved.conflict, false);
+  assert.equal(moved.rows[1]["日期"], "2027-05-01");
+  assert.equal(moved.rows[1]["內文"], "  markdown\n");
+  assert.equal(
+    moveItineraryToDay(rows, "I003", "2027-05-01", 0).conflict,
+    true,
+  );
+  assert.equal(
+    moveItineraryToDay(rows, "I001", "2027-05-03", 0).conflict,
+    false,
+  );
+  assert.equal(rows[2]["日期"], "2027-05-02");
+  assert.throws(() => moveItineraryToDay(rows, "I999", "2027-05-01", 0));
+  assert.throws(() => moveItineraryToDay(rows, "I001", "2027-05-02", 3));
 });

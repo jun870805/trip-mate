@@ -47,3 +47,28 @@
     display: none;
   }
 }
+.subtitleRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.subtitleRow > p {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+}
+.more {
+  display: flex;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.printBody {
+  margin-top: 12px;
+}
+
+.title {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}

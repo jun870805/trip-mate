@@ -122,6 +122,7 @@ function table(book: Workbook, name: SheetName): Row[] {
     ensure(
       headers.includes(header) ||
         (name === "航班" && ["出發航廈", "抵達航廈"].includes(header)) ||
+        (name === "每日行程" && header === "內文") ||
         (name === "飯店" &&
           [
             "入住時間",
@@ -139,7 +140,12 @@ function table(book: Workbook, name: SheetName): Row[] {
     .filter(({ row }) => row.some((v) => String(v).trim() !== ""))
     .map(({ row, index }) => {
       const result = Object.fromEntries(
-        headers.map((h, i) => [h, String(row[i] ?? "").trim()]),
+        headers.map((h, i) => [
+          h,
+          name === "每日行程" && h === "內文"
+            ? String(row[i] ?? "")
+            : String(row[i] ?? "").trim(),
+        ]),
       );
       locations.set(result, `${name} 第 ${index + 2} 列`);
       assertRecordIds(result, `${name} 第 ${index + 2} 列`);

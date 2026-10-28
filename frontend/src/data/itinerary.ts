@@ -57,13 +57,31 @@ export function moveItinerary(
     throw Error("無效的行程排序。");
   const [entry] = ordered.splice(from, 1);
   ordered.splice(index, 0, entry);
+  return { rows: ordered, conflict: hasItineraryTimeConflict(ordered, id) };
+}
+export function hasItineraryTimeConflict(ordered: Row[], id: string): boolean {
   const timed = ordered.filter((row) => row["開始時間"]);
   const i = timed.findIndex((row) => row["行程ID"] === id);
-  const conflict =
+  return (
     i >= 0 &&
-    ((i > 0 && timed[i - 1]["開始時間"] > entry["開始時間"]) ||
-      (i < timed.length - 1 && timed[i + 1]["開始時間"] < entry["開始時間"]));
-  return { rows: ordered, conflict };
+    ((i > 0 && timed[i - 1]["開始時間"] > timed[i]["開始時間"]) ||
+      (i < timed.length - 1 && timed[i + 1]["開始時間"] < timed[i]["開始時間"]))
+  );
+}
+export function moveItineraryToDay(
+  rows: Row[],
+  id: string,
+  date: string,
+  index: number,
+): { rows: Row[]; conflict: boolean } {
+  const entry = rows.find((row) => row["行程ID"] === id);
+  const ordered = orderedItinerary(
+    rows.filter((row) => row["日期"] === date && row["行程ID"] !== id),
+  );
+  if (!entry || !Number.isInteger(index) || index < 0 || index > ordered.length)
+    throw Error("無效的行程排序。");
+  ordered.splice(index, 0, { ...entry, 日期: date });
+  return { rows: ordered, conflict: hasItineraryTimeConflict(ordered, id) };
 }
 export interface NotePart {
   text: string;
@@ -173,4 +191,11 @@ export function tripDayNumber(date: string, start: string): number | null {
     return null;
   const day = (current.getTime() - first.getTime()) / 86400000 + 1;
   return day >= 1 ? day : null;
+}
+
+export function itinerarySubtitle(row: Row): string {
+  return [row["說明"], row["地點"], row["地圖網址"]].filter(Boolean).join("\n");
+}
+export function hasItineraryBody(row: Row): boolean {
+  return !!row["內文"]?.trim();
 }

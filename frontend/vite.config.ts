@@ -10,6 +10,16 @@ export default defineConfig(({ mode }) => {
       ...process.env,
       ...loadEnv(mode, process.cwd(), "VITE_"),
     }),
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            react: ["react", "react-dom"],
+            markdown: ["react-markdown", "remark-gfm"],
+          },
+        },
+      },
+    },
     plugins: [
       react(),
       tailwindcss(),

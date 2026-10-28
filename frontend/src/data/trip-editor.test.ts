@@ -394,8 +394,8 @@ it("preserves reordered and extra columns, literal formulas and expands the shee
     "=not-a-formula",
   );
 });
-function fakeApi() {
-  let book = structuredClone(demo),
+function fakeApi(initialBook = demo) {
+  let book = structuredClone(initialBook),
     writes = 0,
     denied = 0,
     failAfter = false;
@@ -1140,4 +1140,198 @@ it("adds a separate hotel subtitle without migrating or overwriting existing not
     next["飯店"][1].slice(0, book["飯店"][0].length),
     book["飯店"][1],
   );
+});
+it("adds optional Markdown itinerary body to legacy sheets and preserves subtitle and existing data", () => {
+  const book = structuredClone(demo),
+    col = book["每日行程"][0].indexOf("內文");
+  if (col >= 0) for (const cells of book["每日行程"]) cells.splice(col, 1);
+  assert.doesNotThrow(() => parseTrip(trip, book));
+  const row = readRows(book, "每日行程")[0];
+  const body =
+    "## 集合資訊\n\n- 請準時\n- [交通資訊](https://example.com/transit)\n\n**注意事項**";
+  const next = mutateTripBook(trip, book, {
+    kind: "record",
+    mode: "edit",
+    sheet: "每日行程",
+    id: row["行程ID"],
+    values: { ...row, 內文: body },
+  });
+  const saved = parseTrip(trip, next).tables["每日行程"].find(
+    (r) => r["行程ID"] === row["行程ID"],
+  )!;
+  assert.equal(saved["內文"], body);
+  assert.equal(saved["說明"], row["說明"]);
+  assert.equal(saved["標題"], row["標題"]);
+  const index =
+    readRows(next, "每日行程").findIndex((r) => r["行程ID"] === row["行程ID"]) +
+    1;
+  assert.deepEqual(
+    next["每日行程"][index].slice(0, book["每日行程"][0].length).map(String),
+    book["每日行程"][index].map(String),
+  );
+  const cleared = mutateTripBook(trip, next, {
+    kind: "record",
+    mode: "edit",
+    sheet: "每日行程",
+    id: row["行程ID"],
+    values: { ...saved, 內文: "" },
+  });
+  assert.equal(readRows(cleared, "每日行程")[0]["內文"], "");
+});
+it("keeps Markdown indentation and trailing line breaks when reading and editing itinerary bodies", () => {
+  const row = readRows(demo, "每日行程")[0];
+  const body = "    const code = true;\n\n段落  \n下一行\n";
+  const next = mutateTripBook(trip, demo, {
+    kind: "record",
+    mode: "edit",
+    sheet: "每日行程",
+    id: row["行程ID"],
+    values: { ...row, 內文: body },
+  });
+  assert.equal(readRows(next, "每日行程")[0]["內文"], body);
+  assert.equal(parseTrip(trip, next).tables["每日行程"][0]["內文"], body);
+});
+
+it("upgrades a legacy itinerary body header and content in one authorized batch while preserving extra columns", async () => {
+  const legacy = structuredClone(demo),
+    col = legacy["每日行程"][0].indexOf("內文");
+  for (const cells of legacy["每日行程"]) cells.splice(col, 1);
+  legacy["每日行程"][0].push("維護備註");
+  legacy["每日行程"][1].push("保留原資料");
+  const api = fakeApi(legacy),
+    editor = createTripEditor(trip, "itinerary", config, api.fetcher),
+    snapshot = await editor.read(session);
+  const row = readRows(snapshot.book, "每日行程")[0];
+  const body = "## 集合\n\n[資訊](https://example.com/info)\n";
+  const saved = await editor.save(session, snapshot, {
+    kind: "record",
+    mode: "edit",
+    sheet: "每日行程",
+    id: row["行程ID"],
+    values: { ...row, 內文: body },
+  });
+  assert.equal(api.writes, 1);
+  assert.equal(readRows(saved.book, "每日行程")[0]["內文"], body);
+  assert.equal(readRows(saved.book, "每日行程")[0]["維護備註"], "保留原資料");
+  assert.equal(saved.book["每日行程"][0].at(-1), "內文");
+});
+
+it("moves an itinerary across days in one authorized batch and normalizes both dates", async () => {
+  const api = fakeApi(),
+    editor = createTripEditor(trip, "itinerary", config, api.fetcher);
+  const before = await editor.read(session);
+  const rows = readRows(before.book, "每日行程");
+  const moved = rows.find((r) => r["日期"] === trip.start)!;
+  const date = "2027-05-02";
+  const target = rows
+    .filter((r) => r["日期"] === date)
+    .sort((a, b) => Number(a["排序"]) - Number(b["排序"]));
+  const mutation = {
+    kind: "record" as const,
+    mode: "edit" as const,
+    sheet: "每日行程" as const,
+    id: moved["行程ID"],
+    values: {
+      ...moved,
+      日期: date,
+      開始時間: "",
+      結束時間: "",
+      內文: "  preserved\n",
+    },
+    itineraryOrder: [...target.map((r) => r["行程ID"]), moved["行程ID"]],
+  };
+  const result = await editor.save(session, before, mutation);
+  assert.equal(api.writes, 1);
+  const after = readRows(result.book, "每日行程");
+  assert.equal(
+    after.find((r) => r["行程ID"] === moved["行程ID"])?.["日期"],
+    date,
+  );
+  assert.equal(
+    after.find((r) => r["行程ID"] === moved["行程ID"])?.["內文"],
+    "  preserved\n",
+  );
+  for (const day of [trip.start, date]) {
+    const entries = after
+      .filter((r) => r["日期"] === day)
+      .sort((a, b) => Number(a["排序"]) - Number(b["排序"]));
+    assert.deepEqual(
+      entries.map((r) => r["排序"]),
+      entries.map((_, i) => String((i + 1) * 10)),
+    );
+  }
+  assert.deepEqual(result.book["航班"], before.book["航班"]);
+  assert.throws(
+    () =>
+      mutateTripBook(trip, before.book, {
+        ...mutation,
+        itineraryOrder: [moved["行程ID"]],
+      }),
+    /排序/,
+  );
+  assert.throws(
+    () =>
+      mutateTripBook(trip, before.book, {
+        ...mutation,
+        values: { ...mutation.values, 日期: "2027-06-01" },
+      }),
+    /日期/,
+  );
+  await assert.rejects(() => editor.save(session, before, mutation));
+  assert.equal(api.writes, 1);
+});
+it("preserves valid times across dates, requires confirmation for conflicts and accepts an empty destination", () => {
+  const rows = readRows(demo, "每日行程");
+  const moved = rows.find((row) => row["行程ID"] === "I001")!;
+  const mutation = {
+    kind: "record" as const,
+    mode: "edit" as const,
+    sheet: "每日行程" as const,
+    id: "I001",
+    values: { ...moved, 日期: "2027-05-02" },
+    itineraryOrder: ["I001", "I003"],
+  };
+  const valid = mutateTripBook(trip, demo, mutation);
+  assert.equal(
+    readRows(valid, "每日行程").find((row) => row["行程ID"] === "I001")?.[
+      "開始時間"
+    ],
+    "09:00",
+  );
+  assert.throws(
+    () =>
+      mutateTripBook(trip, demo, {
+        ...mutation,
+        itineraryOrder: ["I003", "I001"],
+      }),
+    /時間順序/,
+  );
+  const cleared = mutateTripBook(trip, demo, {
+    ...mutation,
+    itineraryOrder: ["I003", "I001"],
+    values: { ...mutation.values, 開始時間: "", 結束時間: "" },
+  });
+  assert.equal(
+    readRows(cleared, "每日行程").find((row) => row["行程ID"] === "I001")?.[
+      "開始時間"
+    ],
+    "",
+  );
+  const book = structuredClone(demo);
+  const idColumn = book["每日行程"][0].indexOf("行程ID");
+  book["每日行程"] = book["每日行程"].filter(
+    (row, index) => index === 0 || row[idColumn] !== "I004",
+  );
+  const empty = mutateTripBook(trip, book, {
+    ...mutation,
+    values: { ...moved, 日期: trip.end },
+    itineraryOrder: ["I001"],
+  });
+  const entry = readRows(empty, "每日行程").find(
+    (row) => row["行程ID"] === "I001",
+  )!;
+  assert.equal(entry["日期"], trip.end);
+  assert.equal(entry["排序"], "10");
+  assert.equal(entry["開始時間"], "09:00");
+  assert.deepEqual(empty["飯店"], demo["飯店"]);
 });
