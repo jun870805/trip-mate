@@ -67,7 +67,12 @@
   margin-top: 12px;
 }
 
+.heading {
+  min-width: 0;
+}
+
 .title {
+  flex: 1;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   min-width: 0;
@@ -75,8 +80,18 @@
 
 .tags {
   display: flex;
+  flex-shrink: 0;
+  max-width: 50%;
+  justify-content: flex-end;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   min-width: 0;
+}
+
+.tags > :global(.badge) {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

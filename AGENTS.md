@@ -192,6 +192,7 @@
 - 標題、副標支援實際換行及文字 `\n`，只顯示時轉換，不改 Sheets 原值；網站、詳情與 PDF 一致，內文不做此轉換。
 - 副標支援 `[文字](網址)`，用 external 圖示與指定文字；具名 Google Maps 同樣尊重名稱。直接貼網址則 Maps 顯示地圖圖示＋「Google Maps」，其他顯示 external＋「開啟連結」，不吞併前後文字或句尾標點。
 - 內文以 react-markdown＋remark-gfm 顯示 Markdown（標題、清單、表格、圖片等），連結沿用副標規則。內文支援 HTML 與 Markdown 混用，例如 `<br>`／`<br/>`、段落、粗體、清單、表格及安全連結／圖片；用 parse5 解析後只輸出允許的排版標籤與屬性，移除 script、style、iframe、SVG、事件、內嵌樣式與危險網址，不用 dangerouslySetInnerHTML。HTML 的 `<a>` 保留文字並沿用外連圖示；僅 HTTP(S) 可載入，無效連結保留文字。程式碼區塊中的 HTML 保留原文；副標維持原 Markdown／換行規則，不啟用 HTML。詳情與 PDF 共用此處理。
+- 閱讀卡片標題可縮至剩餘寬度並自然換行；右側標籤群組不受長標題擠壓，最多佔內容寬度一半，多個標籤可換列、單一長標籤可換行。所有文字保持在卡片內距內，不裁切資料；只作用於每日行程閱讀卡片及 PDF，不改全站 Badge。
 - 時間字級 14px、欄寬 44px，與內容卡片間距 8px，對整張卡片垂直置中；編輯清單另有緊湊規格。
 - 副標與「查看更多」同一列，距主標 4px，`align-items: flex-end`；副標左側可換行，按鈕不壓縮、靠右與底部對齊。僅非空白內文顯示無圖示底線文字按鈕；無副標仍靠右。
 - 詳情 dialog 依序標題、副標、tag、內文；header `align-items: center`，主副標距 4px，內文上距 12px、以 panel 卡片包裹。外層 24px／20px、內層卡片 8px；保留 X、Escape 與焦點管理。

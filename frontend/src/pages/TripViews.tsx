@@ -467,7 +467,7 @@ export function Itinerary({ data }: { data: TripData }) {
                   >
                     <div className="timeline-time">{row["開始時間"] || ""}</div>
                     <div className="timeline-card">
-                      <div className="spread">
+                      <div className={`spread ${itineraryStyles.heading}`}>
                         <h4 className={itineraryStyles.title}>
                           {displayMultiline(row["標題"])}
                         </h4>
