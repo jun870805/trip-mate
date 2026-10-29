@@ -1,3 +1,4 @@
+import { ItineraryTag } from "../components/ItineraryTag";
 import { displayMultiline } from "../data/display-text";
 import { ItineraryDetailsDialog } from "../components/ItineraryDetailsDialog";
 import { MarkdownContent } from "../components/MarkdownContent";
@@ -474,9 +475,7 @@ export function Itinerary({ data }: { data: TripData }) {
                         {itineraryTags([row]).length > 0 && (
                           <span className={itineraryStyles.tags}>
                             {itineraryTags([row]).map((tag) => (
-                              <Badge key={tag} soft>
-                                {tag}
-                              </Badge>
+                              <ItineraryTag key={tag} tag={tag} />
                             ))}
                           </span>
                         )}

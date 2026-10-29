@@ -197,10 +197,16 @@ try {
         assert.ok(multiTagOptions.includes('<option value="美食">美食</option>') && multiTagOptions.includes('<option value="交通">交通</option>') && !multiTagOptions.includes('value="美食,交通'), 'Split tag options across all dates')
         const multiTagDetail=renderToStaticMarkup(createElement(ItineraryDetailsDialog,{row:multiTagRow,subtitle:'',onClose(){}}))
         for(const html of [multiTagHtml,multiTagDetail]) {
-          assert.equal((html.match(/<span class="badge soft">美食<[/]span>/g)||[]).length,1)
-          assert.equal((html.match(/<span class="badge soft">交通<[/]span>/g)||[]).length,1)
+          assert.equal((html.match(/<span class="badge [^"]*"[^>]*>美食<[/]span>/g)||[]).length,1)
+          assert.equal((html.match(/<span class="badge [^"]*"[^>]*>交通<[/]span>/g)||[]).length,1)
           assert.ok(!html.includes('>美食,交通') && !html.includes('> 美食,交通'))
         }
+        const tagColors=(html)=>new Map([...html.matchAll(/<span class="badge [^"]*" style="([^"]*)">([^<]*)<[/]span>/g)].map(match=>[match[2],match[1]]))
+        const cardTagColors=tagColors(multiTagHtml), detailTagColors=tagColors(multiTagDetail)
+        assert.ok(cardTagColors.get('交通') && cardTagColors.get('美食'))
+        assert.notEqual(cardTagColors.get('交通'),cardTagColors.get('美食'), 'Categories use different colors')
+        assert.equal(cardTagColors.get('交通'),detailTagColors.get('交通'), 'Card/PDF and details share the same tag color')
+        assert.equal(cardTagColors.get('美食'),detailTagColors.get('美食'))
         const detailHtml=renderToStaticMarkup(createElement(ItineraryDetailsDialog,{row:bodyRow,subtitle:bodyRow['說明'],onClose(){}}))
         for(const value of ['搭機出發','副標','>交通</span>','<strong>重點</strong>','關閉']) assert.ok(detailHtml.includes(value),value)
         const escapedNotes=renderToStaticMarkup(createElement(ItineraryNotes,{note:'<script>alert(1)</script>'}))

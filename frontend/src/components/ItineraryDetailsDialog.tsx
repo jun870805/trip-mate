@@ -5,7 +5,7 @@ import type { Row } from "../data/portal";
 import { CloseButton } from "./CloseButton";
 import { ItineraryNotes } from "./ItineraryNotes";
 import { MarkdownContent } from "./MarkdownContent";
-import { Badge } from "./ui";
+import { ItineraryTag } from "./ItineraryTag";
 import styles from "./ItineraryDetailsDialog.module.css";
 
 export function ItineraryDetailsDialog({
@@ -49,9 +49,7 @@ export function ItineraryDetailsDialog({
         {tags.length > 0 && (
           <div className={styles.tag}>
             {tags.map((tag) => (
-              <Badge key={tag} soft>
-                {tag}
-              </Badge>
+              <ItineraryTag key={tag} tag={tag} />
             ))}
           </div>
         )}
