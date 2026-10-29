@@ -14,6 +14,8 @@ import {
   itineraryTags,
   matchesItineraryTag,
   tripDayNumber,
+  itineraryDateLabel,
+  itineraryDateText,
 } from "../data/itinerary";
 import { ItineraryNotes, MapLink } from "../components/ItineraryNotes";
 import { flushSync } from "react-dom";
@@ -397,8 +399,7 @@ export function Itinerary({ data }: { data: TripData }) {
               <option value="all">全部日期</option>
               {dates.map((date) => (
                 <option key={date} value={date}>
-                  {dayPrefix(date)}
-                  {displayDate(date)}
+                  {itineraryDateLabel(date, data.trip.start, data.trip.end)}
                 </option>
               ))}
             </select>
@@ -437,13 +438,11 @@ export function Itinerary({ data }: { data: TripData }) {
             <div className="day-label">
               {dayPrefix(date) && <span>{dayPrefix(date).trim()}</span>}
               <h3>
-                {date.slice(5).replace("-", "/")} (
-                {
-                  ["日", "一", "二", "三", "四", "五", "六"][
-                    new Date(`${date}T00:00:00Z`).getUTCDay()
-                  ]
-                }
-                )
+                {itineraryDateText(
+                  date,
+                  data.trip.start,
+                  data.trip.end,
+                ).replace("(", " (")}
               </h3>
             </div>
             {!data.tables["每日行程"].some((row) => row["日期"] === date) && (
@@ -467,7 +466,9 @@ export function Itinerary({ data }: { data: TripData }) {
                     key={row["行程ID"]}
                   >
                     <div className="timeline-time">{row["開始時間"] || ""}</div>
-                    <div className="timeline-card">
+                    <div
+                      className={`timeline-card ${hasItineraryBody(row) ? itineraryStyles.clickableCard : ""}`}
+                    >
                       <div className={`spread ${itineraryStyles.heading}`}>
                         <h4 className={itineraryStyles.title}>
                           {displayMultiline(row["標題"])}

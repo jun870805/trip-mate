@@ -200,6 +200,29 @@ export function tripDayNumber(date: string, start: string): number | null {
   return day >= 1 ? day : null;
 }
 
+/** Compact local calendar labels for daily itinerary controls; never changes ISO data. */
+export function itineraryDateText(
+  date: string,
+  start: string,
+  end: string,
+): string {
+  if (tripDayNumber(date, date) === null) return date;
+  const local = new Date(date + "T00:00:00Z");
+  const sameYear =
+    start.slice(0, 4) === end.slice(0, 4) &&
+    date.slice(0, 4) === start.slice(0, 4);
+  const calendar = `${sameYear ? "" : date.slice(0, 4) + "/"}${local.getUTCMonth() + 1}/${local.getUTCDate()}`;
+  return `${calendar}(${["日", "一", "二", "三", "四", "五", "六"][local.getUTCDay()]})`;
+}
+export function itineraryDateLabel(
+  date: string,
+  start: string,
+  end: string,
+): string {
+  const day = tripDayNumber(date, start);
+  return `${day === null ? "" : `D${day} - `}${itineraryDateText(date, start, end)}`;
+}
+
 export function itinerarySubtitle(row: Row): string {
   return [row["說明"], row["地點"], row["地圖網址"]].filter(Boolean).join("\n");
 }

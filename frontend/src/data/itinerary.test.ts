@@ -7,6 +7,8 @@ import {
   itineraryTags,
   matchesItineraryTag,
   tripDayNumber,
+  itineraryDateLabel,
+  itineraryDateText,
   orderedItinerary,
   insertItinerary,
   moveItinerary,
@@ -270,4 +272,46 @@ it("splits comma-separated itinerary tags, trims and deduplicates while matching
   assert.equal(matchesItineraryTag(rows[2], "美食"), false);
   assert.equal(matchesItineraryTag(rows[3], ""), true);
   assert.deepEqual(itineraryTags([{ 類型: "交通" }]), ["交通"]);
+});
+
+it("formats same-year itinerary dates as Dn - M/D(weekday) without changing ISO values", () => {
+  assert.equal(
+    itineraryDateLabel("2026-04-13", "2026-04-13", "2026-04-18"),
+    "D1 - 4/13(一)",
+  );
+  assert.equal(
+    itineraryDateLabel("2026-04-14", "2026-04-13", "2026-04-18"),
+    "D2 - 4/14(二)",
+  );
+  assert.equal(
+    itineraryDateText("2026-04-13", "2026-04-13", "2026-04-18"),
+    "4/13(一)",
+  );
+  assert.equal(
+    itineraryDateLabel("2028-03-01", "2028-02-28", "2028-03-02"),
+    "D3 - 3/1(三)",
+  );
+});
+it("keeps years for cross-year trips and legacy dates from a different year", () => {
+  assert.equal(
+    itineraryDateLabel("2027-12-31", "2027-12-31", "2028-01-02"),
+    "D1 - 2027/12/31(五)",
+  );
+  assert.equal(
+    itineraryDateLabel("2028-01-01", "2027-12-31", "2028-01-02"),
+    "D2 - 2028/1/1(六)",
+  );
+  assert.equal(
+    itineraryDateText("2028-01-01", "2027-04-13", "2027-04-18"),
+    "2028/1/1(六)",
+  );
+  assert.equal(
+    itineraryDateLabel("2026-04-12", "2026-04-13", "2026-04-18"),
+    "4/12(日)",
+  );
+  assert.equal(itineraryDateLabel("bad", "2026-04-13", "2026-04-18"), "bad");
+  assert.equal(
+    itineraryDateLabel("2026-02-30", "2026-04-13", "2026-04-18"),
+    "2026-02-30",
+  );
 });

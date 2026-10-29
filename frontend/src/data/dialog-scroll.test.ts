@@ -1,6 +1,10 @@
 import { it } from "node:test";
 import assert from "node:assert/strict";
-import { installDialogScrollLock } from "./dialog-scroll.ts";
+import {
+  installDialogScrollLock,
+  scrollDialogToTop,
+  createScrollActivity,
+} from "./dialog-scroll.ts";
 function fixture() {
   function style() {
     const values = new Map<string, { value: string; priority: string }>();
@@ -123,4 +127,63 @@ it("tracks date-picker popover toggle events and removes the listener on disposa
   dispose();
   f.setPopover(1);
   assert.equal(f.body.style.getPropertyValue("position"), "");
+});
+
+it("returns only the owning dialog to the top and restores keyboard focus without scrolling the page", () => {
+  for (const reduced of [true, false]) {
+    let scroll: ScrollToOptions | undefined, focus: FocusOptions | undefined;
+    const dialog = {
+      ownerDocument: {
+        defaultView: { matchMedia: () => ({ matches: reduced }) },
+      },
+      scrollTo: (value: ScrollToOptions) => {
+        scroll = value;
+      },
+      querySelector: () => ({
+        focus: (value: FocusOptions) => {
+          focus = value;
+        },
+      }),
+    };
+    scrollDialogToTop(dialog as unknown as HTMLDialogElement);
+    assert.deepEqual(scroll, { top: 0, behavior: reduced ? "auto" : "smooth" });
+    assert.deepEqual(focus, { preventScroll: true });
+  }
+});
+it("shows back-to-top only during scrolling and resets the three-second idle deadline", (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const visibility: boolean[] = [];
+  const activity = createScrollActivity((value) => visibility.push(value));
+  activity.scroll(120);
+  assert.equal(visibility.at(-1), true);
+  context.mock.timers.tick(2999);
+  assert.equal(visibility.at(-1), true);
+  activity.scroll(150);
+  context.mock.timers.tick(1);
+  assert.equal(visibility.at(-1), true);
+  context.mock.timers.tick(2999);
+  assert.equal(visibility.at(-1), false);
+  activity.scroll(160);
+  assert.equal(visibility.at(-1), true);
+  activity.dispose();
+});
+it("hides immediately at the top and cancels idle timers on cleanup", (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const visibility: boolean[] = [];
+  const activity = createScrollActivity((value) => visibility.push(value));
+  activity.scroll(20);
+  activity.scroll(0);
+  assert.equal(visibility.at(-1), false);
+  const count = visibility.length;
+  context.mock.timers.tick(3000);
+  assert.equal(visibility.length, count);
+  activity.scroll(10);
+  activity.dispose();
+  const disposedCount = visibility.length;
+  context.mock.timers.tick(3000);
+  assert.equal(visibility.length, disposedCount);
+  // React StrictMode may clean up and re-run the same mounted effect.
+  activity.scroll(30);
+  context.mock.timers.tick(3000);
+  assert.equal(visibility.at(-1), false);
 });

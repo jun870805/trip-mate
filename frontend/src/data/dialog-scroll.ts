@@ -82,3 +82,38 @@ export function installDialogScrollLock(
     restore = undefined;
   };
 }
+
+/** Return within this modal only; preserve page position and keyboard focus. */
+export function scrollDialogToTop(dialog: HTMLDialogElement): void {
+  const reduced = dialog.ownerDocument.defaultView?.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  dialog.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+  dialog
+    .querySelector<HTMLButtonElement>(".dialog-heading button")
+    ?.focus({ preventScroll: true });
+}
+
+/** Reset visibility after each scroll, with no pending work after dialog cleanup. */
+export function createScrollActivity(onVisible: (visible: boolean) => void) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  function dispose() {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+  }
+  return {
+    scroll(scrollTop: number) {
+      dispose();
+      const visible = scrollTop > 0;
+      onVisible(visible);
+      if (visible)
+        timer = setTimeout(() => {
+          timer = undefined;
+          onVisible(false);
+        }, 3000);
+    },
+    dispose,
+  };
+}

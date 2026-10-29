@@ -1,3 +1,6 @@
+import { useId, useRef } from "react";
+import { scrollMarkdownSection } from "../data/markdown-anchors";
+import linkStyles from "./IconTextLink.module.css";
 import { safeMarkdownHtml } from "../data/markdown-html";
 import { displayMultiline } from "../data/display-text";
 import ReactMarkdown from "react-markdown";
@@ -15,9 +18,27 @@ export function MarkdownContent({
   text: string;
   inline?: boolean;
 }) {
+  const root = useRef<HTMLDivElement>(null);
+  const anchorPrefix =
+    "itinerary-section-" + useId().replace(/[^a-zA-Z0-9_-]/g, "") + "-";
   if (inline) text = displayMultiline(text);
   const components: Components = {
     a({ href, children, node }) {
+      if (!inline && node?.data?.markdownAnchor && href?.startsWith("#")) {
+        return (
+          <a
+            href={href}
+            className={linkStyles.link}
+            onClick={(event) => {
+              event.preventDefault();
+              if (root.current)
+                scrollMarkdownSection(root.current, href.slice(1));
+            }}
+          >
+            {children}
+          </a>
+        );
+      }
       const url = safeUrl(href || "");
       if (!url) return <>{children}</>;
       const raw = text.slice(
@@ -82,7 +103,7 @@ export function MarkdownContent({
   const content = (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      rehypePlugins={inline ? [] : [safeMarkdownHtml]}
+      rehypePlugins={inline ? [] : [[safeMarkdownHtml, { anchorPrefix }]]}
       unwrapDisallowed
       allowedElements={inline ? ["p", "a", "br", "code"] : undefined}
       components={components}
@@ -90,5 +111,11 @@ export function MarkdownContent({
       {text}
     </ReactMarkdown>
   );
-  return inline ? content : <div className={styles.body}>{content}</div>;
+  return inline ? (
+    content
+  ) : (
+    <div ref={root} className={styles.body}>
+      {content}
+    </div>
+  );
 }

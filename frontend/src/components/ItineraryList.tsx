@@ -6,11 +6,10 @@ import {
   tripDates,
   orderedItinerary,
   moveItineraryToDay,
-  tripDayNumber,
+  itineraryDateLabel,
   readReorderPreference,
   writeReorderPreference,
 } from "../data/itinerary";
-import { displayDate } from "../data/display-date";
 import { Empty, Icon } from "./ui";
 import { CloseButton } from "./CloseButton";
 import styles from "./ItineraryList.module.css";
@@ -195,7 +194,7 @@ export function ItineraryList({
           <option value="all">全部日期</option>
           {dates.map((date) => (
             <option key={date} value={date}>
-              {displayDate(date)}
+              {itineraryDateLabel(date, trip.start, trip.end)}
             </option>
           ))}
         </select>
@@ -233,7 +232,7 @@ export function ItineraryList({
             >
               {day === "all" && (
                 <h3 className={styles.dayHeading}>
-                  DAY {tripDayNumber(date, trip.start)} {displayDate(date)}
+                  {itineraryDateLabel(date, trip.start, trip.end)}
                 </h3>
               )}
               <div className={styles.dayRows}>

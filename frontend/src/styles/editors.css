@@ -28,6 +28,7 @@
 }
 .catalog-dialog {
   --card-padding: 8px;
+  --dialog-padding: 24px;
   width: min(600px, calc(100% - 32px));
   max-height: 90dvh;
   overflow-y: auto;
@@ -47,6 +48,14 @@
 .dialog-heading {
   justify-content: space-between;
   margin-bottom: 12px;
+}
+.catalog-dialog .dialog-heading {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: calc(-1 * var(--dialog-padding)) calc(-1 * var(--dialog-padding)) 0;
+  padding: var(--dialog-padding) var(--dialog-padding) 12px;
+  background: var(--paper);
 }
 .dialog-heading h2 {
   font-size: 22px;
@@ -121,6 +130,9 @@
   border-color: #9c3e2d;
 }
 @media (max-width: 700px) {
+  .catalog-dialog {
+    --dialog-padding: 20px;
+  }
   .catalog-dialog form {
     padding: 20px;
   }

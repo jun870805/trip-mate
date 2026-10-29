@@ -26,7 +26,27 @@ with sync_playwright() as p:
         page = browser.new_page(viewport={'width': 390, 'height': 844})
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
-        page.on('dialog', lambda dialog: dialog.accept())
+        close_policy={'accept':True,'messages':[]}
+        def respond_to_dialog(dialog):
+            close_policy['messages'].append(dialog.message)
+            if dialog.type=='confirm' and not close_policy['accept']:
+                dialog.dismiss()
+            else:
+                dialog.accept()
+        page.on('dialog', respond_to_dialog)
+        def assert_form_close_cancelled(dialog, field, expected):
+            before=len(writes)
+            before_prompts=len(close_policy['messages'])
+            close_policy['accept']=False
+            dialog.get_by_role('button', name='關閉', exact=True).click()
+            expect(field).to_have_value(expected)
+            page.keyboard.press('Escape')
+            expect(field).to_have_value(expected)
+            close_policy['accept']=True
+            assert len(close_policy['messages'])==before_prompts+2
+            assert '不會保存' in close_policy['messages'][-1]
+            assert len(writes)==before
+
         page.route('https://accounts.google.com/gsi/client', lambda route: route.fulfill(content_type='application/javascript', body=sdk))
         page.route('https://openidconnect.googleapis.com/**', lambda route: route.fulfill(headers=headers, json={'email': 'guide@example.com', 'email_verified': True}))
         def sheets(route):
@@ -110,6 +130,7 @@ with sync_playwright() as p:
         expect(dialog).to_be_visible()
         expect(date_field).to_have_value(start.replace('-', '/'))
         dialog.get_by_label('事項', exact=True).fill('確認集合地點')
+        assert_form_close_cancelled(dialog, dialog.get_by_label('事項', exact=True), '確認集合地點')
         dialog.get_by_label('截止日期', exact=True).fill('2027-04-30')
         dialog.get_by_label('負責人', exact=True).select_option('M001')
         dialog.get_by_label('狀態', exact=True).select_option('已完成')
@@ -123,6 +144,7 @@ with sync_playwright() as p:
         dialog.get_by_role('button', name='新增公積金交易', exact=True).click()
         dialog.get_by_label('日期', exact=True).fill(start)
         dialog.get_by_label('項目', exact=True).fill('共同午餐測試')
+        assert_form_close_cancelled(dialog, dialog.get_by_label('項目', exact=True), '共同午餐測試')
         dialog.get_by_label('類型', exact=True).select_option('支出')
         fund_id = dialog.get_by_label('公積金交易 ID', exact=True).input_value()
         expense_id = dialog.get_by_label('支出 ID', exact=True).input_value()
@@ -165,6 +187,24 @@ with sync_playwright() as p:
         page.get_by_role('button', name='編輯行程', exact=True).click()
         dialog = page.get_by_role('dialog', name='編輯行程')
         dialog.get_by_role('button', name='新增每日行程', exact=True).click()
+        dialog.get_by_label('標題', exact=True).fill('關閉確認測試')
+        before_close_writes=len(writes)
+        close_policy['accept']=False
+        dialog.get_by_role('button', name='關閉', exact=True).click()
+        expect(dialog.get_by_label('標題', exact=True)).to_have_value('關閉確認測試')
+        assert '不會保存' in close_policy['messages'][-1]
+        before_escape=len(close_policy['messages'])
+        page.keyboard.press('Escape')
+        assert len(close_policy['messages'])==before_escape+1
+        expect(dialog.get_by_label('標題', exact=True)).to_have_value('關閉確認測試')
+        close_policy['accept']=True
+        dialog.get_by_role('button', name='關閉', exact=True).click()
+        expect(dialog).not_to_be_visible()
+        assert len(writes)==before_close_writes
+        page.get_by_role('button', name='編輯行程', exact=True).click()
+        dialog=page.get_by_role('dialog', name='編輯行程')
+        dialog.get_by_role('button', name='新增每日行程', exact=True).click()
+        expect(dialog.get_by_label('標題', exact=True)).to_have_value('')
         dialog.get_by_label('日期', exact=True).select_option(start)
         start_time = dialog.get_by_label('時間', exact=True)
         expect(start_time).not_to_have_attribute('readonly', '')
@@ -192,7 +232,7 @@ with sync_playwright() as p:
         dialog.get_by_label('標題', exact=True).fill('新增景點測試')
         dialog.get_by_label('標籤', exact=True).fill('自訂標籤')
         dialog.get_by_label('副標', exact=True).fill('[集合餐廳](https://maps.app.goo.gl/example)')
-        dialog.get_by_label('內文', exact=True).fill('## 集合細節\n\n**請準時**\n\n[官網](https://example.com/info)')
+        dialog.get_by_label('內文', exact=True).fill('## 集合細節\n\n[跳到交通方式](#交通方式)\n\n**請準時**\n\n[官網](https://example.com/info)\n\n' + ('補充說明\n\n' * 30) + '## 交通方式\n\n搭乘地鐵\n\n' + ('後續說明\n\n' * 30))
         dialog.get_by_role('button', name='儲存', exact=True).click()
         card = dialog.locator('[data-itinerary-id]').filter(has_text='新增景點測試')
         expect(card).to_be_visible()
@@ -200,6 +240,10 @@ with sync_playwright() as p:
         card.get_by_role('button', name='編輯', exact=True).click()
         expect(dialog.get_by_label('副標', exact=True)).to_have_value('[集合餐廳](https://maps.app.goo.gl/example)')
         expect(dialog.get_by_label('內文', exact=True)).to_contain_text('集合細節')
+        close_policy['accept']=False
+        dialog.get_by_role('button', name='關閉', exact=True).click()
+        expect(dialog.get_by_label('內文', exact=True)).to_contain_text('集合細節')
+        close_policy['accept']=True
         dialog.get_by_role('button', name='取消', exact=True).click()
         previous_writes = len(writes)
         handle=card.get_by_role('button', name='調整「新增景點測試」順序', exact=True)
@@ -269,9 +313,15 @@ with sync_playwright() as p:
         page.get_by_label('行程日期', exact=True).select_option(start)
         view_more=page.get_by_role('button', name='查看更多：新增景點測試', exact=True)
         expect(view_more).to_be_visible()
-        view_more.click()
+        public_card=page.locator('.timeline-card').filter(has_text='新增景點測試')
+        card_link=public_card.get_by_role('link', name='集合餐廳', exact=True)
+        card_link.evaluate('(node)=>node.addEventListener("click",event=>event.preventDefault(),{once:true})')
+        card_link.click()
+        expect(page.get_by_role('dialog', name='新增景點測試', exact=True)).to_have_count(0)
+        public_card.click(position={'x':12,'y':12})
         details=page.get_by_role('dialog', name='新增景點測試', exact=True)
         expect(details).to_be_visible()
+        expect(details.get_by_role('button', name='回到最上面', exact=True)).to_have_count(0)
         # Every native dialog shares one body lock; closing a nested dialog must
         # not unlock its parent. Actual wheel/touch behavior also needs device QA.
         assert page.locator('body').evaluate('(node)=>getComputedStyle(node).position') == 'fixed'
@@ -284,6 +334,48 @@ with sync_playwright() as p:
         expect(details.get_by_role('heading', name='集合細節', exact=True)).to_be_visible()
         expect(details.get_by_role('link', name='集合餐廳', exact=True)).to_have_attribute('href','https://maps.app.goo.gl/example')
         expect(details.get_by_role('link', name='官網', exact=True)).to_have_attribute('href','https://example.com/info')
+        assert details.locator('.dialog-heading').first.evaluate('(node)=>parseFloat(getComputedStyle(node).paddingBottom)') == 12
+        route_before=page.url
+        background_before=page.evaluate('window.scrollY')
+        details.get_by_role('link', name='跳到交通方式', exact=True).click()
+        section=details.get_by_role('heading', name='交通方式', exact=True)
+        page.wait_for_function('(dialog)=>dialog.scrollTop > 0', arg=details.element_handle())
+        # Wait for the accessible smooth scroll before checking its final offset.
+        page.wait_for_timeout(800)
+        assert page.url==route_before
+        assert page.evaluate('window.scrollY')==background_before
+        for viewport in [{'width':390,'height':844},{'width':1280,'height':900}]:
+            page.set_viewport_size(viewport)
+            details.evaluate('(dialog)=>{dialog.scrollTop=dialog.scrollHeight}')
+            header=details.locator('.dialog-heading').first.bounding_box()
+            bounds=details.bounding_box()
+            close=details.get_by_role('button', name='關閉', exact=True).bounding_box()
+            assert header and bounds and close
+            assert abs(header['y']-bounds['y'])<3, 'Dialog heading must remain at its top edge while scrolling'
+            assert bounds['y'] <= close['y'] < bounds['y']+bounds['height']
+        details.evaluate('(dialog)=>{dialog.scrollTop=0}')
+        details.get_by_role('link', name='跳到交通方式', exact=True).click()
+        page.wait_for_timeout(800)
+        header=details.locator('.dialog-heading').first.bounding_box()
+        section_box=section.bounding_box()
+        assert section_box['y'] >= header['y']+header['height'], 'Anchor targets must clear the sticky header'
+        top_button=details.get_by_role('button', name='回到最上面', exact=True)
+        expect(top_button).to_be_visible()
+        page.wait_for_timeout(3200)
+        expect(top_button).to_have_count(0)
+        details.evaluate('(dialog)=>{dialog.scrollTop+=20}')
+        expect(top_button).to_be_visible()
+
+        top_bounds=top_button.bounding_box()
+        dialog_bounds=details.bounding_box()
+        assert dialog_bounds['x'] < top_bounds['x'] < dialog_bounds['x']+dialog_bounds['width']
+        assert dialog_bounds['y'] < top_bounds['y'] < dialog_bounds['y']+dialog_bounds['height']
+        background_before_top=page.evaluate('window.scrollY')
+        top_button.click()
+        page.wait_for_function('(dialog)=>dialog.scrollTop===0', arg=details.element_handle())
+        expect(top_button).to_have_count(0)
+        assert page.evaluate('window.scrollY')==background_before_top
+
         details.get_by_role('button', name='關閉', exact=True).click()
         expect(details).not_to_be_visible()
         page.get_by_role('button', name='登出', exact=True).click()

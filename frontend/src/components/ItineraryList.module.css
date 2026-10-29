@@ -122,14 +122,13 @@
   width: min(460px, calc(100% - 32px));
 }
 .confirm {
+  --dialog-padding: 20px;
   padding: 20px;
-  display: grid;
-  gap: 12px;
   width: 100%;
   min-width: 0;
 }
-.confirm > :global(.dialog-heading) {
-  margin-bottom: 0;
+.confirm > :not(:global(.dialog-heading)) + * {
+  margin-top: 12px;
 }
 .checkbox {
   display: flex;

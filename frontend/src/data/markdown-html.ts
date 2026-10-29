@@ -1,3 +1,4 @@
+import { addMarkdownAnchors, markdownFragment } from "./markdown-anchors.ts";
 import { parseFragment } from "parse5";
 import type { DefaultTreeAdapterTypes } from "parse5";
 import type { Element, ElementContent, Root } from "hast";
@@ -53,7 +54,9 @@ function escape(value: string): string {
 /** Parse mixed HTML/Markdown with HTML5 rules, then construct an allowlisted HAST.
  * No source HTML or attributes are passed directly to React/the browser.
  */
-export function safeMarkdownHtml() {
+export function safeMarkdownHtml({
+  anchorPrefix,
+}: { anchorPrefix?: string } = {}) {
   return (tree: Root) => {
     let markup = "";
     const sources = new Map<number, MarkdownNode>();
@@ -109,7 +112,13 @@ export function safeMarkdownHtml() {
           (tag === "a" && key === "href") ||
           (tag === "img" && key === "src")
         ) {
-          const url = safeUrl(attrs.get(key) || "");
+          const value = attrs.get(key) || "";
+          const url =
+            key === "href" &&
+            anchorPrefix &&
+            markdownFragment(value) !== undefined
+              ? value
+              : safeUrl(value);
           if (url) properties[key] = url;
         }
       }
@@ -154,5 +163,6 @@ export function safeMarkdownHtml() {
       ];
     }
     tree.children = fragment.childNodes.flatMap(clean);
+    if (anchorPrefix) addMarkdownAnchors(tree, anchorPrefix);
   };
 }

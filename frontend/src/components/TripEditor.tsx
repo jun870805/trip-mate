@@ -1,3 +1,4 @@
+import { confirmTripEditorClose } from "../data/editor-close";
 import { ItineraryList } from "./ItineraryList";
 import { CloseButton } from "./CloseButton";
 import bookingStyles from "./BookingCards.module.css";
@@ -14,7 +15,11 @@ import type { RecordKind } from "../data/record-id";
 import { normalizeLocalDateTime } from "../data/timezone";
 import { DatePicker } from "./DatePicker";
 import { RequiredMark } from "./RequiredMark";
-import { tripDates, itinerarySubtitle } from "../data/itinerary";
+import {
+  tripDates,
+  itinerarySubtitle,
+  itineraryDateLabel,
+} from "../data/itinerary";
 import {
   createTripEditor,
   readRows,
@@ -313,6 +318,14 @@ export function TripEditor({
             : { kind: "record", mode: "delete", sheet: entity, id, values: {} };
     void save(mutation);
   }
+  function requestClose() {
+    if (
+      confirmTripEditorClose(!!target, active.current || busy, (message) =>
+        window.confirm(message),
+      )
+    )
+      onClose();
+  }
   return (
     <dialog
       ref={dialog}
@@ -320,13 +333,14 @@ export function TripEditor({
       aria-labelledby="trip-editor-title"
       onCancel={(event) => {
         event.preventDefault();
-        if (!active.current) onClose();
+        event.stopPropagation();
+        requestClose();
       }}
     >
       <div className="trip-editor-body">
         <div className="dialog-heading">
           <h2 id="trip-editor-title">編輯{scopeNames[scope]}</h2>
-          <CloseButton onClick={onClose} disabled={busy} />
+          <CloseButton onClick={requestClose} disabled={busy} />
         </div>
         {!session ? (
           <div className="form-error">
@@ -718,7 +732,7 @@ export function TripForm({
             <option value="">選擇日期</option>
             {tripDates(trip.start, trip.end).map((date) => (
               <option key={date} value={date}>
-                {displayDate(date)}
+                {itineraryDateLabel(date, trip.start, trip.end)}
               </option>
             ))}
           </select>

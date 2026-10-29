@@ -98,3 +98,12 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
 }
+
+.date-picker-panel > .date-picker-month {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -12px -12px -12px;
+  padding: 12px;
+  background: var(--paper);
+}

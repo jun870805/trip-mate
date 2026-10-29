@@ -6,8 +6,10 @@
   min-width: 0;
 }
 .heading:global(.dialog-heading) {
-  margin-bottom: 0;
   align-items: flex-start;
+}
+.content > .heading + * {
+  margin-top: 0;
 }
 .heading h2 {
   white-space: pre-wrap;
@@ -29,4 +31,30 @@
   .content {
     padding: 20px;
   }
+}
+
+.backToTop {
+  position: sticky;
+  bottom: var(--dialog-padding);
+  z-index: 2;
+  height: 0;
+  pointer-events: none;
+}
+.backToTop button {
+  position: absolute;
+  right: var(--dialog-padding);
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--brown);
+  pointer-events: auto;
+}
+.backToTop button:hover {
+  background: #eee3d5;
 }

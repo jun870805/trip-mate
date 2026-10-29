@@ -40,6 +40,7 @@ try {
         import { GuideSharing } from './src/components/GuideSharing'
         import { DRIVE_FILE_SCOPE } from './src/data/guide-auth'
         import bookingStyles from './src/components/BookingCards.module.css'
+        import itineraryStyles from './src/pages/Itinerary.module.css'
         import demo from './src/data/demo.json'
         const trip = parseCatalog(demo['旅程清單'])[0]
         const data = parseTrip(trip, demo)
@@ -122,16 +123,21 @@ try {
         const tagSelect=itineraryHtml.match(/<select aria-label="行程標籤"[^>]*>(.*?)<[/]select>/)?.[1]
         assert.ok(tagSelect && tagSelect.includes('全部標籤'))
         for(const tag of ['交通','住宿','景點','自由活動']) assert.ok(tagSelect.includes('value="'+tag+'"'), 'Tag choices include every itinerary date')
-        assert.ok(itineraryHtml.includes('>DAY 1</span><h3>05/01 (六)</h3>') && itineraryHtml.includes('>DAY 3</span><h3>05/03 (一)</h3>'))
-        assert.ok(itineraryHtml.includes('DAY 1 2027/05/01'))
+        assert.ok(itineraryHtml.includes('>DAY 1</span><h3>5/1 (六)</h3>') && itineraryHtml.includes('>DAY 3</span><h3>5/3 (一)</h3>'))
+        assert.ok(itineraryHtml.includes('<option value="2027-05-01">D1 - 5/1(六)</option>'))
         const sharedMetadata=renderToStaticMarkup(createElement(TripMetadata,{data}))
         assert.ok(itineraryHtml.includes(sharedMetadata), 'PDF header must reuse the website metadata component')
         assert.ok(sharedMetadata.includes('匯率：1 TWD = 4.5 JPY') && sharedMetadata.includes('時差：+1 小時'))
         assert.ok(sharedMetadata.includes('日本・大阪') && sharedMetadata.includes('2027/05/01 - 2027/05/03'))
         const emptyDays = {...data,tables:{...data.tables,每日行程:[]}}
         const emptyDaysHtml=renderToStaticMarkup(createElement(Itinerary,{data:emptyDays}))
-        for(const date of ['2027/05/01','2027/05/02','2027/05/03']) assert.ok(emptyDaysHtml.includes(date), 'Date selector must include every trip day even without entries')
+        for(const date of ['D1 - 5/1(六)','D2 - 5/2(日)','D3 - 5/3(一)']) assert.ok(emptyDaysHtml.includes(date), 'Date selector must include every trip day even without entries')
         assert.ok(emptyDaysHtml.includes('尚未安排當日行程'))
+        const crossYearTrip={...trip,start:'2027-12-31',end:'2028-01-02'}
+        const crossYearHtml=renderToStaticMarkup(createElement(Itinerary,{data:{...emptyDays,trip:crossYearTrip}}))
+        assert.ok(crossYearHtml.includes('<option value="2028-01-01">D2 - 2028/1/1(六)</option>'))
+        assert.ok(crossYearHtml.includes('>DAY 1</span><h3>2027/12/31 (五)</h3>') && crossYearHtml.includes('2027/12/31 - 2028/01/02'), 'Overview keeps the large DAY layout and full trip years')
+
         const sharedLink=renderToStaticMarkup(createElement(IconTextLink,{href:'https://example.com',icon:'home'},'訂房網站'))
         assert.ok(sharedLink.includes('class="'+iconLinkStyles.link+'"') && sharedLink.includes('width="14"'))
         assert.ok(sharedLink.includes('rel="noopener noreferrer"') && sharedLink.includes('target="_blank"'))
@@ -159,7 +165,18 @@ try {
         assert.ok(blockedSubtitle.includes('連結文字') && !blockedSubtitle.includes('<a '))
         const markdownText='# 集合資訊'+String.fromCharCode(10,10)+'**重點** 與 *提醒*'+String.fromCharCode(10,10)+'- 第一項'+String.fromCharCode(10)+'- [網站](https://example.com/info)'+String.fromCharCode(10,10)+'| 欄位 | 值 |'+String.fromCharCode(10)+'| --- | --- |'+String.fromCharCode(10)+'| A | B |'
         const markdownHtml=renderToStaticMarkup(createElement(MarkdownContent,{text:markdownText}))
-        for(const markup of ['<h1>集合資訊</h1>','<strong>重點</strong>','<em>提醒</em>','<ul>','<table>','>網站</span></a>']) assert.ok(markdownHtml.includes(markup),markup)
+        for(const markup of ['>集合資訊</h1>','<strong>重點</strong>','<em>提醒</em>','<ul>','<table>','>網站</span></a>']) assert.ok(markdownHtml.includes(markup),markup)
+        const anchorText=['[交通](#交通方式)', '', '## 交通方式','第一段','','## 交通方式','第二段'].join(String.fromCharCode(10))
+        const anchorHtml=renderToStaticMarkup(createElement(MarkdownContent,{text:anchorText}))
+        const headingIds=[...anchorHtml.matchAll(/<h2 id="([^"]*)"[^>]*>/g)].map(match=>match[1])
+        assert.equal(headingIds.length,2)
+        assert.notEqual(headingIds[0],headingIds[1])
+        assert.ok(anchorHtml.includes('href="#'+headingIds[0]+'"') && !anchorHtml.includes('target="_blank"'), 'Body section links remain local')
+        const anotherAnchor=renderToStaticMarkup(createElement('div',null,createElement(MarkdownContent,{text:anchorText}),createElement(MarkdownContent,{text:anchorText})))
+        const allHeadingIds=[...anotherAnchor.matchAll(/<h2 id="([^"]*)"[^>]*>/g)].map(match=>match[1])
+        assert.equal(new Set(allHeadingIds).size,4, 'Different bodies and duplicate headings have unique IDs')
+        const htmlAnchor=renderToStaticMarkup(createElement(MarkdownContent,{text:'<a href="#交通方式">交通</a><h2 id="unsafe">交通方式</h2>'}))
+        assert.ok(htmlAnchor.includes('href="#itinerary-section-') && !htmlAnchor.includes('id="unsafe"'))
         const unsafeMarkdown=renderToStaticMarkup(createElement(MarkdownContent,{text:'[危險](javascript:alert(1)) <script>alert(1)</script>'}))
         assert.ok(!unsafeMarkdown.includes('href="javascript:') && !unsafeMarkdown.includes('<script>'))
         const codeMarkdown=renderToStaticMarkup(createElement(MarkdownContent,{text:'    <script>code</script>'}))
@@ -181,6 +198,7 @@ try {
         const bodyData={...data,tables:{...data.tables,每日行程:[bodyRow]}}
         const bodyHtml=renderToStaticMarkup(createElement(Itinerary,{data:bodyData}))
         assert.ok(bodyHtml.includes('查看更多') && bodyHtml.includes('aria-label="查看更多：搭機出發"'))
+        assert.ok(bodyHtml.includes(itineraryStyles.clickableCard) && !itineraryHtml.includes(itineraryStyles.clickableCard), 'Only entries with a nonempty body have the card-wide button target')
         assert.ok(bodyHtml.includes('print-only') && bodyHtml.includes('<strong>重點</strong>'), 'PDF includes the Markdown body without opening a dialog')
         assert.ok(!itineraryHtml.includes('查看更多'), 'Legacy entries without a body do not show a view-more button')
         const nl=String.fromCharCode(10), escapedNl=String.fromCharCode(92)+'n'
@@ -209,6 +227,7 @@ try {
         assert.equal(cardTagColors.get('美食'),detailTagColors.get('美食'))
         const detailHtml=renderToStaticMarkup(createElement(ItineraryDetailsDialog,{row:bodyRow,subtitle:bodyRow['說明'],onClose(){}}))
         for(const value of ['搭機出發','副標','>交通</span>','<strong>重點</strong>','關閉']) assert.ok(detailHtml.includes(value),value)
+        assert.ok(!detailHtml.includes('aria-label="回到最上面"'), 'Back-to-top stays hidden at the initial top position')
         const escapedNotes=renderToStaticMarkup(createElement(ItineraryNotes,{note:'<script>alert(1)</script>'}))
         assert.ok(!escapedNotes.includes('<script>') && escapedNotes.includes('&lt;script&gt;'))
         const itineraryList=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:data.tables['每日行程'],day:trip.start,busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
@@ -219,7 +238,7 @@ try {
         assert.ok(itineraryList.includes('<option value="all">全部日期</option>'))
         assert.ok(!itineraryList.includes('上移「') && !itineraryList.includes('下移「'), 'All viewports use drag handles')
         const allDates=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:[data.tables['每日行程'][0]],day:'all',busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
-        assert.ok(allDates.includes('data-drop-date="2027-05-02"') && allDates.includes('DAY 2') && allDates.includes('尚未安排當日行程。'), 'Empty trip dates remain drop destinations')
+        assert.ok(allDates.includes('data-drop-date="2027-05-02"') && allDates.includes('D2 - 5/2(日)') && allDates.includes('尚未安排當日行程。'), 'Empty trip dates remain drop destinations')
         const allHandle=allDates.match(/<button[^>]*data-drag-handle="true"[^>]*>/)?.[0]
         assert.ok(allHandle && !allHandle.includes('disabled'), 'A single entry can move to another day')
         const onlyOne=renderToStaticMarkup(createElement(ItineraryList,{trip,rows:[data.tables['每日行程'][0]],day:trip.start,busy:false,onDay(){},onEdit(){},onRemove(){},onReorder(){}}))
@@ -333,7 +352,7 @@ try {
           for(const input of form.matchAll(/<input[^>]*aria-haspopup="dialog"[^>]*>/g)) assert.ok(input[0].includes('value=""'), entity+' must not prefill date/time inputs')
           if(entity==='開團待辦') assert.ok(form.includes('負責人') && form.includes('<select'))
           if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址') && form.includes('訂房網站') && form.includes('價格') && form.includes('副標題'))
-          if(entity==='每日行程') { const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','標題','副標','內文','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('2027/05/03')); }
+          if(entity==='每日行程') { const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','標題','副標','內文','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('D3 - 5/3(一)')); }
           if(entity==='航班') {assert.ok(form.includes('出發航廈') && form.includes('抵達航廈'));assert.ok(form.includes('出發當地時間') && form.includes('抵達當地時間'));assert.ok(!form.includes('時差'));}
           if(entity==='公積金') assert.ok(form.includes('個人金額') && form.includes('checkbox'))
           if(entity==='行前費用') assert.ok(form.includes('實際刷卡金額') && form.includes('TWD'))

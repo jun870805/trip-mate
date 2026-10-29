@@ -96,3 +96,18 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+/* Stretch the existing accessible button over the card, keeping real links above it. */
+.clickableCard {
+  cursor: pointer;
+}
+.clickableCard .more button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+}
+.clickableCard a {
+  position: relative;
+  z-index: 1;
+}
