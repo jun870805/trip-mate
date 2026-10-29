@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             react: ["react", "react-dom"],
-            markdown: ["react-markdown", "remark-gfm"],
+            markdown: ["react-markdown", "remark-gfm", "parse5"],
           },
         },
       },

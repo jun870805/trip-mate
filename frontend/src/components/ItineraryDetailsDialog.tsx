@@ -1,3 +1,4 @@
+import { itineraryTags } from "../data/itinerary";
 import { displayMultiline } from "../data/display-text";
 import { useEffect, useId, useRef } from "react";
 import type { Row } from "../data/portal";
@@ -18,6 +19,7 @@ export function ItineraryDetailsDialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const title = useId();
+  const tags = itineraryTags([row]);
   useEffect(() => {
     const dialog = ref.current!;
     dialog.showModal();
@@ -44,9 +46,13 @@ export function ItineraryDetailsDialog({
           <CloseButton onClick={close} />
         </div>
         {subtitle && <ItineraryNotes note={subtitle} />}
-        {row["類型"] && (
+        {tags.length > 0 && (
           <div className={styles.tag}>
-            <Badge soft>{row["類型"]}</Badge>
+            {tags.map((tag) => (
+              <Badge key={tag} soft>
+                {tag}
+              </Badge>
+            ))}
           </div>
         )}
         <div className={`panel ${styles.body}`}>

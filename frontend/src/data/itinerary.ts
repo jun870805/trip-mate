@@ -173,11 +173,18 @@ export function writeReorderPreference(
 
 export function itineraryTags(rows: Row[]): string[] {
   return [
-    ...new Set(rows.map((row) => (row["類型"] || "").trim()).filter(Boolean)),
+    ...new Set(
+      rows.flatMap((row) =>
+        (row["類型"] || "")
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      ),
+    ),
   ];
 }
 export function matchesItineraryTag(row: Row, tag: string): boolean {
-  return !tag || (row["類型"] || "").trim() === tag;
+  return !tag || itineraryTags([row]).includes(tag);
 }
 export function tripDayNumber(date: string, start: string): number | null {
   const current = new Date(date + "T00:00:00Z"),

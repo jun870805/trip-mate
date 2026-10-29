@@ -164,6 +164,17 @@ try {
         assert.ok(!unsafeMarkdown.includes('href="javascript:') && !unsafeMarkdown.includes('<script>'))
         const codeMarkdown=renderToStaticMarkup(createElement(MarkdownContent,{text:'    <script>code</script>'}))
         assert.ok(codeMarkdown.includes('<pre><code>') && codeMarkdown.includes('&lt;script&gt;') && !codeMarkdown.includes('<script>'))
+        const htmlText='<p>第一行<br>第二行<br/>第三行</p><strong>HTML重點</strong><a href="https://example.com/html" onclick="alert(1)">HTML官網</a><img src="https://example.com/photo.jpg" onerror="alert(1)"><script>alert(1)</script><iframe src="https://example.com"></iframe>'
+        const htmlBody=renderToStaticMarkup(createElement(MarkdownContent,{text:htmlText}))
+        assert.ok(htmlBody.includes('第一行<br/>第二行<br/>第三行') && htmlBody.includes('<strong>HTML重點</strong>'))
+        assert.ok(htmlBody.includes('href="https://example.com/html"') && htmlBody.includes('>HTML官網</span>') && htmlBody.includes('src="https://example.com/photo.jpg"'))
+        for(const unsafe of ['<script','<iframe','onclick','onerror','alert(1)']) assert.ok(!htmlBody.includes(unsafe),unsafe)
+        const htmlSubtitle=renderToStaticMarkup(createElement(MarkdownContent,{text:'副標<br>仍為原文字',inline:true}))
+        assert.ok(htmlSubtitle.includes('&lt;br&gt;') && !htmlSubtitle.includes('<br/>'), 'HTML support is limited to the body')
+        const htmlRow={...data.tables['每日行程'][0],內文:htmlText}
+        const htmlDetail=renderToStaticMarkup(createElement(ItineraryDetailsDialog,{row:htmlRow,subtitle:'',onClose(){}}))
+        const htmlPdf=renderToStaticMarkup(createElement(Itinerary,{data:{...data,tables:{...data.tables,每日行程:[htmlRow]}}}))
+        for(const rendered of [htmlDetail,htmlPdf]) assert.ok(rendered.includes('第一行<br/>第二行<br/>第三行') && !rendered.includes('<script'))
         const imageMarkdown=renderToStaticMarkup(createElement(MarkdownContent,{text:'![圖片](https://example.com/photo.jpg) ![危險](javascript:alert(1))'}))
         assert.ok(imageMarkdown.includes('src="https://example.com/photo.jpg"') && !imageMarkdown.includes('src="javascript:'))
         const bodyRow={...data.tables['每日行程'][0],說明:'副標 [交通](https://example.com/transit)',類型:'交通',內文:markdownText}
@@ -180,6 +191,16 @@ try {
         assert.ok(multilineDialog.includes(['第一行','第二行','第三行'].join(nl)) && multilineDialog.includes('集合'+nl+'<a') && multilineDialog.includes('準時'), 'Details retain title and subtitle line breaks around named links')
         const multilineSubtitle=renderToStaticMarkup(createElement(MarkdownContent,{text:multilineRow['說明'],inline:true}))
         assert.ok(multilineSubtitle.includes('集合'+nl+'<a') && multilineSubtitle.includes('href="https://example.com/info"') && multilineSubtitle.includes('官網'), 'Normalize before parsing to preserve Markdown link source positions')
+        const multiTagRow={...bodyRow,類型:' 美食,交通,美食,, '}
+        const multiTagHtml=renderToStaticMarkup(createElement(Itinerary,{data:{...bodyData,tables:{...bodyData.tables,每日行程:[multiTagRow]}}}))
+        const multiTagOptions=multiTagHtml.match(/<select aria-label="行程標籤"[^>]*>(.*?)<[/]select>/)?.[1]
+        assert.ok(multiTagOptions.includes('<option value="美食">美食</option>') && multiTagOptions.includes('<option value="交通">交通</option>') && !multiTagOptions.includes('value="美食,交通'), 'Split tag options across all dates')
+        const multiTagDetail=renderToStaticMarkup(createElement(ItineraryDetailsDialog,{row:multiTagRow,subtitle:'',onClose(){}}))
+        for(const html of [multiTagHtml,multiTagDetail]) {
+          assert.equal((html.match(/<span class="badge soft">美食<[/]span>/g)||[]).length,1)
+          assert.equal((html.match(/<span class="badge soft">交通<[/]span>/g)||[]).length,1)
+          assert.ok(!html.includes('>美食,交通') && !html.includes('> 美食,交通'))
+        }
         const detailHtml=renderToStaticMarkup(createElement(ItineraryDetailsDialog,{row:bodyRow,subtitle:bodyRow['說明'],onClose(){}}))
         for(const value of ['搭機出發','副標','>交通</span>','<strong>重點</strong>','關閉']) assert.ok(detailHtml.includes(value),value)
         const escapedNotes=renderToStaticMarkup(createElement(ItineraryNotes,{note:'<script>alert(1)</script>'}))

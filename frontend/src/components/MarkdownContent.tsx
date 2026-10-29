@@ -1,3 +1,4 @@
+import { safeMarkdownHtml } from "../data/markdown-html";
 import { displayMultiline } from "../data/display-text";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
@@ -23,7 +24,7 @@ export function MarkdownContent({
         node?.position?.start.offset ?? 0,
         node?.position?.end.offset ?? 0,
       );
-      const named = raw.startsWith("[");
+      const named = raw.startsWith("[") || node?.data?.htmlLink === true;
       const bare =
         raw.startsWith("<") && raw.endsWith(">") ? raw.slice(1, -1) : raw;
       const parts = noteLinks(bare);
@@ -81,6 +82,7 @@ export function MarkdownContent({
   const content = (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
+      rehypePlugins={inline ? [] : [safeMarkdownHtml]}
       unwrapDisallowed
       allowedElements={inline ? ["p", "a", "br", "code"] : undefined}
       components={components}

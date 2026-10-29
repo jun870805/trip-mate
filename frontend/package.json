@@ -15,6 +15,7 @@
     "test:coverage": "node --experimental-strip-types --test --experimental-test-coverage --test-coverage-include=src/data/*.ts --test-coverage-exclude=src/data/*.test.ts --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 src/data/*.test.ts"
   },
   "dependencies": {
+    "parse5": "^7.3.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",

@@ -958,14 +958,14 @@ it("writes reordered itinerary through one authorized batch, preserves other cel
     mode: "edit" as const,
     sheet: "每日行程" as const,
     id: moved["行程ID"],
-    values: { ...moved, 開始時間: "", 結束時間: "", 類型: "午餐集合" },
+    values: { ...moved, 開始時間: "", 結束時間: "", 類型: "午餐集合,美食" },
     itineraryOrder: rows.map((r) => r["行程ID"]).reverse(),
   };
   const result = await editor.save(session, before, mutation);
   assert.equal(api.writes, 1);
   const parsed = validateEditorBook(trip, result.book, "itinerary");
   assert.equal(parsed.tables["每日行程"][0]["行程ID"], moved["行程ID"]);
-  assert.equal(parsed.tables["每日行程"][0]["類型"], "午餐集合");
+  assert.equal(parsed.tables["每日行程"][0]["類型"], "午餐集合,美食");
   assert.deepEqual(result.book["航班"], before.book["航班"]);
   assert.deepEqual(result.book["飯店"], before.book["飯店"]);
   const updates = buildCellUpdates(before.book, result.book, before.grids) as {

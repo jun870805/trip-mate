@@ -471,7 +471,15 @@ export function Itinerary({ data }: { data: TripData }) {
                         <h4 className={itineraryStyles.title}>
                           {displayMultiline(row["標題"])}
                         </h4>
-                        {row["類型"] && <Badge soft>{row["類型"]}</Badge>}
+                        {itineraryTags([row]).length > 0 && (
+                          <span className={itineraryStyles.tags}>
+                            {itineraryTags([row]).map((tag) => (
+                              <Badge key={tag} soft>
+                                {tag}
+                              </Badge>
+                            ))}
+                          </span>
+                        )}
                       </div>
                       {(itinerarySubtitle(row) || hasItineraryBody(row)) && (
                         <div

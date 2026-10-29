@@ -256,3 +256,18 @@ it("moves across days into an exact slot, preserves content, and checks destinat
   assert.throws(() => moveItineraryToDay(rows, "I999", "2027-05-01", 0));
   assert.throws(() => moveItineraryToDay(rows, "I001", "2027-05-02", 3));
 });
+it("splits comma-separated itinerary tags, trims and deduplicates while matching whole tags", () => {
+  const rows: Row[] = [
+    { 類型: " 景點, 美食,景點,, " },
+    { 類型: "美食,交通" },
+    { 類型: " , " },
+    {},
+  ];
+  assert.deepEqual(itineraryTags(rows), ["景點", "美食", "交通"]);
+  assert.equal(matchesItineraryTag(rows[0], "美食"), true);
+  assert.equal(matchesItineraryTag(rows[0], "美"), false);
+  assert.equal(matchesItineraryTag(rows[0], "景點,美食"), false);
+  assert.equal(matchesItineraryTag(rows[2], "美食"), false);
+  assert.equal(matchesItineraryTag(rows[3], ""), true);
+  assert.deepEqual(itineraryTags([{ 類型: "交通" }]), ["交通"]);
+});
