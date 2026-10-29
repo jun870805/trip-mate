@@ -69,6 +69,7 @@
 
 .heading {
   min-width: 0;
+  align-items: flex-start;
 }
 
 .title {
