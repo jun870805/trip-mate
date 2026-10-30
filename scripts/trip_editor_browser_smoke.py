@@ -230,6 +230,7 @@ with sync_playwright() as p:
         expect(start_time).to_have_value('19:45')
         start_time.fill('18:30')
         dialog.get_by_label('標題', exact=True).fill('新增景點測試')
+        dialog.get_by_label('類別', exact=True).select_option('三餐')
         dialog.get_by_label('標籤', exact=True).fill('自訂標籤')
         tag_writes=len(writes)
         dialog.get_by_role('button', name='選擇既有標籤', exact=True).click()
@@ -357,6 +358,17 @@ with sync_playwright() as p:
         view_more=page.get_by_role('button', name='查看更多：新增景點測試', exact=True)
         expect(view_more).to_be_visible()
         public_card=page.locator('.timeline-card').filter(has_text='新增景點測試')
+        mark=public_card.locator('[data-category-watermark="三餐"]')
+        expect(mark).to_be_visible()
+        assert mark.evaluate('(node)=>getComputedStyle(node).pointerEvents')=='none'
+        assert mark.bounding_box()['height'] <= public_card.bounding_box()['height']
+        mark_bounds=mark.bounding_box()
+        card_bounds=public_card.bounding_box()
+        right_gap=card_bounds['x']+card_bounds['width']-mark_bounds['x']-mark_bounds['width']
+        assert abs(right_gap/card_bounds['width']-0.2)<0.02
+        assert abs(mark_bounds['y']+mark_bounds['height']-card_bounds['y']-card_bounds['height'])<2
+
+
         card_link=public_card.get_by_role('link', name='集合餐廳', exact=True)
         card_link.evaluate('(node)=>node.addEventListener("click",event=>event.preventDefault(),{once:true})')
         card_link.click()

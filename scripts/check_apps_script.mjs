@@ -6,6 +6,7 @@ const schema = JSON.parse(
   readFileSync("frontend/src/data/schema.json", "utf8"),
 );
 const books = [];
+const validationLists = [];
 const range = () => {
   const chain = new Proxy(
     {},
@@ -16,7 +17,12 @@ const range = () => {
               assert.ok(Array.isArray(values[0]));
               return chain;
             }
-          : () => chain,
+          : key === "requireValueInList"
+            ? (values) => {
+                validationLists.push(Array.from(values));
+                return chain;
+              }
+            : () => chain,
     },
   );
   return chain;
@@ -65,6 +71,15 @@ assert.deepEqual(
 assert.deepEqual(
   books[1].sheets.map((s) => s.name),
   Object.keys(schema).filter((n) => n !== "旅程清單"),
+);
+const categories = JSON.parse(
+  readFileSync("frontend/src/data/itinerary-categories.json", "utf8"),
+);
+assert.ok(
+  validationLists.some(
+    (values) => JSON.stringify(values) === JSON.stringify(categories),
+  ),
+  "Apps Script category validation must use the shared options",
 );
 console.log(
   "Apps Script creates a new catalog and 11-sheet trip template with mocked Google services.",

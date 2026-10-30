@@ -199,11 +199,11 @@ function rowIndex(
   );
 }
 function put(book: Workbook, sheet: TripSheetName, values: Row, index: number) {
-  if (
-    sheet === "每日行程" &&
-    !book[sheet][0].some((value) => String(value).trim() === "內文")
-  )
-    book[sheet][0].push("內文");
+  if (sheet === "每日行程") {
+    for (const field of ["內文", "類別"])
+      if (!book[sheet][0].some((value) => String(value).trim() === field))
+        book[sheet][0].push(field);
+  }
   if (sheet === "航班" || sheet === "飯店") {
     for (const field of sheet === "航班"
       ? ["出發航廈", "抵達航廈"]

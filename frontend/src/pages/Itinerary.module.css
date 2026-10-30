@@ -111,3 +111,7 @@
   position: relative;
   z-index: 1;
 }
+
+.categoryCard {
+  isolation: isolate;
+}

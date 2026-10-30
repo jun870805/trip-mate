@@ -1,3 +1,4 @@
+import { ItineraryCategoryMark } from "../components/ItineraryCategoryMark";
 import { ItineraryTag } from "../components/ItineraryTag";
 import { displayMultiline } from "../data/display-text";
 import { ItineraryDetailsDialog } from "../components/ItineraryDetailsDialog";
@@ -468,8 +469,9 @@ export function Itinerary({ data }: { data: TripData }) {
                   >
                     <div className="timeline-time">{row["開始時間"] || ""}</div>
                     <div
-                      className={`timeline-card ${hasItineraryBody(row) ? itineraryStyles.clickableCard : ""}`}
+                      className={`timeline-card ${hasItineraryBody(row) ? itineraryStyles.clickableCard : ""} ${row["類別"] && row["類別"] !== "未分類" ? itineraryStyles.categoryCard : ""}`}
                     >
+                      <ItineraryCategoryMark category={row["類別"]} />
                       <div className={`spread ${itineraryStyles.heading}`}>
                         <h4 className={itineraryStyles.title}>
                           {displayMultiline(row["標題"])}

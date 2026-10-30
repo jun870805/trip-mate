@@ -1,3 +1,4 @@
+import itineraryCategories from "../data/itinerary-categories.json" with { type: "json" };
 import { ItineraryTagInput } from "./ItineraryTagInput";
 import { confirmTripEditorClose } from "../data/editor-close";
 import { ItineraryList } from "./ItineraryList";
@@ -604,6 +605,7 @@ const fields: Record<BasicSheet, Field[]> = {
     { key: "日期", type: "date", required: true },
     { key: "開始時間", label: "時間", type: "time" },
     { key: "標題", required: true, type: "textarea" },
+    { key: "類別", options: itineraryCategories },
     { key: "說明", label: "副標", type: "textarea" },
     { key: "內文", type: "textarea" },
     { key: "類型", label: "標籤" },
@@ -622,6 +624,7 @@ function defaultValues(book: Workbook, entity: Entity, row: Row | null): Row {
     if (entity === "公積金") value["類型"] = "儲值";
     if (entity === "開團待辦") value["狀態"] = "待辦";
   }
+  if (entity === "每日行程") value["類別"] = value["類別"] || "未分類";
   if (entity === "每日行程" && row) value["說明"] = itinerarySubtitle(row);
   if (entity === "公積金" && row && row["類型"] !== "調整")
     value["記帳金額"] = row["記帳金額"].replace(/^-/, "");

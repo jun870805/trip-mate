@@ -18,6 +18,7 @@ try {
         import App from './src/App'
         import { ItineraryList } from './src/components/ItineraryList'
         import { ItineraryTagInput } from './src/components/ItineraryTagInput'
+        import { ItineraryCategoryMark } from './src/components/ItineraryCategoryMark'
         import { MarkdownContent } from './src/components/MarkdownContent'
         import { ItineraryDetailsDialog } from './src/components/ItineraryDetailsDialog'
         import { ItineraryNotes } from './src/components/ItineraryNotes'
@@ -195,6 +196,14 @@ try {
         for(const rendered of [htmlDetail,htmlPdf]) assert.ok(rendered.includes('第一行<br/>第二行<br/>第三行') && !rendered.includes('<script'))
         const imageMarkdown=renderToStaticMarkup(createElement(MarkdownContent,{text:'![圖片](https://example.com/photo.jpg) ![危險](javascript:alert(1))'}))
         assert.ok(imageMarkdown.includes('src="https://example.com/photo.jpg"') && !imageMarkdown.includes('src="javascript:'))
+        for(const category of ['三餐','活動','交通','購物']) {
+          const mark=renderToStaticMarkup(createElement(ItineraryCategoryMark,{category}))
+          assert.ok(mark.includes('data-category-watermark="'+category+'"') && mark.includes('aria-hidden="true"'))
+          const categoryRow={...data.tables['每日行程'][0],類別:category,內文:'內容'}
+          const categorized=renderToStaticMarkup(createElement(Itinerary,{data:{...data,tables:{...data.tables,每日行程:[categoryRow]}}}))
+          assert.ok(categorized.includes(itineraryStyles.categoryCard) && categorized.includes('data-category-watermark="'+category+'"') && categorized.includes('查看更多'))
+        }
+        for(const category of ['',undefined,'未分類','toString','其他']) assert.equal(renderToStaticMarkup(createElement(ItineraryCategoryMark,{category})),'')
         const bodyRow={...data.tables['每日行程'][0],說明:'副標 [交通](https://example.com/transit)',類型:'交通',內文:markdownText}
         const bodyData={...data,tables:{...data.tables,每日行程:[bodyRow]}}
         const bodyHtml=renderToStaticMarkup(createElement(Itinerary,{data:bodyData}))
@@ -372,7 +381,7 @@ try {
           for(const input of form.matchAll(/<input[^>]*aria-haspopup="dialog"[^>]*>/g)) assert.ok(input[0].includes('value=""'), entity+' must not prefill date/time inputs')
           if(entity==='開團待辦') assert.ok(form.includes('負責人') && form.includes('<select'))
           if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址') && form.includes('訂房網站') && form.includes('價格') && form.includes('副標題'))
-          if(entity==='每日行程') { assert.ok(form.includes('選擇既有標籤') && ['交通','住宿','景點','自由活動'].every(tag=>form.includes('>'+tag+'</span>')), 'Tag picker includes saved tags from every day'); const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','標題','副標','內文','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('D3 - 5/3(一)')); }
+          if(entity==='每日行程') { assert.ok(form.includes('類別') && ['未分類','三餐','活動','交通','購物'].every(category=>form.includes('<option>'+category+'</option>') || form.includes('>'+category+'</option>'))); assert.ok(form.includes('選擇既有標籤') && ['交通','住宿','景點','自由活動'].every(tag=>form.includes('>'+tag+'</span>')), 'Tag picker includes saved tags from every day'); const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','標題','副標','內文','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('D3 - 5/3(一)')); }
           if(entity==='航班') {assert.ok(form.includes('出發航廈') && form.includes('抵達航廈'));assert.ok(form.includes('出發當地時間') && form.includes('抵達當地時間'));assert.ok(!form.includes('時差'));}
           if(entity==='公積金') assert.ok(form.includes('個人金額') && form.includes('checkbox'))
           if(entity==='行前費用') assert.ok(form.includes('實際刷卡金額') && form.includes('TWD'))

@@ -8,6 +8,7 @@ root = Path(__file__).resolve().parents[1]
 schema = json.loads((root / 'frontend/src/data/schema.json').read_text())
 rules = json.loads((root / 'frontend/src/data/id-rules.json').read_text())
 demo = json.loads((root / 'frontend/src/data/demo.json').read_text())
+categories = json.loads((root / 'frontend/src/data/itinerary-categories.json').read_text())
 import re
 for rule in rules.values():
     index = schema[rule['table']].index(rule['column'])
@@ -32,6 +33,15 @@ for filename in ['旅程目錄範本.xlsx', '每趟旅程範本.xlsx', '範例�
             id_columns = {column for rule in rules.values() for column in [rule['column'], *rule.get('referenceColumns', [])]}
             expected_validators = sum(header in id_columns for header in headers)
             assert len([rule for rule in validations if rule.attrib['type'] == 'custom']) == expected_validators
+            if name == '每日行程':
+                number = headers.index('類別') + 1
+                letters = ''
+                while number:
+                    number, remainder = divmod(number - 1, 26)
+                    letters = chr(65 + remainder) + letters
+                category_rule = next(rule for rule in validations if rule.attrib['sqref'] == f'{letters}2:{letters}1001')
+                assert category_rule.attrib['type'] == 'list'
+                assert category_rule.find('s:formula1', ns).text == '"' + ','.join(categories) + '"'
             if filename == '旅程目錄範本.xlsx':
                 row = xml.findall('s:sheetData/s:row', ns)[1]
                 values = [cell.find('s:is/s:t', ns).text for cell in row]

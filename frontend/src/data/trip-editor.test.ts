@@ -1430,3 +1430,58 @@ it("rejects copying a missing record or a sheet outside the itinerary copy scope
     /複製/,
   );
 });
+it("adds itinerary category to a legacy sheet while preserving tags, body and extra fields", () => {
+  const legacy = structuredClone(demo);
+  const categoryColumn = legacy["每日行程"][0].indexOf("類別");
+  if (categoryColumn >= 0)
+    for (const cells of legacy["每日行程"]) cells.splice(categoryColumn, 1);
+  legacy["每日行程"][0].push("額外欄位");
+  const extra = legacy["每日行程"][0].length - 1;
+  legacy["每日行程"][1][extra] = "保留資料";
+  assert.doesNotThrow(() => parseTrip(trip, legacy));
+  const source = readRows(legacy, "每日行程")[0];
+  const next = mutateTripBook(trip, legacy, {
+    kind: "record",
+    mode: "edit",
+    sheet: "每日行程",
+    id: source["行程ID"],
+    values: { ...source, 類別: "三餐" },
+  });
+  assert.ok(next["每日行程"][0].includes("類別"));
+  const saved = readRows(next, "每日行程")[0];
+  assert.equal(saved["類別"], "三餐");
+  assert.equal(saved["類型"], source["類型"]);
+  assert.equal(saved["內文"], source["內文"]);
+  assert.equal(saved["額外欄位"], "保留資料");
+  assert.deepEqual(legacy["每日行程"][0].includes("類別"), false);
+  assert.throws(
+    () =>
+      mutateTripBook(trip, next, {
+        kind: "record",
+        mode: "edit",
+        sheet: "每日行程",
+        id: source["行程ID"],
+        values: { ...saved, 類別: "早餐" },
+      }),
+    /類別/,
+  );
+});
+it("saves category and a missing header together in a single authorized batch", async () => {
+  const legacy = structuredClone(demo);
+  const col = legacy["每日行程"][0].indexOf("類別");
+  if (col >= 0) for (const cells of legacy["每日行程"]) cells.splice(col, 1);
+  const api = fakeApi(legacy),
+    editor = createTripEditor(trip, "itinerary", config, api.fetcher);
+  const before = await editor.read(session);
+  const row = readRows(before.book, "每日行程")[0];
+  const next = await editor.save(session, before, {
+    kind: "record",
+    mode: "edit",
+    sheet: "每日行程",
+    id: row["行程ID"],
+    values: { ...row, 類別: "活動" },
+  });
+  assert.equal(api.writes, 1);
+  assert.equal(readRows(next.book, "每日行程")[0]["類別"], "活動");
+  assert.deepEqual(next.book["航班"], before.book["航班"]);
+});

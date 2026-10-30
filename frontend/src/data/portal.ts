@@ -1,3 +1,4 @@
+import itineraryCategories from "./itinerary-categories.json" with { type: "json" };
 import { normalizeTimezone, validateFlightTimes } from "./timezone.ts";
 import schema from "./schema.json" with { type: "json" };
 import type { SheetRows } from "./sheets.ts";
@@ -122,7 +123,7 @@ function table(book: Workbook, name: SheetName): Row[] {
     ensure(
       headers.includes(header) ||
         (name === "航班" && ["出發航廈", "抵達航廈"].includes(header)) ||
-        (name === "每日行程" && header === "內文") ||
+        (name === "每日行程" && ["內文", "類別"].includes(header)) ||
         (name === "飯店" &&
           [
             "入住時間",
@@ -483,6 +484,13 @@ export function parseTrip(trip: Trip, book: Workbook): TripData {
   }
   for (const row of tables["每日行程"]) {
     required(row, ["日期", "標題", "排序"], "每日行程");
+    if (row["類別"])
+      atField(row, "類別", () =>
+        ensure(
+          itineraryCategories.includes(row["類別"]),
+          `類別須為${itineraryCategories.join("、")}。`,
+        ),
+      );
     ensure(Number.isFinite(Number(row["排序"])), "行程排序必須是數字。");
     if (row["時區"])
       row["時區"] = atField(row, "時區", () => normalizeTimezone(row["時區"]));

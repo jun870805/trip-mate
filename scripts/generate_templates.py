@@ -9,6 +9,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = json.loads((ROOT / 'frontend/src/data/schema.json').read_text())
 ID_RULES = json.loads((ROOT / 'frontend/src/data/id-rules.json').read_text())
+ITINERARY_CATEGORIES = json.loads((ROOT / 'frontend/src/data/itinerary-categories.json').read_text())
 ID_COLUMNS = {column: rule['prefix'] for rule in ID_RULES.values() for column in [rule['column'], *rule.get('referenceColumns', [])]}
 OUT = ROOT / 'frontend/public/templates'
 OUT.mkdir(parents=True, exist_ok=True)
@@ -39,6 +40,7 @@ def workbook(path, sheets):
                 data.append(f'<row r="{rownum}">{"".join(cells)}</row>')
             width = len(rows[0])
             choices = {
+                '類別': ITINERARY_CATEGORIES,
                 '旅程狀態': ['規劃中', '即將出發', '旅途中', '已結束'],
                 '狀態': ['待辦', '進行中', '已完成', '已取消'],
                 '支付方式': ['行前收款', '公積金'],
@@ -86,6 +88,7 @@ demo['飯店'] += [['hotel_1', '範例飯店', '', '2027-05-01', '15:00', '2027-
 demo['每日行程'] += [['i1', '2027-05-01', '09:00', '', 'Asia/Taipei', '搭機出發', '交通', '桃園機場', '', '時間為出發地當地時間', 'flight_1', '', 10], ['i2', '2027-05-01', '15:00', '', '', '飯店入住', '住宿', '範例飯店', '', '集合後一同辦理入住', '', 'hotel_1', 20], ['i3', '2027-05-02', '10:00', '12:00', '', '大阪城散步', '景點', '大阪城公園', 'https://www.google.com/maps/search/?api=1&query=Osaka+Castle', '範例行程，時間可自行調整', '', '', 10], ['i4', '2027-05-03', '', '', '', '自由活動與返程', '自由活動', '', '', '範例行程', '', '', 10]]
 for itinerary_row in demo['每日行程'][1:]:
     itinerary_row.append('')
+    itinerary_row.append({'i1': '交通', 'i2': '未分類', 'i3': '活動', 'i4': '活動'}[itinerary_row[0]])
 demo['開團待辦'] += [['task1', '確認旅遊日期', '其他', '已完成', '2027-03-01', '2027-02-28', 'member_a', '', 10], ['task2', '訂購機票', '航班', '已完成', '2027-04-01', '2027-03-20', 'member_a', '', 20], ['task3', '確認行前收款', '其他', '進行中', '2027-04-20', '', 'member_b', '', 30], ['task4', '確認機場接送', '交通', '待辦', '2027-04-25', '', 'member_c', '', 40]]
 aliases = {
     'trip': ['demo_trip'], 'member': ['member_a', 'member_b', 'member_c'],
@@ -122,7 +125,7 @@ function createTripMateTemplates() {
       sheet.setFrozenRows(1);
       sheet.setColumnWidths(1, headers.length, 180);
       sheet.getRange(1, 1, sheet.getMaxRows(), headers.length).createFilter();
-      const choices = {旅程狀態:['規劃中','即將出發','旅途中','已結束'],類型:name === '公積金交易' ? ['儲值','支出','退款','調整'] : ['景點','餐飲','交通','住宿','自由活動','其他'],狀態:['待辦','進行中','已完成','已取消'],支付方式:['行前收款','公積金']};
+      const choices = {類別:ITINERARY_CATEGORIES,旅程狀態:['規劃中','即將出發','旅途中','已結束'],類型:name === '公積金交易' ? ['儲值','支出','退款','調整'] : ['景點','餐飲','交通','住宿','自由活動','其他'],狀態:['待辦','進行中','已完成','已取消'],支付方式:['行前收款','公積金']};
       headers.forEach(function(header, i) {
         if (choices[header] && !(name === '每日行程' && header === '類型')) sheet.getRange(2, i + 1, sheet.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(choices[header], true).setAllowInvalid(false).build());
         if (idPrefixes[header]) {
@@ -142,6 +145,6 @@ function createTripMateTemplates() {
   console.log('每趟旅程範本：' + template.getUrl());
   console.log('先填寫資料，之後按需要設定公開檢視；此程式不會變更共用權限。');
 }
-'''.replace('SCHEMA', json.dumps(SCHEMA, ensure_ascii=False)).replace('ID_COLUMNS', json.dumps(ID_COLUMNS, ensure_ascii=False))
+'''.replace('SCHEMA', json.dumps(SCHEMA, ensure_ascii=False)).replace('ID_COLUMNS', json.dumps(ID_COLUMNS, ensure_ascii=False)).replace('ITINERARY_CATEGORIES', json.dumps(ITINERARY_CATEGORIES, ensure_ascii=False))
 (OUT / '建立Google試算表範本.gs').write_text(script)
 print('Generated catalog with sample row, blank trip workbook, labeled demo, and Apps Script.')
