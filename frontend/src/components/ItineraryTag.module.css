@@ -1,6 +1,6 @@
 .tag:global(.badge) {
-  background: hsl(var(--tag-hue) 34% 90%);
-  color: hsl(var(--tag-hue) 32% 30%);
+  background: hsl(var(--tag-hue) 42% 89%);
+  color: hsl(var(--tag-hue) 38% 30%);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }

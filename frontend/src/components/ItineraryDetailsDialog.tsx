@@ -12,10 +12,12 @@ import styles from "./ItineraryDetailsDialog.module.css";
 
 export function ItineraryDetailsDialog({
   row,
+  allTags = itineraryTags([row]),
   subtitle,
   onClose,
 }: {
   row: Row;
+  allTags?: string[];
   subtitle: string;
   onClose: () => void;
 }) {
@@ -57,7 +59,7 @@ export function ItineraryDetailsDialog({
         {tags.length > 0 && (
           <div className={styles.tag}>
             {tags.map((tag) => (
-              <ItineraryTag key={tag} tag={tag} />
+              <ItineraryTag key={tag} tag={tag} allTags={allTags} />
             ))}
           </div>
         )}

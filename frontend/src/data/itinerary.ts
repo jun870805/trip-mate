@@ -183,6 +183,12 @@ export function itineraryTags(rows: Row[]): string[] {
     ),
   ];
 }
+export function appendItineraryTag(value: string, selected: string): string {
+  const tag = selected.trim();
+  const current = itineraryTags([{ 類型: value }]);
+  if (!tag || tag.includes(",") || current.includes(tag)) return value;
+  return [...current, tag].join(",");
+}
 export function matchesItineraryTag(row: Row, tag: string): boolean {
   return !tag || itineraryTags([row]).includes(tag);
 }

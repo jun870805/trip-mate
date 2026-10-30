@@ -425,6 +425,7 @@ export function Itinerary({ data }: { data: TripData }) {
       {detailRow && (
         <ItineraryDetailsDialog
           row={detailRow}
+          allTags={tags}
           subtitle={itinerarySubtitle(detailRow)}
           onClose={() => setDetailsId(null)}
         />
@@ -476,7 +477,11 @@ export function Itinerary({ data }: { data: TripData }) {
                         {itineraryTags([row]).length > 0 && (
                           <span className={itineraryStyles.tags}>
                             {itineraryTags([row]).map((tag) => (
-                              <ItineraryTag key={tag} tag={tag} />
+                              <ItineraryTag
+                                key={tag}
+                                tag={tag}
+                                allTags={tags}
+                              />
                             ))}
                           </span>
                         )}

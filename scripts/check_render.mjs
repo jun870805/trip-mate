@@ -17,6 +17,7 @@ try {
         import { Overview, Itinerary, Fund, Expenses, Tasks } from './src/pages/TripViews'
         import App from './src/App'
         import { ItineraryList } from './src/components/ItineraryList'
+        import { ItineraryTagInput } from './src/components/ItineraryTagInput'
         import { MarkdownContent } from './src/components/MarkdownContent'
         import { ItineraryDetailsDialog } from './src/components/ItineraryDetailsDialog'
         import { ItineraryNotes } from './src/components/ItineraryNotes'
@@ -225,6 +226,13 @@ try {
         assert.notEqual(cardTagColors.get('交通'),cardTagColors.get('美食'), 'Categories use different colors')
         assert.equal(cardTagColors.get('交通'),detailTagColors.get('交通'), 'Card/PDF and details share the same tag color')
         assert.equal(cardTagColors.get('美食'),detailTagColors.get('美食'))
+        const multiTagPicker=renderToStaticMarkup(createElement(ItineraryTagInput,{value:'',tags:['美食','交通'],onChange(){}}))
+        const pickerTagColors=tagColors(multiTagPicker)
+        assert.equal(cardTagColors.get('美食'),pickerTagColors.get('美食'), 'Tag picker uses the same full-trip palette')
+        assert.equal(cardTagColors.get('交通'),pickerTagColors.get('交通'))
+        const secondTagDetail=renderToStaticMarkup(createElement(ItineraryDetailsDialog,{row:{...bodyRow,類型:'交通'},allTags:['美食','交通'],subtitle:'',onClose(){}}))
+        assert.equal(tagColors(secondTagDetail).get('交通'),cardTagColors.get('交通'), 'A single-tag detail keeps its assigned trip color')
+
         const detailHtml=renderToStaticMarkup(createElement(ItineraryDetailsDialog,{row:bodyRow,subtitle:bodyRow['說明'],onClose(){}}))
         for(const value of ['搭機出發','副標','>交通</span>','<strong>重點</strong>','關閉']) assert.ok(detailHtml.includes(value),value)
         assert.ok(!detailHtml.includes('aria-label="回到最上面"'), 'Back-to-top stays hidden at the initial top position')
@@ -340,6 +348,15 @@ try {
         assert.ok(!freshForm.includes('舊的未儲存內容') && !freshForm.includes('草稿'))
         assert.ok(freshForm.includes('建立並填入 ID'))
         delete window.sessionStorage
+        const pickerTags=renderToStaticMarkup(createElement(ItineraryTagInput,{value:'景點',tags:['交通','景點','自由活動'],onChange(){}}))
+        assert.ok(pickerTags.includes('aria-label="標籤"') && pickerTags.includes('aria-label="選擇既有標籤"') && pickerTags.includes('aria-expanded="false"') && pickerTags.includes('popover="auto"'))
+        const selectedTagButton=[...pickerTags.matchAll(/<button[^>]*>/g)].map(match=>match[0]).find(button=>button.includes('aria-pressed="true"'))
+        assert.ok(selectedTagButton && selectedTagButton.includes('disabled'), 'Existing tags already in the input cannot be added twice')
+        assert.ok(pickerTags.includes('>交通</span>') && pickerTags.includes('>自由活動</span>'))
+        const emptyTagPicker=renderToStaticMarkup(createElement(ItineraryTagInput,{value:'',tags:[],onChange(){}}))
+        assert.ok(emptyTagPicker.includes('尚無既有標籤') && emptyTagPicker.includes('aria-label="標籤"'))
+        const unsafeTagPicker=renderToStaticMarkup(createElement(ItineraryTagInput,{value:'',tags:['<script>alert(1)</script>'],onChange(){}}))
+        assert.ok(!unsafeTagPicker.includes('<script>') && unsafeTagPicker.includes('&lt;script&gt;'))
         const editingHandlers = {onLogin(){},onExpired(){},onBusy(){},onSaved(){},onCancel(){},onSave(){}}
         assert.equal(renderToStaticMarkup(createElement(TripEditing, {trip,tab:'overview',session:null,loginBusy:false,...editingHandlers})), '')
         const editingTools = renderToStaticMarkup(createElement(TripEditing, {trip,tab:'overview',session,loginBusy:false,...editingHandlers}))
@@ -355,7 +372,7 @@ try {
           for(const input of form.matchAll(/<input[^>]*aria-haspopup="dialog"[^>]*>/g)) assert.ok(input[0].includes('value=""'), entity+' must not prefill date/time inputs')
           if(entity==='開團待辦') assert.ok(form.includes('負責人') && form.includes('<select'))
           if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址') && form.includes('訂房網站') && form.includes('價格') && form.includes('副標題'))
-          if(entity==='每日行程') { const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','標題','副標','內文','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('D3 - 5/3(一)')); }
+          if(entity==='每日行程') { assert.ok(form.includes('選擇既有標籤') && ['交通','住宿','景點','自由活動'].every(tag=>form.includes('>'+tag+'</span>')), 'Tag picker includes saved tags from every day'); const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','標題','副標','內文','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('D3 - 5/3(一)')); }
           if(entity==='航班') {assert.ok(form.includes('出發航廈') && form.includes('抵達航廈'));assert.ok(form.includes('出發當地時間') && form.includes('抵達當地時間'));assert.ok(!form.includes('時差'));}
           if(entity==='公積金') assert.ok(form.includes('個人金額') && form.includes('checkbox'))
           if(entity==='行前費用') assert.ok(form.includes('實際刷卡金額') && form.includes('TWD'))

@@ -1,3 +1,4 @@
+import { ItineraryTagInput } from "./ItineraryTagInput";
 import { confirmTripEditorClose } from "../data/editor-close";
 import { ItineraryList } from "./ItineraryList";
 import { CloseButton } from "./CloseButton";
@@ -19,6 +20,8 @@ import {
   tripDates,
   itinerarySubtitle,
   itineraryDateLabel,
+  itineraryTags,
+  orderedItinerary,
 } from "../data/itinerary";
 import {
   createTripEditor,
@@ -752,6 +755,13 @@ export function TripForm({
               </option>
             ))}
           </select>
+        ) : entity === "每日行程" && key === "類型" ? (
+          <ItineraryTagInput
+            value={values[key] || ""}
+            tags={itineraryTags(orderedItinerary(readRows(book, "每日行程")))}
+            disabled={busy}
+            onChange={(value) => field(key, value)}
+          />
         ) : relation ? (
           <select
             value={values[key] || ""}

@@ -231,6 +231,33 @@ with sync_playwright() as p:
         start_time.fill('18:30')
         dialog.get_by_label('標題', exact=True).fill('新增景點測試')
         dialog.get_by_label('標籤', exact=True).fill('自訂標籤')
+        tag_writes=len(writes)
+        dialog.get_by_role('button', name='選擇既有標籤', exact=True).click()
+        tag_picker=page.get_by_role('dialog', name='選擇既有標籤', exact=True)
+        expect(tag_picker).to_be_visible()
+        tag_header=tag_picker.locator('.dialog-heading').bounding_box()
+        for tag_button in tag_picker.locator('button[aria-pressed]').all():
+            tag_button.scroll_into_view_if_needed()
+            bounds=tag_button.bounding_box()
+            panel_bounds=tag_picker.bounding_box()
+            assert bounds['y'] >= tag_header['y']+tag_header['height']-1, 'Tag labels must not be covered by the picker heading'
+            assert bounds['x'] >= panel_bounds['x'] and bounds['x']+bounds['width'] <= panel_bounds['x']+panel_bounds['width'], 'Tag labels must wrap within the picker'
+
+        for tag in ['交通','住宿','景點','自由活動']:
+            expect(tag_picker.get_by_role('button', name=tag, exact=True)).to_be_visible()
+        tag_picker.get_by_role('button', name='景點', exact=True).click()
+        expect(tag_picker).not_to_be_visible()
+        expect(dialog.get_by_label('標籤', exact=True)).to_have_value('自訂標籤,景點')
+        assert len(writes)==tag_writes
+        dialog.get_by_role('button', name='選擇既有標籤', exact=True).click()
+        expect(tag_picker.get_by_role('button', name='景點', exact=True)).to_be_disabled()
+        tag_close_prompts=len(close_policy['messages'])
+        tag_picker.press('Escape')
+        expect(tag_picker).not_to_be_visible()
+        expect(dialog).to_be_visible()
+        assert len(close_policy['messages'])==tag_close_prompts
+        expect(dialog.get_by_label('標籤', exact=True)).to_have_value('自訂標籤,景點')
+
         dialog.get_by_label('副標', exact=True).fill('[集合餐廳](https://maps.app.goo.gl/example)')
         dialog.get_by_label('內文', exact=True).fill('## 集合細節\n\n[跳到交通方式](#交通方式)\n\n**請準時**\n\n[官網](https://example.com/info)\n\n' + ('補充說明\n\n' * 30) + '## 交通方式\n\n搭乘地鐵\n\n' + ('後續說明\n\n' * 30))
         dialog.get_by_role('button', name='儲存', exact=True).click()

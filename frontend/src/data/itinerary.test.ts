@@ -5,6 +5,7 @@ import {
   itinerarySubtitle,
   hasItineraryBody,
   itineraryTags,
+  appendItineraryTag,
   matchesItineraryTag,
   tripDayNumber,
   itineraryDateLabel,
@@ -314,4 +315,15 @@ it("keeps years for cross-year trips and legacy dates from a different year", ()
     itineraryDateLabel("2026-02-30", "2026-04-13", "2026-04-18"),
     "2026-02-30",
   );
+});
+
+it("appends picked tags without replacing current tags or adding duplicates", () => {
+  assert.equal(appendItineraryTag("景點", "美食"), "景點,美食");
+  assert.equal(appendItineraryTag("景點,", " 美食 "), "景點,美食");
+  assert.equal(appendItineraryTag(" 景點,美食 ", "景點"), " 景點,美食 ");
+  assert.equal(appendItineraryTag("景點,景點,,美食", "交通"), "景點,美食,交通");
+  assert.equal(appendItineraryTag(" , ", "自由活動"), "自由活動");
+  assert.equal(appendItineraryTag("", "自訂標籤"), "自訂標籤");
+  assert.equal(appendItineraryTag("景點", ""), "景點");
+  assert.equal(appendItineraryTag("景點", "美食,交通"), "景點");
 });

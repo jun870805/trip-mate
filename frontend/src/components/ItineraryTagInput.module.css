@@ -1,0 +1,81 @@
+.control {
+  display: block;
+  position: relative;
+  min-width: 0;
+}
+:global(.catalog-fields) .control > input {
+  padding-right: 40px;
+}
+.trigger {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--brown);
+}
+.panel {
+  --dialog-padding: 12px;
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  max-height: min(320px, calc(100dvh - 24px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: #44372e;
+  font: 13px var(--font-sans);
+}
+.panel:popover-open {
+  display: flex;
+  flex-direction: column;
+}
+.panel > .heading:global(.dialog-heading) {
+  position: static;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.options {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 12px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  gap: 8px;
+}
+.option {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.option > :global(.badge) {
+  display: block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.empty {
+  padding: 0 12px 12px;
+  color: var(--muted);
+}
