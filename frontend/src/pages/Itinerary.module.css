@@ -112,6 +112,30 @@
   z-index: 1;
 }
 
-.categoryCard {
-  isolation: isolate;
+/* Category colors apply only to reading cards, including PDF. */
+:global(.timeline-card).categoryCard {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+:global(.timeline-card).categoryCard[data-category="三餐"] {
+  background: color-mix(in srgb, var(--orange) 10%, var(--paper));
+  border-color: color-mix(in srgb, var(--orange) 48%, var(--line));
+}
+:global(.timeline-card).categoryCard[data-category="活動"] {
+  background: color-mix(in srgb, #648264 11%, var(--paper));
+  border-color: color-mix(in srgb, #648264 50%, var(--line));
+}
+:global(.timeline-card).categoryCard[data-category="交通"] {
+  background: color-mix(in srgb, #68849b 11%, var(--paper));
+  border-color: color-mix(in srgb, #68849b 50%, var(--line));
+}
+:global(.timeline-card).categoryCard[data-category="購物"] {
+  background: color-mix(in srgb, #a57489 11%, var(--paper));
+  border-color: color-mix(in srgb, #a57489 50%, var(--line));
+}
+@media (forced-colors: active) {
+  :global(.timeline-card).categoryCard[data-category] {
+    background: Canvas;
+    border-color: CanvasText;
+  }
 }

@@ -358,15 +358,10 @@ with sync_playwright() as p:
         view_more=page.get_by_role('button', name='查看更多：新增景點測試', exact=True)
         expect(view_more).to_be_visible()
         public_card=page.locator('.timeline-card').filter(has_text='新增景點測試')
-        mark=public_card.locator('[data-category-watermark="三餐"]')
-        expect(mark).to_be_visible()
-        assert mark.evaluate('(node)=>getComputedStyle(node).pointerEvents')=='none'
-        assert mark.bounding_box()['height'] <= public_card.bounding_box()['height']
-        mark_bounds=mark.bounding_box()
-        card_bounds=public_card.bounding_box()
-        right_gap=card_bounds['x']+card_bounds['width']-mark_bounds['x']-mark_bounds['width']
-        assert abs(right_gap/card_bounds['width']-0.2)<0.02
-        assert abs(mark_bounds['y']+mark_bounds['height']-card_bounds['y']-card_bounds['height'])<2
+        expect(public_card).to_have_attribute('data-category', '三餐')
+        expect(public_card.locator('[data-category-watermark]')).to_have_count(0)
+        colors=public_card.evaluate('(node)=>({background:getComputedStyle(node).backgroundColor,border:getComputedStyle(node).borderTopColor})')
+        assert colors['background'] != colors['border']
 
 
         card_link=public_card.get_by_role('link', name='集合餐廳', exact=True)

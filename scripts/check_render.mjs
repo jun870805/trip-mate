@@ -18,7 +18,6 @@ try {
         import App from './src/App'
         import { ItineraryList } from './src/components/ItineraryList'
         import { ItineraryTagInput } from './src/components/ItineraryTagInput'
-        import { ItineraryCategoryMark } from './src/components/ItineraryCategoryMark'
         import { MarkdownContent } from './src/components/MarkdownContent'
         import { ItineraryDetailsDialog } from './src/components/ItineraryDetailsDialog'
         import { ItineraryNotes } from './src/components/ItineraryNotes'
@@ -197,13 +196,10 @@ try {
         const imageMarkdown=renderToStaticMarkup(createElement(MarkdownContent,{text:'![圖片](https://example.com/photo.jpg) ![危險](javascript:alert(1))'}))
         assert.ok(imageMarkdown.includes('src="https://example.com/photo.jpg"') && !imageMarkdown.includes('src="javascript:'))
         for(const category of ['三餐','活動','交通','購物']) {
-          const mark=renderToStaticMarkup(createElement(ItineraryCategoryMark,{category}))
-          assert.ok(mark.includes('data-category-watermark="'+category+'"') && mark.includes('aria-hidden="true"'))
           const categoryRow={...data.tables['每日行程'][0],類別:category,內文:'內容'}
           const categorized=renderToStaticMarkup(createElement(Itinerary,{data:{...data,tables:{...data.tables,每日行程:[categoryRow]}}}))
-          assert.ok(categorized.includes(itineraryStyles.categoryCard) && categorized.includes('data-category-watermark="'+category+'"') && categorized.includes('查看更多'))
+          assert.ok(categorized.includes(itineraryStyles.categoryCard) && categorized.includes('data-category="'+category+'"') && !categorized.includes('data-category-watermark') && categorized.includes('查看更多'))
         }
-        for(const category of ['',undefined,'未分類','toString','其他']) assert.equal(renderToStaticMarkup(createElement(ItineraryCategoryMark,{category})),'')
         const bodyRow={...data.tables['每日行程'][0],說明:'副標 [交通](https://example.com/transit)',類型:'交通',內文:markdownText}
         const bodyData={...data,tables:{...data.tables,每日行程:[bodyRow]}}
         const bodyHtml=renderToStaticMarkup(createElement(Itinerary,{data:bodyData}))
