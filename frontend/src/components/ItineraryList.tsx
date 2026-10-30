@@ -79,6 +79,7 @@ export function ItineraryList({
   busy,
   onEdit,
   onRemove,
+  onDuplicate,
   onReorder,
 }: {
   trip: Trip;
@@ -88,6 +89,7 @@ export function ItineraryList({
   busy: boolean;
   onEdit: (row: Row) => void;
   onRemove: (row: Row) => void;
+  onDuplicate: (row: Row) => void;
   onReorder: (mutation: TripMutation) => void;
 }) {
   const dates = [
@@ -309,6 +311,14 @@ export function ItineraryList({
                         </div>
                       </div>
                       <div className={styles.actions}>
+                        <button
+                          type="button"
+                          className="quiet-button"
+                          disabled={busy || !!pending || dragging}
+                          onClick={() => onDuplicate(row)}
+                        >
+                          複製
+                        </button>
                         <button
                           type="button"
                           className="quiet-button"

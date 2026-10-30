@@ -1,3 +1,4 @@
+import type { Workbook } from "./portal.ts";
 import { it } from "node:test";
 import assert from "node:assert/strict";
 import demo from "./demo.json" with { type: "json" };
@@ -1334,4 +1335,98 @@ it("preserves valid times across dates, requires confirmation for conflicts and 
   assert.equal(entry["排序"], "10");
   assert.equal(entry["開始時間"], "09:00");
   assert.deepEqual(empty["飯店"], demo["飯店"]);
+});
+it("duplicates itinerary records verbatim except their new ID, including reordered and extra columns", () => {
+  for (const [sheet, key, prefix] of [
+    ["每日行程", "行程ID", "I"],
+    ["航班", "航班ID", "A"],
+    ["飯店", "住宿ID", "H"],
+  ] as const) {
+    const book: Workbook = structuredClone(demo);
+    const headers = book[sheet][0];
+    headers.push("自訂欄位");
+    const source = book[sheet][1];
+    source[headers.length - 1] = "  =保留原始文字與空白  ";
+    if (sheet === "每日行程")
+      source[headers.indexOf("內文")] = "  ## 內文\n<br>\n";
+    const high = [...source];
+    high[headers.indexOf(key)] = prefix + "999";
+    book[sheet].push(high);
+    for (const row of book[sheet]) {
+      while (row.length < headers.length) row.push("");
+      row.reverse();
+    }
+    const idColumn = book[sheet][0].findIndex((value) => value === key);
+    const id = String(book[sheet][1][idColumn]);
+    const before = structuredClone(book);
+    const result = mutateTripBook(trip, book, { kind: "duplicate", sheet, id });
+    const clone = result[sheet].at(-1)!;
+    assert.equal(clone[idColumn], prefix + "1000");
+    assert.deepEqual(
+      clone.map((value, index) => (index === idColumn ? null : value)),
+      book[sheet][1].map((value, index) => (index === idColumn ? null : value)),
+    );
+    assert.deepEqual(result[sheet].slice(0, -1), book[sheet]);
+    for (const other of Object.keys(book) as (keyof typeof book)[])
+      if (other !== sheet) assert.deepEqual(result[other], book[other]);
+    assert.deepEqual(book, before);
+  }
+});
+it("duplicates through a single authorized batch for an ordinary guide and rejects stale snapshots", async () => {
+  const initial = structuredClone(demo);
+  const extraColumn = initial["每日行程"][0].length;
+  initial["每日行程"][0].push("自訂欄位");
+  initial["每日行程"][1][extraColumn] = "  =原樣複製而非公式  ";
+  initial["每日行程"][1][initial["每日行程"][0].indexOf("內文")] =
+    "  **原始內文**\n<br>\n";
+  const api = fakeApi(initial);
+  const guides = readGuideConfig({
+    VITE_GOOGLE_CLIENT_ID: "client",
+    VITE_GUIDE_EMAILS: '["owner@example.com","guide@example.com"]',
+  });
+  const editor = createTripEditor(trip, "itinerary", guides, api.fetcher);
+  const before = await editor.read(session);
+  const source = readRows(before.book, "每日行程")[0];
+  const mutation = {
+    kind: "duplicate" as const,
+    sheet: "每日行程" as const,
+    id: source["行程ID"],
+  };
+  const result = await editor.save(session, before, mutation);
+  assert.equal(api.writes, 1);
+  const copied = readRows(result.book, "每日行程").at(-1)!;
+  assert.equal(
+    result.book["每日行程"].at(-1)![extraColumn],
+    "  =原樣複製而非公式  ",
+  );
+  assert.notEqual(copied["行程ID"], source["行程ID"]);
+  assert.deepEqual({ ...copied, 行程ID: source["行程ID"] }, source);
+  assert.deepEqual(automaticTripIds(before.book, mutation), mutation);
+  await assert.rejects(
+    () => editor.save(session, before, mutation),
+    /其他地方更新/,
+  );
+  assert.equal(api.writes, 1);
+  await assert.rejects(() => editor.save(null, result, mutation));
+  assert.equal(api.writes, 1);
+});
+it("rejects copying a missing record or a sheet outside the itinerary copy scope", () => {
+  assert.throws(
+    () =>
+      mutateTripBook(trip, demo, {
+        kind: "duplicate",
+        sheet: "每日行程",
+        id: "I999",
+      }),
+    /找不到/,
+  );
+  assert.throws(
+    () =>
+      mutateTripBook(trip, demo, {
+        kind: "duplicate",
+        sheet: "團員",
+        id: "M001",
+      } as unknown as Parameters<typeof mutateTripBook>[2]),
+    /複製/,
+  );
 });

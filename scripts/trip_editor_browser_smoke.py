@@ -237,6 +237,22 @@ with sync_playwright() as p:
         card = dialog.locator('[data-itinerary-id]').filter(has_text='新增景點測試')
         expect(card).to_be_visible()
         expect(card.get_by_role('link', name='集合餐廳')).to_have_count(0)
+        original_id=card.get_attribute('data-itinerary-id')
+        before_copy=len(writes)
+        card.get_by_role('button', name='複製', exact=True).click()
+        expect(dialog.locator('[data-itinerary-id]').filter(has_text='新增景點測試')).to_have_count(2)
+        assert len(writes)==before_copy+1
+        columns=book['每日行程'][0]
+        key_column=columns.index('行程ID')
+        source_row=next(row for row in book['每日行程'][1:] if row and row[key_column]==original_id)
+        copy_row=book['每日行程'][-1]
+        copy_id=copy_row[key_column]
+        assert copy_id!=original_id
+        assert [value for index,value in enumerate(copy_row) if index!=key_column]==[value for index,value in enumerate(source_row) if index!=key_column]
+        dialog.locator('[data-itinerary-id="'+copy_id+'"]').get_by_role('button', name='刪除', exact=True).click()
+        expect(dialog.locator('[data-itinerary-id]').filter(has_text='新增景點測試')).to_have_count(1)
+        assert len(writes)==before_copy+2
+
         card.get_by_role('button', name='編輯', exact=True).click()
         expect(dialog.get_by_label('副標', exact=True)).to_have_value('[集合餐廳](https://maps.app.goo.gl/example)')
         expect(dialog.get_by_label('內文', exact=True)).to_contain_text('集合細節')

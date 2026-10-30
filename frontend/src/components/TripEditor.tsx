@@ -271,7 +271,7 @@ export function TripEditor({
       );
       setSnapshot(next);
       setTarget(null);
-      setNotice("已儲存。");
+      setNotice(mutation.kind === "duplicate" ? "已複製。" : "已儲存。");
       onSaved();
     } catch (cause) {
       if (cause instanceof TripEditApiError && cause.status === 401)
@@ -285,6 +285,11 @@ export function TripEditor({
       active.current = false;
       setBusy(false);
       onBusy(false);
+    }
+  }
+  function duplicate(row: Row) {
+    if (entity === "每日行程" || entity === "航班" || entity === "飯店") {
+      void save({ kind: "duplicate", sheet: entity, id: itemId(entity, row) });
     }
   }
   function remove(row: Row) {
@@ -447,6 +452,7 @@ export function TripEditor({
                           setTarget({ entity, row });
                         }}
                         onRemove={remove}
+                        onDuplicate={duplicate}
                         onReorder={(mutation) => void save(mutation)}
                       />
                     ) : (
@@ -479,6 +485,16 @@ export function TripEditor({
                               </small>
                             </div>
                             <div className="editor-row-actions">
+                              {scope === "itinerary" && (
+                                <button
+                                  type="button"
+                                  className="quiet-button"
+                                  disabled={busy}
+                                  onClick={() => duplicate(row)}
+                                >
+                                  複製
+                                </button>
+                              )}
                               <button
                                 className="quiet-button"
                                 disabled={busy}

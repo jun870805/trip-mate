@@ -38,6 +38,7 @@ export interface ReceiptInput {
   id: string;
 }
 export type TripMutation =
+  | { kind: "duplicate"; sheet: "每日行程" | "航班" | "飯店"; id: string }
   | {
       kind: "record";
       mode: Mode;
@@ -94,19 +95,22 @@ export function editorSheets(scope: EditorScope): TripSheetName[] {
   return ["旅程設定", ...scopes[scope]];
 }
 export function mutationScope(mutation: TripMutation): EditorScope {
-  return mutation.kind === "record"
-    ? mutation.sheet === "開團待辦"
-      ? "tasks"
-      : mutation.sheet === "團員"
-        ? "accounting"
-        : "itinerary"
-    : "accounting";
+  return mutation.kind === "duplicate"
+    ? "itinerary"
+    : mutation.kind === "record"
+      ? mutation.sheet === "開團待辦"
+        ? "tasks"
+        : mutation.sheet === "團員"
+          ? "accounting"
+          : "itinerary"
+      : "accounting";
 }
-export function automaticTripIds(
+export function automaticTripIds<T extends TripMutation>(
   book: Workbook,
-  mutation: TripMutation,
-): TripMutation {
+  mutation: T,
+): T {
   const next = structuredClone(mutation);
+  if (next.kind === "duplicate") return next;
   if (next.mode === "delete") return next;
   const kind =
     next.kind === "record"
@@ -302,7 +306,24 @@ export function mutateTripBook(
     scope = mutationScope(mutation);
   const settings = readRows(book, "旅程設定")[0],
     currency = settings["記帳幣別"];
-  if (mutation.kind === "record") {
+  if (mutation.kind === "duplicate") {
+    const { sheet, id } = mutation;
+    check(
+      ["每日行程", "航班", "飯店"].includes(sheet),
+      "只能複製行程、航班或住宿。",
+    );
+    const kind = kinds[sheet],
+      key = rules[kind].column;
+    assertRecordId(kind, id);
+    const sourceIndex = rowIndex(book, sheet, key, id);
+    check(sourceIndex > 0, "找不到要複製的資料，請重新讀取。");
+    const idColumn = book[sheet][0].findIndex(
+      (value) => String(value).trim() === key,
+    );
+    const copied = [...book[sheet][sourceIndex]];
+    copied[idColumn] = nextRecordIdFromRows(kind, book[sheet]);
+    book[sheet].push(copied);
+  } else if (mutation.kind === "record") {
     const { sheet, mode } = mutation,
       kind = kinds[sheet],
       key = rules[kind].column;
