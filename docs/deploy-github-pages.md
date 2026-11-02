@@ -29,6 +29,8 @@
 | VITE_GUIDE_EMAILS | `["你的email@gmail.com"]`，可放多個 email |
 | VITE_BASE_PATH | 一般專案可留空；使用自訂網域時填 `/` |
 
+要啟用 AI 助手，另依 [Firebase 設定](setup-ai.md#6-github-pages-設定) 新增 `VITE_AI_ENABLED`、`VITE_AI_FIREBASE_CONFIG`、`VITE_AI_MODEL`、`VITE_AI_APP_CHECK_SITE_KEY` 四個公開 variables；workflow 已接入，未設預設停用。
+
 GitHub 網頁的值直接貼上，不要加 shell 使用的外層單引號。例如 email 清單填 `["a@gmail.com","b@gmail.com"]`，不要填 `'["a@gmail.com"]'`。
 
 只查看資料時可不設 Client ID，email 可設 `[]`；要使用導遊功能則兩者都要正確設定。API Key 與目錄 ID 未填時 workflow 會停止，避免部署空白設定。

@@ -16,6 +16,8 @@ try {
         import { renderToStaticMarkup } from 'react-dom/server'
         import { Overview, Itinerary, Fund, Expenses, Tasks } from './src/pages/TripViews'
         import App from './src/App'
+        import { ChatPanel } from './src/ai/ui/ChatPanel'
+        import { ChangePreview } from './src/features/trip-ai/ChangePreview'
         import { ItineraryList } from './src/components/ItineraryList'
         import { ItineraryTagInput } from './src/components/ItineraryTagInput'
         import { MarkdownContent } from './src/components/MarkdownContent'
@@ -45,6 +47,20 @@ try {
         import demo from './src/data/demo.json'
         const trip = parseCatalog(demo['旅程清單'])[0]
         const data = parseTrip(trip, demo)
+        const chat = renderToStaticMarkup(createElement(ChatPanel, {
+          entries: [{id:0,role:'user',text:'查詢行程',files:['行程.pdf']}],
+          disabled:false,status:'唯讀查詢',onSend:async()=>{},
+        }))
+        for (const text of ['查詢行程','行程.pdf','上傳檔案','送出','聊天記錄']) assert.ok(chat.includes(text))
+        const welcome = renderToStaticMarkup(createElement(ChatPanel, {entries:[],disabled:false,status:'',onSend:async()=>{}}))
+        assert.ok(welcome.includes('您好！ 我是您的 AI 助手') && welcome.includes('輸入提示詞即可開始使用，或是可以先試試以下功能～'))
+        const preview = {id:'approval',scopeId:trip.id,toolName:'itinerary_update',summary:'修改行程',changes:[{
+          operation:'update',target:'I001',before:{行程ID:'I001',標題:'景點',開始時間:'09:00'},after:{行程ID:'I001',標題:'景點',開始時間:'10:00'},
+        }]}
+        const changes = renderToStaticMarkup(createElement(ChangePreview, {preview,showIds:false,disabled:false,onApprove(){},onReject(){}}))
+        for (const text of ['09:00','10:00','確認儲存','取消變更']) assert.ok(changes.includes(text))
+        assert.ok(!changes.includes('I001'), 'Ordinary users must not see business IDs in AI preview')
+        assert.ok(!renderToStaticMarkup(createElement(MarkdownContent, {text:'![tracking](https://example.com/pixel.png)',allowImages:false})).includes('<img'), 'AI model images must not trigger arbitrary network requests')
         globalThis.window = { location: { pathname: '/' } }
         const home = renderToStaticMarkup(createElement(App))
         assert.ok(home.includes('選擇旅程'))

@@ -19,7 +19,7 @@ export function installDialogScrollLock(
   }
   function sync() {
     const open = !!doc.querySelector(
-      'dialog[open], [role="dialog"]:popover-open',
+      'dialog[open], [role="dialog"]:popover-open, [data-modal-open="true"]',
     );
     if (open && !restore) {
       const body = doc.body.style,
@@ -71,7 +71,7 @@ export function installDialogScrollLock(
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: ["open"],
+    attributeFilter: ["open", "data-modal-open"],
   });
   doc.addEventListener("toggle", sync, true);
   sync();

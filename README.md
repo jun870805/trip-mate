@@ -219,3 +219,11 @@ VITE_GUIDE_EMAILS='["owner@example.com","manager@example.com"]'
 旅程試算表設定僅供超級使用者操作：一般管理者編輯入口時不顯示試算表 ID／網址、公開讀取檢查及導遊權限同步按鈕，也不能變更旅程對應的試算表。名稱、日期等基本資料與旅程內編輯功能仍依原有權限使用。既有旅程的「同步導遊編輯權」須由超級使用者登入執行。
 
 內部業務 ID 僅對超級使用者顯示；一般管理者新增資料使用系統預設編號，編輯畫面不顯示 ID 欄位或編號說明，關聯選單只顯示名稱。已儲存 ID 仍固定，Google Sheets 與網址路由中的識別值保留。範本與設定教學僅在超級使用者登入後顯示，其他管理者仍可查看範例及編輯旅程資料。
+
+## AI 助手
+
+每趟旅程的「行程」分頁提供懸浮 AI 助手，支援聊天、縮小恢復、檔案上傳與行程變更預覽。訪客唯讀；導遊依原本 Google ACL 編輯，所有寫入必須先按確認。縮小保留當次對話與輸入，X／Escape 結束並捨棄；不保存聊天草稿。
+
+先依 [Firebase／App Check 設定](docs/setup-ai.md) 填入 `frontend/.env.example` 的 `VITE_AI_*` 公開設定，或設定 GitHub Actions variables 並重新建置。預設停用，未設定時彈窗顯示尚未啟用，不產生假回覆。不得將 LLM Secret 或 App Check debug token 放入前端環境變數。
+
+可移植設計與 API 見 [AI 模組 README](frontend/src/ai/README.md)，實際接入見 [接入盤點](docs/ai-agent-integration.md)。`npm run check` 包含 AI 測試、可移植邊界與瀏覽器打包檢查；UI 模擬測試為 `scripts/ai_browser_smoke.py`，真實模型、Google 寫入與部署仍需外部環境驗證。

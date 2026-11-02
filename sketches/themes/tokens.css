@@ -1,0 +1,11 @@
+/* Values copied from the existing trip-mate theme; sketches only. */
+:root {
+  --paper: #fffaf2;
+  --line: #dfd0bf;
+  --muted: #796c60;
+  --brown: #795d48;
+  --orange: #a95e38;
+  --page: #f3ebdf;
+  --ink: #44372e;
+  --font: "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif;
+}

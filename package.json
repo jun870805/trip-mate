@@ -13,7 +13,10 @@
     "test:coverage": "npm run test:coverage --workspace frontend",
     "test:render": "node scripts/check_render.mjs",
     "templates": "python3 scripts/generate_templates.py",
-    "check": "npm run test:coverage && npm run test:render && python3 scripts/check_templates.py && node scripts/check_apps_script.mjs && npm run build && npm run check:pages",
-    "check:pages": "node scripts/check_pages_build.mjs"
+    "check": "npm run test:coverage && npm run test:ai:coverage && npm run check:ai:bundle && npm run test:render && python3 scripts/check_templates.py && node scripts/check_apps_script.mjs && npm run build && npm run check:pages",
+    "check:pages": "node scripts/check_pages_build.mjs",
+    "test:ai": "npm run test:ai --workspace frontend",
+    "test:ai:coverage": "npm run test:ai:coverage --workspace frontend",
+    "check:ai:bundle": "node scripts/check_ai_bundle.mjs"
   }
 }

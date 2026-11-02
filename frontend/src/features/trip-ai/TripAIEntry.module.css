@@ -1,0 +1,50 @@
+.launcher { position: fixed; right: 20px; bottom: 24px; z-index: 25; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; width: 72px; min-height: 76px; padding: 8px 4px; border: 1px solid var(--brown); border-radius: 8px; background: var(--brown); color: var(--paper); font-size: 12px; }
+.launcher[aria-expanded="true"] { visibility: hidden; }
+.launcher:hover { background: var(--orange); border-color: var(--orange); }
+.pendingDot { position: absolute; top: -10px; right: -4px; padding: 2px 6px; border: 1px solid var(--orange); border-radius: 4px; color: var(--paper); background: var(--orange); font-size: 11px; }
+.surface { position: fixed; top: 0; right: 0; bottom: 0; width: var(--ai-sidebar-width, 408px); z-index: 30; }
+.surface[hidden] { display: none; }
+.dialog { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 0; --dialog-padding: 16px; }
+.heading { display: flex; flex: none; align-items: center; gap: 12px; padding: 16px 16px 12px; }
+.robot { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 8px; background: var(--brown); color: var(--paper); }
+.title { flex: 1; min-width: 0; }
+.title h2 { font-size: 17px; line-height: 1.4; }
+.title p { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.headerButton { display: grid; place-items: center; flex: none; min-width: 40px; min-height: 40px; padding: 8px 12px; font-size: 13px; white-space: nowrap; border: 1px solid var(--line); border-radius: 4px; color: var(--brown); background: transparent; }
+.headerButton:hover:not(:disabled) { background: color-mix(in srgb, var(--brown) 10%, var(--paper)); }
+.headerActions { display: flex; flex: none; align-items: center; gap: 4px; }
+.memoryNotice { flex: none; margin: 0; padding: 0 16px 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+@media screen and (min-width: 701px) {
+  :global(body.ai-sidebar-open) { --ai-sidebar-width: 408px; }
+  :global(body.ai-sidebar-open .main-wrap), :global(body.ai-sidebar-open .site-header) { max-width: 1528px; padding-right: calc(var(--ai-sidebar-width) + 40px); }
+}
+@media (min-width: 701px) and (max-width: 1120px) {
+  :global(body.ai-sidebar-open) { --ai-sidebar-width: clamp(300px, 34vw, 376px); }
+  :global(body.ai-sidebar-open .site-header) { flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 700px) {
+  .surface { inset: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; z-index: 100; }
+  .surface::before { content: ""; position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 24%, transparent); z-index: -1; }
+  .dialog { overscroll-behavior: contain; border-radius: 8px; }
+}
+@media (max-width: 700px) { .launcher { right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); } }
+@media print { .launcher, .surface { display: none !important; } }
+@media (forced-colors: active) {
+  .launcher, .robot { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
+  .pendingDot { background: Highlight; color: HighlightText; }
+}
+.preview { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.preview h3 { font-size: 17px; margin-bottom: 4px; }
+.hint { font-size: 12px; color: var(--muted); }
+.warning { color: #ff0000; }
+.warnings { color: var(--orange); }
+.warnings { padding-left: 20px; margin: 8px 0; }
+.changes { display: grid; gap: 8px; margin-top: 12px; }
+.change { border: 1px solid var(--line); border-radius: 8px; padding: 8px; min-width: 0; }
+.change h4 { white-space: pre-wrap; font-size: 14px; overflow-wrap: anywhere; }
+.change dl { display: grid; gap: 8px; margin: 8px 0 0; }
+.field dt { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.field dd { display: grid; gap: 4px; margin: 0; }
+.field dd > div { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; white-space: pre-wrap; }
+.valueLabel { color: var(--muted); font-size: 12px; }
+.previewActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; flex-wrap: wrap; }

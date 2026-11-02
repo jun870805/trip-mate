@@ -49,6 +49,10 @@ export function Overview({
   data: TripData;
   routeRoot: string;
 }) {
+  const note =
+    data.note.trim() === "請填入旅程 ID、當地幣別與匯率（1 台幣 = 多少當地幣）。"
+      ? ""
+      : data.note;
   const totals = summarize(data);
   const progress = taskProgress(data.tables["開團待辦"]);
   const today = useTripToday(data.timezone);
@@ -59,7 +63,7 @@ export function Overview({
           <h2>旅程總覽</h2>
         </div>
       </div>
-      {data.note && <p className="trip-note">{data.note}</p>}
+      {note && <p className="trip-note">{note}</p>}
       <div className="stats-grid">
         {data.sectionErrors?.tasks ? (
           <p className="panel">開團進度暫時無法顯示</p>
@@ -138,7 +142,7 @@ export function Overview({
     </section>
   );
 }
-export function Itinerary({ data }: { data: TripData }) {
+export function Itinerary({ data, inlineDetails = false }: { data: TripData; inlineDetails?: boolean }) {
   const today = useTripToday(data.timezone);
   const [day, setDay] = useState(() =>
     today >= data.trip.start && today <= data.trip.end ? today : "all",
@@ -151,6 +155,7 @@ export function Itinerary({ data }: { data: TripData }) {
     return number === null ? "" : `DAY ${number} `;
   };
   const [detailsId, setDetailsId] = useState<string | null>(null);
+  const [detailsInline, setDetailsInline] = useState(false);
   const detailRow = data.tables["每日行程"].find(
     (row) => row["行程ID"] === detailsId,
   );
@@ -201,7 +206,7 @@ export function Itinerary({ data }: { data: TripData }) {
           }}
         />
       )}
-      <div className={bookingStyles["booking-stack"]}>
+      <div className={inlineDetails ? `${bookingStyles["booking-stack"]} ${itineraryStyles.assistantBookings}` : bookingStyles["booking-stack"]}>
         <section className={bookingStyles["booking-section"]}>
           <h3>航班資訊</h3>
           {data.tables["航班"].length ? (
@@ -422,7 +427,7 @@ export function Itinerary({ data }: { data: TripData }) {
         </div>
       )}
 
-      {detailRow && (
+      {detailRow && !inlineDetails && !detailsInline && (
         <ItineraryDetailsDialog
           row={detailRow}
           allTags={tags}
@@ -500,16 +505,19 @@ export function Itinerary({ data }: { data: TripData }) {
                           {hasItineraryBody(row) && (
                             <div className={`${itineraryStyles.more} no-print`}>
                               <TextLinkButton
-                                opensDialog
-                                onClick={() => setDetailsId(row["行程ID"])}
-                                label={`查看更多：${row["標題"]}`}
+                                opensDialog={!inlineDetails}
+                                onClick={() => { setDetailsInline(inlineDetails); setDetailsId(inlineDetails && detailsId === row["行程ID"] ? null : row["行程ID"]); }}
+                                label={`${inlineDetails && detailsId === row["行程ID"] ? '收合內文' : '查看更多'}：${row["標題"]}`}
                               >
-                                查看更多
+                                {inlineDetails && detailsId === row["行程ID"] ? '收合內文' : '查看更多'}
                               </TextLinkButton>
                             </div>
                           )}
                         </div>
                       )}
+                      {inlineDetails && detailsId === row["行程ID"] && <div className={`${itineraryStyles.inlineBody} no-print`}>
+                        <MarkdownContent text={row["內文"] || ""} />
+                      </div>}
                       {hasItineraryBody(row) && (
                         <div
                           className={`${itineraryStyles.printBody} print-only`}

@@ -2,6 +2,22 @@ import type { ReactNode } from "react";
 
 export function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const paths: Record<string, ReactNode> = {
+    assistant: (
+      <>
+        <path d="M4 4h16v12H9l-5 4V4Z" />
+        <path d="M8 8h8M8 12h5" />
+      </>
+    ),
+    robot: <>
+      <path d="M12 5V3M10.5 2.5h3M4 11H3a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h1M20 11h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1" />
+      <rect x="4" y="6" width="16" height="15" rx="5" />
+      <circle cx="8.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <path d="M9 16c1.5 2 4.5 2 6 0M6.5 14.5h1M16.5 14.5h1" />
+    </>,
+    plus: <path d="M12 5v14M5 12h14" />,
+    trash: <><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></>,
+    minimize: <path d="M5 16h14" />,
     overview: (
       <>
         <rect x="3" y="3" width="7" height="7" rx="1" />

@@ -14,9 +14,11 @@ import styles from "./MarkdownContent.module.css";
 export function MarkdownContent({
   text,
   inline = false,
+  allowImages = true,
 }: {
   text: string;
   inline?: boolean;
+  allowImages?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const anchorPrefix =
@@ -84,7 +86,7 @@ export function MarkdownContent({
     },
     img({ src, alt }) {
       const url = typeof src === "string" ? safeUrl(src) : "";
-      return url ? (
+      return url && allowImages ? (
         <img
           src={url}
           alt={alt || ""}

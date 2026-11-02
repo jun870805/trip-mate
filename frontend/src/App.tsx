@@ -1,3 +1,4 @@
+import { TripAIEntry } from "./features/trip-ai/TripAIEntry";
 import { CloseButton } from "./components/CloseButton";
 import { TripHeaderActions } from "./components/TripHeaderActions";
 import { displayDate } from "./data/display-date";
@@ -401,6 +402,7 @@ function TripLoader({
   onExpired: () => void;
   onBusy: (busy: boolean) => void;
 }) {
+  const [aiExpanded, setAiExpanded] = useState(false);
   const [data, setData] = useState<TripData | null>(null);
   const [error, setError] = useState<{
     message: string;
@@ -439,6 +441,14 @@ function TripLoader({
       });
     return () => controller.abort();
   }, [trip, isDemo, revision]);
+  const aiControls = (
+    <TripAIEntry
+      trip={trip} source={isDemo ? "demo" : "trip"} data={data}
+      available={tab === "itinerary" && hasLoaded && !error && !data?.sectionErrors?.itinerary}
+      loading={refreshing || !data} config={guideConfig} session={guideSession}
+      onSaved={() => setRevision(value => value + 1)} onExpired={onExpired} onBusy={onBusy} onExpanded={setAiExpanded}
+    />
+  );
   const editControls = !isDemo ? (
     <TripEditing
       key="guide-trip-editing"
@@ -456,6 +466,7 @@ function TripLoader({
     return (
       <>
         {editControls}
+        {aiControls}
         <TripReadFailure
           trip={trip}
           message={error.message}
@@ -469,6 +480,7 @@ function TripLoader({
     return (
       <>
         {editControls}
+        {aiControls}
         <Empty>
           {refreshing && hasLoaded
             ? "正在更新旅程資料…"
@@ -495,6 +507,7 @@ function TripLoader({
   return (
     <>
       {editControls}
+      {aiControls}
       <section className="trip-heading no-print">
         <TripHeaderActions
           busy={refreshing}
@@ -552,7 +565,7 @@ function TripLoader({
                 : "print-only"
           }
         >
-          {!data.sectionErrors?.itinerary && <Itinerary data={data} />}
+          {!data.sectionErrors?.itinerary && <Itinerary data={data} inlineDetails={aiExpanded} />}
         </div>
         {tab === "fund" && !sectionError && <Fund data={data} />}
         {tab === "expenses" && !sectionError && (

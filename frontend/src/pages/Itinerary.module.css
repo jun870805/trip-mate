@@ -139,3 +139,6 @@
     border-color: CanvasText;
   }
 }
+
+.inlineBody { position: relative; z-index: 1; margin-top: 12px; padding-top: 8px; cursor: auto; overflow-wrap: anywhere; }
+@media screen and (min-width: 701px) and (max-width: 1120px) { .assistantBookings { grid-template-columns: minmax(0, 1fr); } }

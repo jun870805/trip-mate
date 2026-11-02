@@ -1485,3 +1485,23 @@ it("saves category and a missing header together in a single authorized batch", 
   assert.equal(readRows(next.book, "每日行程")[0]["類別"], "活動");
   assert.deepEqual(next.book["航班"], before.book["航班"]);
 });
+
+it('saves an itinerary batch once, generates distinct IDs and refuses stale or mixed-scope batches', async () => {
+  const api = fakeApi();
+  const editor = createTripEditor(trip, 'itinerary', config, api.fetcher);
+  const before = await editor.read(session);
+  const original = readRows(before.book, '每日行程')[0];
+  const mutations = ['AI 第一筆', 'AI 第二筆'].map(title => ({
+    kind: 'record' as const, sheet: '每日行程' as const, mode: 'add' as const,
+    values: { ...original, 標題: title, 開始時間: '', 結束時間: '' },
+  }));
+  const next = await editor.saveItineraryBatch(session, before, mutations);
+  assert.equal(api.writes, 1);
+  const added = readRows(next.book, '每日行程').filter(row => row['標題'].startsWith('AI '));
+  assert.equal(added.length, 2);
+  assert.equal(new Set(added.map(row => row['行程ID'])).size, 2);
+  await assert.rejects(editor.saveItineraryBatch(session, before, mutations), /其他地方更新/);
+  await assert.rejects(editor.saveItineraryBatch(session, next, [{ kind: 'record', sheet: '團員', mode: 'add', values: {} }]), /每日行程/);
+  await assert.rejects(editor.saveItineraryBatch(session, next, []), /筆數/);
+  assert.equal(api.writes, 1);
+});

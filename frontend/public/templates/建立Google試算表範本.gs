@@ -26,7 +26,7 @@ function createTripMateTemplates() {
           sheet.getRange(2, i + 1, sheet.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireFormulaSatisfied(formula).setAllowInvalid(false).setHelpText('ID 格式：' + idPrefixes[header] + '001 至 ' + idPrefixes[header] + '9999').build());
         }
       });
-      if (name === '旅程設定') sheet.getRange(2, 1, 1, headers.length).setValues([['1','','Asia/Tokyo','JPY','TWD','','請填入旅程 ID、當地幣別與匯率（1 台幣 = 多少當地幣）。']]);
+      if (name === '旅程設定') sheet.getRange(2, 1, 1, headers.length).setValues([['1','','Asia/Tokyo','JPY','TWD','','']]);
       if (name === '旅程清單') sheet.getRange(2, 1, 1, headers.length).setValues([['T001','範例旅程','日本・大阪','2027-05-01','2027-05-03','請替換為你的旅程試算表ID','規劃中','',1]]);
     });
   }

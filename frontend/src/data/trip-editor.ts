@@ -822,82 +822,94 @@ export function createTripEditor(
     validateEditorBook(trip, values, scope);
     return { book: values, grids };
   }
+  async function commit(
+    session: GuideSession | null,
+    before: EditorSnapshot,
+    mutations: readonly TripMutation[],
+    batch: boolean,
+    authorize?: () => void,
+  ): Promise<EditorSnapshot> {
+    assertGuideSession(session, config);
+    const mutation = mutations[0];
+    check(mutations.length > 0 && mutations.length <= 100, "批次筆數須為 1～100。");
+    if (batch) check(scope === "itinerary" && mutations.every(item =>
+      item.kind === "record" && item.sheet === "每日行程"), "批次只允許每日行程操作。");
+    check(mutationScope(mutation) === scope, "此操作不屬於目前編輯範圍。");
+    const current = await read(session);
+    check(
+      fingerprint(current) === fingerprint(before),
+      "資料已在其他地方更新，請關閉編輯並重新讀取後再修改。",
+    );
+    let book = current.book;
+    if (
+      mutation.kind === "record" &&
+      mutation.sheet === "團員" &&
+      mutation.mode === "delete"
+    ) {
+      const source = createPortalRepository("", async (url, init) => {
+        const target = new URL(String(url));
+        target.searchParams.delete("key");
+        return request(session, target.href, init);
+      });
+      const refs = await source.read(trip.spreadsheetId, ["開團待辦"]);
+      check(
+        schema["開團待辦"].every((field) =>
+          refs["開團待辦"]?.[0]?.some(
+            (value) => String(value).trim() === field,
+          ),
+        ),
+        "無法確認開團待辦引用，不能刪除團員。",
+      );
+      check(
+        !readRows(refs, "開團待辦").some(
+          (row) => row["負責團員ID"] === mutation.id,
+        ),
+        "團員仍被開團待辦引用，不能刪除。",
+      );
+      book = { ...book, ...refs };
+    }
+    let next = book;
+    for (const item of mutations) {
+      check(mutationScope(item) === scope, "此操作不屬於目前編輯範圍。");
+      next = mutateTripBook(trip, next,
+        batch || !isSuperUser(session, config) ? automaticTripIds(next, item) : item);
+    }
+    const requests = buildCellUpdates(book, next, current.grids);
+    if (requests.length) {
+      authorize?.();
+      try {
+        await request(
+          session,
+          `https://sheets.googleapis.com/v4/spreadsheets/${trip.spreadsheetId}:batchUpdate`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requests }),
+          },
+        );
+      } catch (error) {
+        if (error instanceof TripEditApiError) throw error;
+        throw new Error(
+          "儲存結果無法確認，請關閉表單並重新讀取。不要直接重送，以免重複記帳。",
+        );
+      }
+    }
+    // Refresh after the write, including changed grid dimensions and calculated values.
+    try {
+      return await read(session);
+    } catch {
+      throw new Error(
+        "資料已送出儲存，但重新讀取失敗。請關閉表單並重新讀取後確認，勿重複儲存。",
+      );
+    }
+  }
   return {
     read,
-    async save(
-      session: GuideSession | null,
-      before: EditorSnapshot,
-      mutation: TripMutation,
-    ): Promise<EditorSnapshot> {
-      assertGuideSession(session, config);
-      check(mutationScope(mutation) === scope, "此操作不屬於目前編輯範圍。");
-      const current = await read(session);
-      check(
-        fingerprint(current) === fingerprint(before),
-        "資料已在其他地方更新，請關閉編輯並重新讀取後再修改。",
-      );
-      let book = current.book;
-      if (
-        mutation.kind === "record" &&
-        mutation.sheet === "團員" &&
-        mutation.mode === "delete"
-      ) {
-        const source = createPortalRepository("", async (url, init) => {
-          const target = new URL(String(url));
-          target.searchParams.delete("key");
-          return request(session, target.href, init);
-        });
-        const refs = await source.read(trip.spreadsheetId, ["開團待辦"]);
-        check(
-          schema["開團待辦"].every((field) =>
-            refs["開團待辦"]?.[0]?.some(
-              (value) => String(value).trim() === field,
-            ),
-          ),
-          "無法確認開團待辦引用，不能刪除團員。",
-        );
-        check(
-          !readRows(refs, "開團待辦").some(
-            (row) => row["負責團員ID"] === mutation.id,
-          ),
-          "團員仍被開團待辦引用，不能刪除。",
-        );
-        book = { ...book, ...refs };
-      }
-      const next = mutateTripBook(
-          trip,
-          book,
-          isSuperUser(session, config)
-            ? mutation
-            : automaticTripIds(book, mutation),
-        ),
-        requests = buildCellUpdates(book, next, current.grids);
-      if (requests.length) {
-        try {
-          await request(
-            session,
-            `https://sheets.googleapis.com/v4/spreadsheets/${trip.spreadsheetId}:batchUpdate`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ requests }),
-            },
-          );
-        } catch (error) {
-          if (error instanceof TripEditApiError) throw error;
-          throw new Error(
-            "儲存結果無法確認，請關閉表單並重新讀取。不要直接重送，以免重複記帳。",
-          );
-        }
-      }
-      // Refresh after the write, including changed grid dimensions and calculated values.
-      try {
-        return await read(session);
-      } catch {
-        throw new Error(
-          "資料已送出儲存，但重新讀取失敗。請關閉表單並重新讀取後確認，勿重複儲存。",
-        );
-      }
+    save(session: GuideSession | null, before: EditorSnapshot, mutation: TripMutation) {
+      return commit(session, before, [mutation], false);
+    },
+    saveItineraryBatch(session: GuideSession | null, before: EditorSnapshot, mutations: readonly TripMutation[], authorize?: () => void) {
+      return commit(session, before, mutations, true, authorize);
     },
   };
 }

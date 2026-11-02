@@ -39,7 +39,10 @@ function browserStorage(): Storage | null {
     return null;
   }
 }
-export const guideConfig = readGuideConfig(import.meta.env);
+export const guideConfig = readGuideConfig({
+  VITE_GOOGLE_CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  VITE_GUIDE_EMAILS: import.meta.env.VITE_GUIDE_EMAILS,
+});
 let loadingGoogle: Promise<GoogleIdentity> | null = null;
 function loadGoogle(): Promise<GoogleIdentity> {
   if (window.google?.accounts?.oauth2) return Promise.resolve(window.google);
