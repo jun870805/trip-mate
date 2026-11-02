@@ -17,7 +17,7 @@
 | `contracts.ts` | Context、訊息、檔案、工具、Provider、預覽及狀態契約 |
 | `core/registry.ts` | 工具白名單、重名檢查、依權限輸出模型可見宣告、Zod JSON Schema |
 | `prompts/base-rules.ts` | `BASE_RULES`：回答主題、委婉婉拒、資料可信邊界、確認及憑證規則 |
-| `core/errors.ts` | 可移植 ProviderRateLimitError／ProviderModelUnavailableError，對應安全的 rate_limit／model_unavailable 狀態 |
+| `core/errors.ts`、`core/diagnostics.ts` | 可移植 ProviderRequestError／ProviderRateLimitError／ProviderModelUnavailableError，錯誤分類與憑證遮蔽／長度限制 |
 | `core/controller.ts` | 有上限的模型／工具循環、單一待確認操作、取消及生命週期 |
 | `providers/firebase.ts` | Firebase SDK 請求／回應與 Schema 映射，保留原始模型內容及簽章等附帶資訊 |
 | `providers/firebase-runtime.ts` | 明確、延遲建立 Firebase App／App Check／模型；不在 import 時連線 |
@@ -275,7 +275,16 @@ AI 回覆下方左側的小型無邊框複製圖示由可移植的 `ai/ui/CopyMe
 
 `ChatPanel` 的 `modelSelector` 是可選 React 插槽，放在送出按鈕左側，送出期間也會停用此區控制項。模型、範圍與授權的切換規則仍由 Host 負責；模型歷史按各自 key 隔離，切換不混用 opaque。
 
-Provider adapter 可拋出 `ProviderRateLimitError` 表示 HTTP 429，Controller 保留安全提示及 `AgentState.errorCode = 'rate_limit'`。Firebase adapter 使用 SDK 的 `customErrorData.status`（或 HTTP status）辨識，不直接輸出 SDK 原始錯誤。UI 以 `quotaExceeded` 顯示正紅色提示，不自動重試／切模型。工具提交後的真實結果仍保留，不把後續模型錯誤當作回滾或再次執行的理由。
+Provider adapter 可拋出 `ProviderRateLimitError` 表示 HTTP 429，Controller 保留安全提示及 `AgentState.errorCode = 'rate_limit'`。Firebase adapter 使用 SDK 的 `customErrorData.status`（或 HTTP status）辨識，不直接輸出 SDK 物件、headers 或完整 response；以 `ProviderRequestError.details` 傳遞經遮蔽的 code／message。UI 以 `quotaExceeded` 顯示正紅色提示，不自動重試／切模型。工具提交後的真實結果仍保留，不把後續模型錯誤當作回滾或再次執行的理由。
 
 
 模型 API 404 由 `ProviderModelUnavailableError` 表達，Controller 設定 `errorCode = 'model_unavailable'`，以安全提示引導換模型或聯絡導遊；不假設所有 404 都是永久不支援，也不將 400／403 一律分類為模型不存在。`ChatPanel.errorTone='danger'` 可呈現紅字；原有 `quotaExceeded` 仍保留相容。EmailJS 使用獨立 Host／結果流程，不受模型錯誤分類影響。
+
+
+## API 錯誤診斷與回報
+
+Firebase adapter 將 HTTP 或 SDK 例外轉為 `ProviderRequestError`，404／429 保留原有子類別。`details.code` 優先使用 HTTP status，再使用 SDK code，無資訊為 `unknown`；空白／被阻擋回應使用 `empty_response`。Firebase SDK 並未公開完整原始 HTTP response，因此 `details.message` 是 SDK 提供的 API 錯誤訊息，限制 2000 字，不宣稱保留完整 response。`core/diagnostics.ts` 遮蔽常見 token／API key，清除 URL 查詢參數及帳密；不序列化 SDK 物件或 request headers。
+
+Controller 在 `state.failure` 提供 id／code／message，並在原提示後附上 `(錯誤代碼：code，錯誤訊息:message)`。此資料不放進模型訊息、opaque 或已完成對話暫存，下一輪／清空即移除。Host 可使用 `ChatPanel.errorAction` 注入回報按鈕；核心與可移植 UI 不依賴 EmailJS。
+
+本專案 `features/trip-ai/ErrorReportButton.tsx` 延遲載入，點擊「回報錯誤」才呼叫 `error-report.ts`，沿用既有 EmailJS 公開設定與固定收件人範本。只傳最後一則真正使用者訊息（最多 6000 字，過長標示截斷）、指定 API／旅程資訊與時間，排除先前對話及附件。姓名參數為「錯誤回報」，title 為旅程名稱。每個 failure id 僅提交一次，不自動重試或透過模型寄信；設定缺漏停用，200／OK 才顯示原生成功彈窗。正式投遞仍須另行實測，見 `docs/setup-email.md`。

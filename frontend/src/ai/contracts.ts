@@ -59,6 +59,8 @@ export interface ProviderRequest {
 }
 export interface Provider { generate(request: ProviderRequest): Promise<Omit<Message, 'role'>> }
 export type AgentStatus = 'idle' | 'running' | 'awaiting_confirmation' | 'committing' | 'error' | 'disposed';
+export interface ProviderFailureDetails { code: string; message: string }
+export interface ProviderFailure extends ProviderFailureDetails { id: string }
 export interface AgentState {
   status: AgentStatus;
   messages: Message[];
@@ -66,6 +68,8 @@ export interface AgentState {
   pending?: PendingPreview;
   error?: string;
   errorCode?: 'rate_limit' | 'model_unavailable';
+  /** Sanitized provider diagnostics for display/reporting; never part of saved conversations. */
+  failure?: ProviderFailure;
 }
 export interface AgentOptions {
   provider: Provider;

@@ -134,6 +134,10 @@ it('email decisions finish without a model follow-up that asks to send again',as
     assert.equal(f.agent.getState().status,'idle');
     assert.equal(f.agent.getState().pending,undefined);
     assert.equal(f.requests.length,approved?1:0);
+    const checkpoint=f.agent.exportConversation();assert.ok(checkpoint);
+    const restored=fixture();restored.agent.restoreConversation(checkpoint);
+    assert.equal(restored.agent.getState().results.at(-1)?.status,approved?'success':'cancelled');
+    assert.equal(restored.requests.length,0);assert.equal(restored.modelRequests.length,0);
     // A later, explicit request may still prepare a new email.
     await f.agent.send('另外有新的需求，請準備另一封郵件');
     assert.ok(f.agent.getState().pending);

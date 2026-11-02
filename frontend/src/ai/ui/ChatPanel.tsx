@@ -11,6 +11,7 @@ export interface ChatPanelProps {
   thinking?: boolean;
   enterToSend?: boolean;
   error?: string;
+  errorAction?: ReactNode;
   quotaExceeded?: boolean;
   errorTone?: 'default' | 'danger';
   modelSelector?: ReactNode;
@@ -23,7 +24,7 @@ export interface ChatPanelProps {
   onReset?(): void;
 }
 /** Portable controlled view: application owns the agent, permissions, modal and preview. */
-export function ChatPanel({ entries, disabled, status, thinking = false, enterToSend = true, error, quotaExceeded = false, errorTone = 'default', modelSelector, notice, suggestions = [], preview, previewId,
+export function ChatPanel({ entries, disabled, status, thinking = false, enterToSend = true, error, errorAction, quotaExceeded = false, errorTone = 'default', modelSelector, notice, suggestions = [], preview, previewId,
   renderMessage = text => text, onSend, onReset }: ChatPanelProps) {
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -71,7 +72,7 @@ export function ChatPanel({ entries, disabled, status, thinking = false, enterTo
         </div>)}
       </div>
       {preview && <div ref={previewElement} className={styles.preview}>{preview}</div>}
-      {(error || inputError) && <p className={`${styles.error} ${quotaExceeded || errorTone === 'danger' ? styles.quotaError : ''}`} role="alert">{inputError || error}</p>}
+      {(error || inputError) && <p className={`${styles.error} ${quotaExceeded || errorTone === 'danger' ? styles.quotaError : ''}`} role="alert">{inputError || error}{!inputError && error && errorAction && <> {errorAction}</>}</p>}
     </div>
     <form className={styles.composer} onSubmit={submit}>
       {(status || onReset) && <div className={styles.statusRow}>

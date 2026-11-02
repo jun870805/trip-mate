@@ -26,7 +26,7 @@
 .primary { background: var(--brown, #795d48); color: var(--paper, #fffaf2); padding: 8px 12px; border: 1px solid var(--brown, #795d48); border-radius: 4px; font-size: 14px; }
 .secondary { border-radius: 4px; }
 .preview { margin-top: 12px; }
-.error { color: var(--orange, #a95e38); font-size: 13px; line-height: 1.7; margin-top: 12px; }
+.error { color: var(--orange, #a95e38); font-size: 13px; line-height: 1.7; margin-top: 12px; overflow-wrap: anywhere; }
 @media (max-width: 700px) {
   .user { max-width: 94%; }
   /* Keep the computed font at 16px for iOS focus, with a visible 14px size. */

@@ -6,6 +6,13 @@ export interface ChatEntry {
   text: string;
   files: string[];
 }
+export function lastUserMessage(messages: readonly Message[]): string {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (message.role === 'user' && message.parts[0] && 'text' in message.parts[0]) return message.parts[0].text;
+  }
+  return '';
+}
 /** Never expose opaque provider data, tool arguments/results or extracted file contents. */
 export function chatEntries(messages: readonly Message[], formatResult?: (name: string, result: ToolResult) => string | null): ChatEntry[] {
   return messages.flatMap<ChatEntry>((message, id) => {

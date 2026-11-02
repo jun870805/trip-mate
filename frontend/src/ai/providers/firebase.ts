@@ -1,4 +1,5 @@
-import { ProviderRateLimitError, ProviderModelUnavailableError } from '../core/errors.ts';
+import { ProviderRateLimitError, ProviderModelUnavailableError, ProviderRequestError } from '../core/errors.ts';
+import { providerFailureDetails } from '../core/diagnostics.ts';
 import { Schema } from '@firebase/ai';
 import type { Content, GenerateContentRequest, SingleRequestOptions } from '@firebase/ai';
 import type { Provider, Part } from '../contracts.ts';
@@ -55,20 +56,20 @@ export function createFirebaseProvider(model: FirebaseModel): Provider {
       response = await model.generateContent({ contents, tools,
         systemInstruction: `${request.system}\n應用提供的目前範圍：${JSON.stringify(request.context)}` }, { signal: request.signal });
     } catch (error) {
-      const details=error as {status?:unknown;customErrorData?:{status?:unknown}} | null;
-      if (details?.status===404 || details?.customErrorData?.status===404) throw new ProviderModelUnavailableError();
-      if (details?.status===429 || details?.customErrorData?.status===429) throw new ProviderRateLimitError();
-      throw error;
+      const details = providerFailureDetails(error);
+      if (details.code === '404') throw new ProviderModelUnavailableError(details);
+      if (details.code === '429') throw new ProviderRateLimitError(details);
+      throw new ProviderRequestError(undefined, details);
     }
     request.signal.throwIfAborted();
     const candidate = response.response.candidates?.[0]?.content;
-    if (!candidate?.parts?.length) throw new Error('模型沒有可用回應，可能受到內容限制。');
+    if (!candidate?.parts?.length) throw new ProviderRequestError(undefined, { code: 'empty_response', message: '模型沒有可用回應，可能受到內容限制。' });
     const parts: Part[] = [];
     for (const part of candidate.parts) {
       if ('text' in part && typeof part.text === 'string' && !('thought' in part && part.thought)) parts.push({ text: part.text });
       else if ('functionCall' in part && part.functionCall) parts.push({ call: { name: part.functionCall.name, args: part.functionCall.args } });
     }
-    if (!parts.length) throw new Error('模型沒有可用文字或工具回應。');
+    if (!parts.length) throw new ProviderRequestError(undefined, { code: 'empty_response', message: '模型沒有可用文字或工具回應。' });
     return { parts, opaque: structuredClone(candidate) };
   } };
 }

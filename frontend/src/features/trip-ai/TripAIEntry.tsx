@@ -1,8 +1,8 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { AgentState } from '../../ai/contracts';
 import { trapDialogFocus } from '../../ai/ui/dialog-focus';
 import { ChatPanel } from '../../ai/ui/ChatPanel';
-import { chatEntries } from '../../ai/ui/presentation';
+import { chatEntries, lastUserMessage } from '../../ai/ui/presentation';
 import { createPortal } from 'react-dom';
 import { CloseButton } from '../../components/CloseButton';
 import { readModelOptions } from './model-options';
@@ -22,6 +22,7 @@ import styles from './TripAIEntry.module.css';
 type TripAgent = ReturnType<typeof createTripAgent>;
 const idle = (): AgentState => ({ status: 'idle', messages: [], results: [] });
 const suggestions = ['總結這趟行程', '看看哪一天安排太趕', '我搭乘幾點的飛機'];
+const ErrorReportButton = lazy(() => import('./ErrorReportButton'));
 export interface TripAIEntryProps {
   trip: Trip; source: 'trip' | 'demo'; data: TripData | null; available: boolean; loading: boolean;
   config: GuideConfig; session: GuideSession | null;
@@ -218,6 +219,8 @@ export function TripAIEntry(props: TripAIEntryProps) {
     state.status === 'running' ? '思考中...' : state.status === 'awaiting_confirmation' ? state.pending?.toolName === 'itinerary_request_email' ? '等待你確認寄送' : '等待你確認變更' : !ready ? 'AI 尚未就緒' :
     '';
   const modelLocked=connecting || parsing || props.loading || ['running','committing','awaiting_confirmation'].includes(state.status);
+  let projectId = '';
+  try { const config = JSON.parse(import.meta.env.VITE_AI_FIREBASE_CONFIG || '{}'); if (typeof config.projectId === 'string') projectId = config.projectId; } catch { /* unavailable configuration */ }
   if (!props.available) return null;
   return <>
     <button ref={launcher} type="button" className={`no-print ${styles.launcher}`} aria-label={open ? 'AI 助手已開啟' : state.pending ? '開啟 AI 助手，尚有待確認變更' : '開啟 AI 助手'}
@@ -246,6 +249,10 @@ export function TripAIEntry(props: TripAIEntryProps) {
             {modelChoices.models.map(model => <option key={model} value={model}>{model}{model === modelChoices.defaultModel ? ' (推薦)' : ''}</option>)}
           </select>}
           status={status} thinking={status === '思考中...'} enterToSend={desktop} error={error || state.error} notice={notice} suggestions={suggestions}
+          errorAction={!error && state.failure && <Suspense fallback={null}><ErrorReportButton key={state.failure.id} guideEmail={props.config.emails[0]} report={{ failure: state.failure,
+            lastMessage: lastUserMessage(state.messages),
+            tripName: props.trip.name, tripId: props.trip.id, model: selectedModel, projectId,
+            pageUrl: typeof window === 'undefined' ? '' : `${window.location.origin}${window.location.pathname}` }} /></Suspense>}
           onSend={send}
           renderMessage={(text, role) => role === 'model' ? <MarkdownContent text={text} allowImages={false} /> : text}
           previewId={state.pending?.id} preview={state.pending && (state.pending.toolName === 'itinerary_request_email' ? <EmailPreview preview={state.pending} disabled={writing || props.loading} onApprove={() => void decide(true)} onReject={() => void decide(false)} /> : <ChangePreview preview={state.pending} showIds={showIds} disabled={writing || props.loading}

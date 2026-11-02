@@ -1,7 +1,8 @@
 import type { AgentContext, AgentOptions, AgentState, PreparedChange, Tool, ToolResult } from '../contracts.ts';
 import { readConversation } from './conversation.ts';
 import type { Conversation } from './conversation.ts';
-import { ProviderRateLimitError, ProviderModelUnavailableError } from './errors.ts';
+import { ProviderRateLimitError, ProviderModelUnavailableError, ProviderRequestError } from './errors.ts';
+import type { ProviderFailureDetails } from '../contracts.ts';
 import { createRegistry } from './registry.ts';
 import { BASE_RULES } from '../prompts/base-rules.ts';
 
@@ -30,9 +31,11 @@ export function createAgent(options: AgentOptions) {
     return structuredClone(current);
   }
   function active(token: number) { return token === epoch && !aborter.signal.aborted && state.status !== 'disposed'; }
-  function fail(message = 'AI 請求失敗，請重新確認後再試。', errorCode?: AgentState['errorCode']) {
+  function fail(message = 'AI 請求失敗，請重新確認後再試。', errorCode?: AgentState['errorCode'], details?: ProviderFailureDetails) {
     pending = undefined;
-    state = { ...state, status: 'error', pending: undefined, error: message, errorCode };
+    state = { ...state, status: 'error', pending: undefined,
+      error: details ? `${message} (錯誤代碼：${details.code}，錯誤訊息:${details.message})` : message,
+      errorCode, failure: details ? { ...details, id: crypto.randomUUID() } : undefined };
     emit();
   }
   function record(name: string, result: ToolResult) {
@@ -91,8 +94,9 @@ export function createAgent(options: AgentOptions) {
       }
     } catch (error) {
       if (active(token)) {
-        if (error instanceof ProviderModelUnavailableError) fail(error.message,'model_unavailable');
-        else if (error instanceof ProviderRateLimitError) fail(error.message,'rate_limit');
+        if (error instanceof ProviderModelUnavailableError) fail(error.message,'model_unavailable',error.details);
+        else if (error instanceof ProviderRateLimitError) fail(error.message,'rate_limit',error.details);
+        else if (error instanceof ProviderRequestError) fail(error.message,undefined,error.details);
         else fail(error instanceof Error && /上限|範圍|一次只能|格式/.test(error.message) ? error.message : undefined);
       }
     }
@@ -151,7 +155,7 @@ export function createAgent(options: AgentOptions) {
           part.attachment.data.length > 5600000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(part.attachment.data)) throw new Error('附件內容無效或過大。');
       }
       context();
-      state = { ...state, status: 'running', pending: undefined, error: undefined, errorCode: undefined };
+      state = { ...state, status: 'running', pending: undefined, error: undefined, errorCode: undefined, failure: undefined };
       hasFiles ||= attachments.length > 0;
       state.messages.push({ role: 'user', parts: [{ text }, ...structuredClone(attachments)] });
       turns = 0; calls = 0; emit();

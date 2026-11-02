@@ -71,3 +71,12 @@ Service ID／Template ID 從 EmailJS Dashboard 複製，Public Key 從 Account �
 `npm run test:ai`／`npm run check` 及 `scripts/ai_browser_smoke.py` 使用 Provider／EmailJS／Google API 替身，不寄真實郵件。完成上述外部設定後，請自行用一封測試需求確認 To、Reply-To、格式與實際收件；程式完成不等於已替你設定 EmailJS 或驗證真實投遞。
 
 參考：[EmailJS REST send](https://www.emailjs.com/docs/rest-api/send/)、[模板變數與跳脫](https://www.emailjs.com/docs/user-guide/dynamic-variables-templates/)、[防濫用功能](https://www.emailjs.com/docs/faq/does-emailjs-expose-my-account-to-spam/)。
+
+
+## AI 錯誤回報
+
+AI API 請求失敗時，錯誤文字後提供「回報錯誤」按鈕，點擊即寄送，不另經聊天確認。沿用上方四個 `VITE_EMAILJS_*` 設定及同一範本，無需另建服務；範本 To 仍須固定為你的第一位導遊信箱。此功能也提供給已登入導遊，不受訪客行程調整工具限制。
+
+模板 `title` 為旅程名稱，`name`／`requester_name` 為「錯誤回報」，`time` 為台灣寄送時間，`subject` 為 `[AI 錯誤回報] 旅程名稱`，`message` 包含最後一則使用者訊息、代碼、API 錯誤訊息、模型、API 路徑、旅程 ID、去除查詢參數的頁面網址及回報編號。請確保範本本文有 `{{message}}`。不傳整段對話、附件、headers、token 或 SDK 物件；最後訊息最多 6000 字、錯誤訊息最多 2000 字並遮蔽憑證。
+
+同一筆錯誤只提交一次，失敗或結果不明不重送；200／OK 後彈窗顯示「回報成功」及「謝謝您的回報，我們將儘速修正錯誤」。這代表 EmailJS 接受申請，仍需你在信箱／EmailJS history 確認實際投遞。未設定時按鈕停用並顯示尚未啟用。

@@ -31,6 +31,9 @@ export function readConversation(value: unknown, scope: string, scopeId: string,
       }
     }
   }
-  if (awaiting.length || (checkpoint.messages.length && checkpoint.messages.at(-1)?.role !== 'model')) throw new Error('對話尚未完成。');
+  const last = checkpoint.messages.at(-1);
+  // A host-rendered decision may finish on a paired tool result without another model call.
+  const completedDecision = last?.role === 'user' && last.parts.every(part => 'result' in part && ['success', 'cancelled'].includes(part.result.response.status));
+  if (awaiting.length || (last && last.role !== 'model' && !completedDecision)) throw new Error('對話尚未完成。');
   return checkpoint as Conversation;
 }

@@ -57,3 +57,4 @@
 .modelSelect:focus { outline: none; box-shadow: none; }
 .modelSelect:focus-visible { background-color: color-mix(in srgb, var(--brown) 12%, var(--paper)); }
 .modelSelect:not([multiple]):not([size]) { background-position: right 20px center; }
+.reportButton { display: inline; padding: 0; border: 0; background: transparent; color: var(--brown); font: inherit; text-decoration: underline; text-underline-offset: 3px; }

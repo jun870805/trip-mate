@@ -19,10 +19,11 @@ grids = [{'sheetId': index + 1, 'title': title, 'gridProperties': {'rowCount': 1
          for index, title in enumerate(name for name in book if name != '旅程清單')]
 writes = []
 emails = []
+error_reports = []
 mail_status = 200
 sdk = """window.google={accounts:{oauth2:{initTokenClient(options){return {requestAccessToken(){options.callback({access_token:'mock-guide-token',expires_in:3600,scope:'openid email https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file'});}};}}}};"""
 provider = """
-import {ProviderRateLimitError,ProviderModelUnavailableError} from '/src/ai/core/errors.ts';
+import {ProviderRateLimitError,ProviderModelUnavailableError,ProviderRequestError} from '/src/ai/core/errors.ts';
 export async function initializeFirebaseProvider(config) {
   const selectedModel=config.model;
   window.__activeModel=selectedModel;
@@ -33,8 +34,9 @@ export async function initializeFirebaseProvider(config) {
     const last=request.messages.at(-1), result=last.parts.find(p=>p.result)?.result;
     if(result) return {parts:[{text:result.response.status==='success'?'已收到實際操作結果。':'已取消，未執行修改。'}]};
     const text=last.parts[0].text;
-    if(text.includes('測試用量429')) throw new ProviderRateLimitError();
-    if(text.includes('測試模型404')) throw new ProviderModelUnavailableError();
+    if(text.includes('測試用量429')) throw new ProviderRateLimitError({code:'429',message:'Quota exceeded.'});
+    if(text.includes('測試模型404')) throw new ProviderModelUnavailableError({code:'404',message:'Model not found.'});
+    if(text.includes('測試一般401')) throw new ProviderRequestError(undefined,{code:'401',message:'Firebase App Check token is invalid.'});
     if(text.includes('慢')) {await new Promise(done=>setTimeout(done,600));return {parts:[{text:'較慢的回覆'}]};}
     if(text.includes('匯入') || text.includes('上傳檔案')) return {parts:[{call:{name:'itinerary_import',args:{activities:[{date:DATE,title:'檔案匯入景點',body:'  保留空白\\n\\n第二段'}],warnings:[]}}}]};
     if(text.includes('轉交') && request.tools.some(tool=>tool.name==='itinerary_request_email')) return {parts:[{call:{name:'itinerary_request_email',args:{request:'第二天午餐希望改成素食餐廳。',contactName:'測試訪客',replyTo:'visitor@example.com'}}}]};
@@ -97,7 +99,7 @@ with sync_playwright() as p:
             assert body['service_id']=='service_test' and body['template_id']=='template_test'
             assert body['user_id']=='public_test'
             assert 'to_email' not in body['template_params']
-            emails.append(body)
+            (error_reports if body['template_params'].get('name')=='錯誤回報' else emails).append(body)
             route.fulfill(status=mail_status,headers=headers,content_type='text/plain',body='OK' if mail_status==200 else 'rejected')
         page.route('https://api.emailjs.com/api/v1.0/email/send',emailjs)
         page.goto(args.url)
@@ -213,7 +215,7 @@ with sync_playwright() as p:
         before=page.evaluate('window.__modelRequests.length')
         message.fill('測試用量429');message.press('Enter')
         quota=dialog.get_by_role('alert')
-        expect(quota).to_have_text('超過用量，請更換語言模型，或稍後再試。')
+        expect(quota).to_contain_text('超過用量，請更換語言模型，或稍後再試。 (錯誤代碼：429，錯誤訊息:Quota exceeded.)')
         assert quota.evaluate('(el)=>getComputedStyle(el).color')=='rgb(255, 0, 0)'
         page.screenshot(path='/tmp/trip-ai-model-quota.png')
         expect(models).to_be_enabled()
@@ -230,7 +232,7 @@ with sync_playwright() as p:
         before=page.evaluate('window.__modelRequests.length')
         message.fill('測試模型404');message.press('Enter')
         missing=dialog.get_by_role('alert')
-        expect(missing).to_have_text('此模型目前無法使用，請更換語言模型或聯絡導遊。')
+        expect(missing).to_contain_text('此模型目前無法使用，請更換語言模型或聯絡導遊。 (錯誤代碼：404，錯誤訊息:Model not found.)')
         assert missing.evaluate('(el)=>getComputedStyle(el).color')=='rgb(255, 0, 0)'
         expect(models).to_be_enabled()
         expect(models).to_have_value('test-model')
@@ -240,6 +242,42 @@ with sync_playwright() as p:
         expect(dialog.get_by_role('alert')).to_have_count(0)
         assert page.evaluate('window.__modelRequests.length')==before+1
         models.select_option('test-model')
+        expect(message).to_be_enabled()
+        # Error reporting is a direct user action, never an AI tool or an automatic retry.
+        message.fill('測試一般401：想調整午餐');message.press('Enter')
+        failure=dialog.get_by_role('alert')
+        expect(failure).to_contain_text('AI 請求失敗，請重新確認後再試。 (錯誤代碼：401，錯誤訊息:Firebase App Check token is invalid.)')
+        report_button=dialog.get_by_role('button',name='回報錯誤',exact=True)
+        expect(report_button).to_be_enabled()
+        assert not error_reports
+        page.set_viewport_size({'width':390,'height':844})
+        expect(dialog).to_have_attribute('role','dialog')
+        assert failure.evaluate('(el)=>el.scrollWidth<=el.clientWidth')
+        page.screenshot(path='/tmp/trip-ai-error-report-mobile.png')
+        with page.expect_event('dialog') as popup:
+            report_button.evaluate('(button)=>{button.click();button.click();}')
+        alert=popup.value
+        assert alert.type=='alert' and alert.message=='回報成功\n謝謝您的回報，我們將儘速修正錯誤'
+        alert.accept()
+        expect(dialog.get_by_role('button',name='已回報',exact=True)).to_be_disabled()
+        assert len(error_reports)==1 and not emails and not writes
+        report_params=error_reports[0]['template_params']
+        assert report_params['name']=='錯誤回報' and report_params['message'].count('測試一般401：想調整午餐')==1
+        assert '401' in report_params['message'] and 'Firebase App Check token is invalid.' in report_params['message']
+        assert '總結行程' not in report_params['message']
+        page.set_viewport_size({'width':1280,'height':900})
+        expect(dialog).to_have_attribute('role','complementary')
+        dialog.get_by_role('button',name='新對話',exact=True).click()
+        expect(message).to_be_enabled()
+        mail_status=500
+        message.fill('測試一般401：另一個問題');message.press('Enter')
+        report_button=dialog.get_by_role('button',name='回報錯誤',exact=True)
+        expect(report_button).to_be_enabled();report_button.click()
+        expect(dialog.get_by_text('回報未確認成功，請勿重複寄送。',exact=False)).to_be_visible()
+        expect(report_button).to_be_disabled()
+        assert len(error_reports)==2
+        mail_status=200
+        dialog.get_by_role('button',name='新對話',exact=True).click()
         expect(message).to_be_enabled()
         template=dialog.get_by_role('button',name='總結這趟行程',exact=True)
         template.evaluate('(button)=>{button.click();button.click();}')
@@ -465,6 +503,6 @@ with sync_playwright() as p:
         expect(q.get_by_role('log')).to_be_empty()
         quota.close()
         assert not errors, errors
-        print('AI UI passed: model selection/draft/history isolation, recommended default, red 404/429 and no automatic retry;  guest email preview/cancel/approve, no replay, login invalidation, HTTP rejection;  refresh memory, clear, pending not replayed, responsive composer,  desktop/mobile, scroll/focus, minimize/restore, cancel/confirm, uploads, refresh results, ID privacy, stale replies and scope cleanup. Mock Sheets writes: 2.')
+        print('AI UI passed: safe API diagnostics, error report one-click/dedup/success alert/rejection/mobile; model selection/draft/history isolation, recommended default, red 404/429 and no automatic retry;  guest email preview/cancel/approve, no replay, login invalidation, HTTP rejection;  refresh memory, clear, pending not replayed, responsive composer,  desktop/mobile, scroll/focus, minimize/restore, cancel/confirm, uploads, refresh results, ID privacy, stale replies and scope cleanup. Mock Sheets writes: 2.')
     finally:
         browser.close()
