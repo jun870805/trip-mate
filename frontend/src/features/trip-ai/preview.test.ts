@@ -19,3 +19,9 @@ it('shows create/delete fields and truthful write status',()=>{
   assert.match(writeResultLabel('itinerary_add',{status:'cancelled'})!,/未執行/);
   assert.match(writeResultLabel('itinerary_add',{status:'conflict'})!,/未確認/);
 });
+
+it('email results report accepted requests without claiming itinerary writes or delivery',()=>{
+  assert.equal(writeResultLabel('itinerary_request_email',{status:'success'}),'郵件服務已接受寄送申請，等待導遊回覆；行程尚未修改。');
+  assert.equal(writeResultLabel('itinerary_request_email',{status:'cancelled'}),'已取消寄送，未寄出郵件。');
+  assert.ok(writeResultLabel('itinerary_request_email',{status:'error'})?.includes('勿直接重送'));
+});

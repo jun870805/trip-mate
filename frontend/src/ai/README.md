@@ -1,6 +1,6 @@
 # 可移植 AI 模組
 
-這是可移植的 TypeScript Agent，另提供選用的 React 聊天面板。核心可由其他前端或測試程式呼叫，不依賴旅程資料模型、Google Sheets、路由、Vite 環境變數或 React；`ui/` 的 React 元件亦不依賴本專案業務。旅程頁已有懸浮入口與原生聊天 dialog。
+這是可移植的 TypeScript Agent，另提供選用的 React 聊天面板。核心可由其他前端或測試程式呼叫，不依賴旅程資料模型、Google Sheets、路由、Vite 環境變數或 React；`ui/` 的 React 元件亦不依賴本專案業務。旅程頁已有懸浮入口、桌面側欄與手機聊天窗。
 
 ## 責任與依賴方向
 
@@ -259,3 +259,10 @@ AI 回覆下方左側的小型無邊框複製圖示由可移植的 `ai/ui/CopyMe
 - Controller 每次模型請求依序組合 `BASE_RULES` 與 `options.system`；額外規則是補充，不應放寬共用限制。`BASE_RULES` 仍可從 `ai/index.ts` 匯入，原本從 `core/controller.ts` 匯入的用法也保留相容。
 
 修改後執行 `npm run test:ai` 與 `npm run check:ai:bundle`；正式網站須重新建置部署才會套用。提示詞不應包含服務憑證或私人資料；工具授權與寫入確認仍須由 Host 強制執行，不以提示詞取代。
+
+
+## 訪客調整需求轉寄
+
+本專案另有旅程端 `features/trip-ai/guest-email.ts` 與 `emailjs.ts`，不屬於可移植核心。寄信工具使用獨立 `contact_guide` 權限及既有 prepare／approve／reject 流程；不授予訪客行程寫入權，也不擴充核心的郵件相依。確認後重驗訪客身份／旅程讀取，以 EmailJS 固定模板提交，不傳模型指定收件人。郵件預覽使用 `EmailPreview.tsx`，實際接受結果與 Sheets 儲存結果分開。
+
+啟用需要公開 EmailJS 設定及固定的第一位導遊 To 範本，見 [訪客郵件設定](../../../docs/setup-email.md)。不設定也可使用原有 AI 查詢／導遊編輯。測試使用替身，沒有真實投遞驗證。

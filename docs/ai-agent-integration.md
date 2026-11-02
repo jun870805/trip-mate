@@ -59,3 +59,12 @@
 本輪自動化以 Provider／OAuth／Sheets 替身驗證，無真實雲端寫入。執行 `npm run check` 與 `python3 scripts/ai_browser_smoke.py --chrome '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'`（測試用 Vite 預設 port 5193）。
 
 AI 回覆下方左側的小型無邊框複製圖示由可移植的 `ai/ui/CopyMessageButton.tsx` 提供；僅複製該則回覆的 Markdown 文字，成功顯示短暫勾號，剪貼簿不可用／拒絕時提示手動選取。
+
+
+## 訪客需求郵件
+
+未登入訪客要求調整行程時，若 EmailJS 設定完整，AI 可使用 `itinerary_request_email` 整理需求。獨立 `contact_guide` 權限不授予行程寫入權；導遊登入／範例不提供此工具。郵件預覽顯示第一位導遊收件人、主旨及完整本文，確認才提交，取消不寄送。寄送中套用既有 busy 限制，避免關閉、新對話或重複批准。
+
+`guest-email.ts` 重驗身份、範圍與目前公開資料；`emailjs.ts` 使用固定 API、公鑰與模板，無私鑰或自動重試。服務接受結果獨立呈現，不能當作行程儲存或導遊收件證明。EmailJS 範本的 To 必須固定為 `VITE_GUIDE_EMAILS` 第一筆；前端不傳動態 To，純前端也無法獨立核對遠端模板設定。
+
+設定步驟與已知限制見 [EmailJS 設定](setup-email.md)。本輪 Node 測試與瀏覽器 Provider／EmailJS／Sheets 替身驗證通過；未寄真實郵件、未設定 EmailJS 帳號或部署。

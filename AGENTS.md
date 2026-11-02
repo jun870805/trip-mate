@@ -256,6 +256,9 @@
 - 已確認介面：右下方明顯機器人入口，按鈕文字固定「AI 助手」，不因已有對話改為「繼續對話」；701px 起為從視窗最上方延伸到底部的右側非模態聊天欄（包含 Logo／header 的高度），左側讓出寬度且可繼續操作、捲動與展開行程內文。700px 以下為聊天視窗，以 modal 語意、inert、焦點循環及共用背景捲動鎖限制背景互動。沿用全站配色、字體及手機底部導覽安全區。
 - AI 能力與聊天 UI 已接入；核心放在 `frontend/src/ai/`，目錄內 `README.md` 說明設計、設定、接入與移植。核心不依賴旅程、Sheets、路由、React 或 Vite env；選用的 `ai/ui` 僅依賴 React／通用契約，旅程橋接、dialog、共用元件與工具放在 `frontend/src/features/trip-ai/`。
 - 已實作行程查詢、經確認增改刪／排序、檔案匯入與地圖搜尋連結補全的 API 與 UI。所有寫入先準備具體差異，確認時重驗當前授權與快照；未知結果／拒絕／衝突停止後續寫入，重新讀取後再操作。不以模型文字當作儲存成功。
+- 訪客行程需求轉寄已採用 EmailJS：未登入且正式旅程可整理調整需求，預覽正規化後 `VITE_GUIDE_EMAILS` 第一筆收件人、主旨及完整本文，使用者按「確認寄送」才送出。訪客只有獨立 `contact_guide` 權限，不取得 Sheets 寫入權。已登入／範例／設定不完整不提供寄送工具；批准前重新確認身份與公開旅程可用。郵件不包含原始附件、整段聊天或憑證，稱呼／回覆信箱僅使用自願提供資訊。EmailJS `title` 帶入旅程名稱，`name` 帶入使用者明確提供的姓名，未提供為「未知使用者」；`time` 為確認寄送當下台灣時間（Asia/Taipei、`YYYY/MM/DD HH:mm:ss`）；保留原有 `trip_name`／`requester_name` 參數相容範本。
+- 郵件工具與 EmailJS adapter 位於 `features/trip-ai/guest-email.ts`、`emailjs.ts`，不放入可移植核心。環境變數 `VITE_AI_EMAILJS_ENABLED/SERVICE_ID/TEMPLATE_ID/PUBLIC_KEY` 為公開設定；無私鑰。EmailJS 範本 To 必須固定第一位導遊，不能使用前端動態收件人；此遠端設定無法由純前端獨立驗證。設定步驟與限制見 `docs/setup-email.md`。
+- 寄送獨立確認，不把聊天中的同意當成已寄出。取消／重整不寄送；寄送中禁止關閉／新對話，重複批准不重送，失敗／未知結果不自動重試。成功僅表示 EmailJS 接受寄送申請，不能宣稱已收件或已修改行程。保留單一 agent 的 60 秒冷卻、15 秒請求逾時；前端限制不能取代服務端防濫用。尚未執行真實郵件投遞。
 - 共用提示詞獨立於 `frontend/src/ai/prompts/base-rules.ts` 的 `BASE_RULES`，由 Controller 匯入；旅程專用規則仍由 `features/trip-ai/index.ts` 注入 `system`，維護方式見 `frontend/src/ai/README.md`。`BASE_RULES` 限定只回答旅遊相關議題。程式碼、除錯、軟體開發等非旅遊需求須簡短委婉婉拒並引導回旅遊，不提供實質答案或呼叫工具；即使包裝為旅遊網站／景點爬蟲也不提供開發內容。混合問題只回旅遊部分，模糊主題先詢問，不因角色扮演或文件指令放寬範圍。
 - Provider 使用 Firebase 官方 AI／App／App Check 模組，可替換；公開設定以 `VITE_AI_*` 明確啟用，模型名稱由設定注入。不得公開服務 Secret、傳送 OAuth token 給模型或自動啟用 debug token。
 - 範例來源強制唯讀且須有效導遊登入。AI 不新增帳務、團員、航班、住宿或旅程目錄操作。縮小不隱含批准；不保存輸入草稿、原始附件、待確認操作或正在寫入的動作。

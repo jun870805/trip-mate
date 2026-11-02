@@ -3,6 +3,8 @@ import type { GuideConfig, GuideSession } from '../../data/guide-auth.ts';
 import { assertGuideSession, WRITE_SCOPE } from '../../data/guide-auth.ts';
 import type { Trip, TripData, Row } from '../../data/portal.ts';
 import { automaticTripIds, createTripEditor, mutateTripBook, readRows, TripEditApiError } from '../../data/trip-editor.ts';
+import { guestEmailAvailable } from './guest-email.ts';
+import type { EmailConfig } from './emailjs.ts';
 import type { EditorSnapshot, TripMutation } from '../../data/trip-editor.ts';
 
 export interface TripHostOptions {
@@ -13,6 +15,7 @@ export interface TripHostOptions {
   /** Existing successful public reader/state; must throw while loading or denied. */
   readData(): Promise<TripData>;
   fetcher?: typeof fetch;
+  email?: EmailConfig;
   onSaved?(): void | Promise<void>;
   onExpired?(): void;
 }
@@ -45,7 +48,10 @@ export function createTripHost(options: TripHostOptions) {
       try { session(); canWrite = !needsReload && !committing; } catch { /* visitors have read access only */ }
       let canRead = true;
       if (options.source === 'demo') { try { assertGuideSession(options.getSession(), options.config); } catch { canRead = false; } }
-      return { scope: 'trip-itinerary', scopeId: trip.id, locale: 'zh-TW', permissions: canWrite ? ['read', 'write'] : canRead ? ['read'] : [] };
+      const permissions=canRead ? ['read'] : [];
+      if (canWrite) permissions.push('write');
+      else if (canRead && guestEmailAvailable(options)) permissions.push('contact_guide');
+      return { scope: 'trip-itinerary', scopeId: trip.id, locale: 'zh-TW', permissions };
     },
     async read(context: AgentContext, signal: AbortSignal) {
       matches(context); signal.throwIfAborted();

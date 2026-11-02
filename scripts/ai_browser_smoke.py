@@ -18,6 +18,8 @@ headers = {'access-control-allow-origin': '*', 'access-control-allow-headers': '
 grids = [{'sheetId': index + 1, 'title': title, 'gridProperties': {'rowCount': 1000, 'columnCount': 30}}
          for index, title in enumerate(name for name in book if name != '旅程清單')]
 writes = []
+emails = []
+mail_status = 200
 sdk = """window.google={accounts:{oauth2:{initTokenClient(options){return {requestAccessToken(){options.callback({access_token:'mock-guide-token',expires_in:3600,scope:'openid email https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file'});}};}}}};"""
 provider = """
 export async function initializeFirebaseProvider() {
@@ -28,6 +30,7 @@ export async function initializeFirebaseProvider() {
     const text=last.parts[0].text;
     if(text.includes('慢')) {await new Promise(done=>setTimeout(done,600));return {parts:[{text:'較慢的回覆'}]};}
     if(text.includes('匯入') || text.includes('上傳檔案')) return {parts:[{call:{name:'itinerary_import',args:{activities:[{date:DATE,title:'檔案匯入景點',body:'  保留空白\\n\\n第二段'}],warnings:[]}}}]};
+    if(text.includes('轉交') && request.tools.some(tool=>tool.name==='itinerary_request_email')) return {parts:[{call:{name:'itinerary_request_email',args:{request:'第二天午餐希望改成素食餐廳。',contactName:'測試訪客',replyTo:'visitor@example.com'}}}]};
     if(text.includes('修改')) return {parts:[{call:{name:'itinerary_update',args:{id:ID,patch:{title:'AI 修改後景點'}}}}]};
     return {parts:[{call:{name:'itinerary_get_summary',args:{}}}]};
   }};
@@ -76,6 +79,20 @@ with sync_playwright() as p:
             else:
                 route.fulfill(headers=headers, json={'sheets': [{'properties': value} for value in grids]})
         page.route('https://sheets.googleapis.com/**', sheets)
+        def emailjs(route):
+            request=route.request
+            if request.method=='OPTIONS':
+                route.fulfill(status=204,headers=headers)
+                return
+            assert request.method=='POST'
+            assert 'authorization' not in request.headers
+            body=json.loads(request.post_data)
+            assert body['service_id']=='service_test' and body['template_id']=='template_test'
+            assert body['user_id']=='public_test'
+            assert 'to_email' not in body['template_params']
+            emails.append(body)
+            route.fulfill(status=mail_status,headers=headers,content_type='text/plain',body='OK' if mail_status==200 else 'rejected')
+        page.route('https://api.emailjs.com/api/v1.0/email/send',emailjs)
         page.goto(args.url)
         page.wait_for_load_state('networkidle')
         expect(page.get_by_role('button', name='開啟 AI 助手', exact=True)).to_have_count(0)
@@ -178,11 +195,64 @@ with sync_playwright() as p:
         expect(dialog.get_by_role('log')).to_be_empty()
         page.reload(); page.wait_for_load_state('networkidle'); launcher.click()
         expect(dialog.get_by_role('log')).to_be_empty()
+        message.fill('想修改第二天午餐，請轉交導遊')
+        message.press('Enter')
+        mail_preview=dialog.get_by_role('region',name='待確認的需求郵件')
+        expect(mail_preview).to_be_visible()
+        expect(mail_preview).to_contain_text('admin@example.com')
+        expect(mail_preview).to_contain_text('第二天午餐希望改成素食餐廳。')
+        expect(mail_preview).to_contain_text('visitor@example.com')
+        assert not emails and not writes
+        mail_preview.get_by_role('button',name='取消寄送',exact=True).click()
+        expect(dialog.get_by_role('log')).to_contain_text('已取消寄送，未寄出郵件。')
+        assert not emails
+        message.fill('請轉交導遊');message.press('Enter')
+        expect(mail_preview).to_be_visible()
+        page.reload();page.wait_for_load_state('networkidle');launcher.click()
+        expect(message).to_be_enabled()
+        expect(mail_preview).to_have_count(0)
+        assert not emails
+        message.fill('請轉交導遊');message.press('Enter')
+        expect(mail_preview).to_be_visible()
+        page.screenshot(path='/tmp/trip-ai-mail-preview.png')
+        page.set_viewport_size({'width':390,'height':844})
+        expect(dialog).to_have_attribute('role','dialog')
+        expect(mail_preview).to_be_visible()
+        mail_preview.get_by_role('button',name='確認寄送',exact=True).scroll_into_view_if_needed()
+        assert dialog.evaluate('(el)=>el.scrollWidth<=el.clientWidth')
+        assert mail_preview.evaluate('(el)=>el.scrollWidth<=el.clientWidth')
+        page.screenshot(path='/tmp/trip-ai-mail-mobile.png')
+        page.set_viewport_size({'width':1280,'height':900})
+        expect(dialog).to_have_attribute('role','complementary')
+        mail_preview.get_by_role('button',name='確認寄送',exact=True).evaluate('(button)=>{button.click();button.click();}')
+        expect(dialog.get_by_role('log')).to_contain_text('郵件服務已接受寄送申請，等待導遊回覆；行程尚未修改。')
+        assert len(emails)==1 and not writes
+        assert emails[0]['template_params']['message'].endswith(emails[0]['template_params']['request_id'])
+        expect(message).to_be_enabled()
+        page.reload();page.wait_for_load_state('networkidle');launcher.click()
+        expect(dialog.get_by_role('log')).to_contain_text('郵件服務已接受寄送申請')
+        assert len(emails)==1
+        dialog.get_by_role('button',name='新對話',exact=True).click()
+        expect(message).to_be_enabled()
+        mail_status=429
+        message.fill('請轉交導遊');message.press('Enter')
+        expect(mail_preview).to_be_visible()
+        mail_preview.get_by_role('button',name='確認寄送',exact=True).click()
+        expect(dialog.get_by_role('log')).to_contain_text('郵件未確認寄送成功。')
+        assert len(emails)==2 and not writes
+        expect(message).to_be_enabled()
+        dialog.get_by_role('button',name='新對話',exact=True).click()
+        expect(message).to_be_enabled()
+        mail_status=200
+        message.fill('請轉交導遊');message.press('Enter')
+        expect(mail_preview).to_be_visible()
         dialog.get_by_role('button', name='關閉 AI 助手').click()
         page.get_by_role('button', name='導遊登入', exact=True).click()
         expect(page.get_by_role('button', name='登出', exact=True)).to_be_visible()
         launcher.click()
         expect(dialog.get_by_role('status')).to_have_count(0)
+        expect(mail_preview).to_have_count(0)
+        assert len(emails)==2
         message.fill('修改第一筆行程')
         dialog.get_by_role('button', name='送出', exact=True).click()
         preview = dialog.get_by_role('region', name='待確認的行程變更')
@@ -336,6 +406,6 @@ with sync_playwright() as p:
         expect(q.get_by_role('log')).to_be_empty()
         quota.close()
         assert not errors, errors
-        print('AI sidebar UI passed: refresh memory, clear, pending not replayed, responsive composer,  desktop/mobile, scroll/focus, minimize/restore, cancel/confirm, uploads, refresh results, ID privacy, stale replies and scope cleanup. Mock Sheets writes: 2.')
+        print('AI UI passed: guest email preview/cancel/approve, no replay, login invalidation, HTTP rejection;  refresh memory, clear, pending not replayed, responsive composer,  desktop/mobile, scroll/focus, minimize/restore, cancel/confirm, uploads, refresh results, ID privacy, stale replies and scope cleanup. Mock Sheets writes: 2.')
     finally:
         browser.close()

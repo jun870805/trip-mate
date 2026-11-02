@@ -23,6 +23,11 @@ export function previewRows(change: Change, showIds: boolean) {
 }
 const writeTools = new Set(['itinerary_add','itinerary_update','itinerary_delete','itinerary_move','itinerary_import','itinerary_apply_maps']);
 export function writeResultLabel(name: string, result: ToolResult): string | null {
+  if (name === 'itinerary_request_email') {
+    if (result.status === 'success') return '郵件服務已接受寄送申請，等待導遊回覆；行程尚未修改。';
+    if (result.status === 'cancelled') return '已取消寄送，未寄出郵件。';
+    return '郵件未確認寄送成功。請先確認收件情況，勿直接重送；行程未修改。';
+  }
   if (!writeTools.has(name)) return null;
   if (result.status === 'cancelled') return '已取消，未執行修改。';
   if (result.status === 'success') {

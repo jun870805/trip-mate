@@ -48,3 +48,7 @@
 .field dd > div { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; white-space: pre-wrap; }
 .valueLabel { color: var(--muted); font-size: 12px; }
 .previewActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+.mailDetails { display: grid; gap: 12px; margin: 12px 0; }
+.mailDetails dt { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+.mailDetails dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }

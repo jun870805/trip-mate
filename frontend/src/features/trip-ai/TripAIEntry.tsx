@@ -13,6 +13,7 @@ import type { GuideConfig, GuideSession } from '../../data/guide-auth';
 import { isSuperUser } from '../../data/guide-auth';
 import type { Trip, TripData } from '../../data/portal';
 import type { createTripAgent } from './index';
+import { EmailPreview } from './EmailPreview';
 import { ChangePreview } from './ChangePreview';
 import { displayAIText, writeResultLabel } from './preview';
 import styles from './TripAIEntry.module.css';
@@ -87,6 +88,10 @@ export function TripAIEntry(props: TripAIEntryProps) {
         VITE_AI_FIREBASE_CONFIG: import.meta.env.VITE_AI_FIREBASE_CONFIG,
         VITE_AI_MODEL: import.meta.env.VITE_AI_MODEL,
         VITE_AI_APP_CHECK_SITE_KEY: import.meta.env.VITE_AI_APP_CHECK_SITE_KEY,
+        VITE_AI_EMAILJS_ENABLED: import.meta.env.VITE_AI_EMAILJS_ENABLED,
+        VITE_AI_EMAILJS_SERVICE_ID: import.meta.env.VITE_AI_EMAILJS_SERVICE_ID,
+        VITE_AI_EMAILJS_TEMPLATE_ID: import.meta.env.VITE_AI_EMAILJS_TEMPLATE_ID,
+        VITE_AI_EMAILJS_PUBLIC_KEY: import.meta.env.VITE_AI_EMAILJS_PUBLIC_KEY,
       });
       if (token !== generation.current) { instance?.agent.dispose(); return; }
       if (!instance) { setNotice('AI 助手尚未啟用，請聯絡導遊。'); return; }
@@ -183,12 +188,12 @@ export function TripAIEntry(props: TripAIEntryProps) {
     if (!instance || !pending || latest.current.loading) return;
     setError('');
     try { if (approved) await instance.agent.approve(pending.id); else await instance.agent.reject(pending.id); }
-    catch { setError('此操作已處理或無法提交，請重新讀取行程後再試。'); }
+    catch { setError(pending.toolName === 'itinerary_request_email' ? '郵件操作已處理或無法提交，請先確認是否已寄送，勿直接重送。' : '此操作已處理或無法提交，請重新讀取行程後再試。'); }
   }
   const showIds = isSuperUser(props.session, props.config);
   const entries = chatEntries(state.messages, writeResultLabel).map(entry => ({ ...entry, text: displayAIText(entry.text, showIds) }));
-  const status = connecting ? '正在連線…' : parsing ? '正在解析檔案…' : writing ? '正在儲存，請勿關閉視窗…' : props.loading ? '正在更新行程…' :
-    state.status === 'running' ? '思考中...' : state.status === 'awaiting_confirmation' ? '等待你確認變更' : !ready ? 'AI 尚未就緒' :
+  const status = connecting ? '正在連線…' : parsing ? '正在解析檔案…' : writing ? '正在提交，請勿關閉視窗…' : props.loading ? '正在更新行程…' :
+    state.status === 'running' ? '思考中...' : state.status === 'awaiting_confirmation' ? state.pending?.toolName === 'itinerary_request_email' ? '等待你確認寄送' : '等待你確認變更' : !ready ? 'AI 尚未就緒' :
     '';
   if (!props.available) return null;
   return <>
@@ -217,8 +222,8 @@ export function TripAIEntry(props: TripAIEntryProps) {
           status={status} thinking={status === '思考中...'} enterToSend error={error || state.error} notice={notice} suggestions={suggestions}
           onSend={send}
           renderMessage={(text, role) => role === 'model' ? <MarkdownContent text={text} allowImages={false} /> : text}
-          previewId={state.pending?.id} preview={state.pending && <ChangePreview preview={state.pending} showIds={showIds} disabled={writing || props.loading}
-            onApprove={() => void decide(true)} onReject={() => void decide(false)} />} />
+          previewId={state.pending?.id} preview={state.pending && (state.pending.toolName === 'itinerary_request_email' ? <EmailPreview preview={state.pending} disabled={writing || props.loading} onApprove={() => void decide(true)} onReject={() => void decide(false)} /> : <ChangePreview preview={state.pending} showIds={showIds} disabled={writing || props.loading}
+            onApprove={() => void decide(true)} onReject={() => void decide(false)} />)} />
       </aside>
     </div>, document.body)}
   </>;

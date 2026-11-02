@@ -17,6 +17,7 @@ try {
         import { Overview, Itinerary, Fund, Expenses, Tasks } from './src/pages/TripViews'
         import App from './src/App'
         import { ChatPanel } from './src/ai/ui/ChatPanel'
+        import { EmailPreview } from './src/features/trip-ai/EmailPreview'
         import { ChangePreview } from './src/features/trip-ai/ChangePreview'
         import { ItineraryList } from './src/components/ItineraryList'
         import { ItineraryTagInput } from './src/components/ItineraryTagInput'
@@ -59,6 +60,9 @@ try {
         }]}
         const changes = renderToStaticMarkup(createElement(ChangePreview, {preview,showIds:false,disabled:false,onApprove(){},onReject(){}}))
         for (const text of ['09:00','10:00','確認儲存','取消變更']) assert.ok(changes.includes(text))
+        const emailPreview=renderToStaticMarkup(createElement(EmailPreview,{preview:{id:'email',scopeId:trip.id,toolName:'itinerary_request_email',summary:'寄送需求',changes:[{operation:'create',after:{收件人:'guide@example.com',主旨:'調整行程',內容:'第二天希望調整午餐。<script>alert(1)</script>'}}]},disabled:false,onApprove(){},onReject(){}}))
+        for(const text of ['guide@example.com','確認寄送','取消寄送','第二天希望調整午餐']) assert.ok(emailPreview.includes(text))
+        assert.ok(!emailPreview.includes('<script>') && !emailPreview.includes('確認儲存'))
         assert.ok(!changes.includes('I001'), 'Ordinary users must not see business IDs in AI preview')
         assert.ok(!renderToStaticMarkup(createElement(MarkdownContent, {text:'![tracking](https://example.com/pixel.png)',allowImages:false})).includes('<img'), 'AI model images must not trigger arbitrary network requests')
         globalThis.window = { location: { pathname: '/' } }

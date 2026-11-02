@@ -227,3 +227,5 @@ VITE_GUIDE_EMAILS='["owner@example.com","manager@example.com"]'
 先依 [Firebase／App Check 設定](docs/setup-ai.md) 填入 `frontend/.env.example` 的 `VITE_AI_*` 公開設定，或設定 GitHub Actions variables 並重新建置。預設停用，未設定時彈窗顯示尚未啟用，不產生假回覆。不得將 LLM Secret 或 App Check debug token 放入前端環境變數。
 
 可移植設計與 API 見 [AI 模組 README](frontend/src/ai/README.md)，實際接入見 [接入盤點](docs/ai-agent-integration.md)。`npm run check` 包含 AI 測試、可移植邊界與瀏覽器打包檢查；UI 模擬測試為 `scripts/ai_browser_smoke.py`，真實模型、Google 寫入與部署仍需外部環境驗證。
+
+訪客可透過 AI 整理行程調整需求，確認後寄給第一位導遊（可選 EmailJS 功能）；啟用與範本設定見 [訪客需求郵件](docs/setup-email.md)。

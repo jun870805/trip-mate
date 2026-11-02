@@ -72,3 +72,5 @@ repository → Settings → Pages → Build and deployment → Source 選 **GitH
 一般專案的 /repository-name/ 前綴由 GitHub Actions 自動推算；若圖片、CSS 或網址指向根路徑，確認 VITE_BASE_PATH 沒有誤填 `/`。設定自訂網域時則使用 `/`，並在 Google API Key 與 OAuth origins 加入該網域。
 
 來源：[GitHub Pages workflow](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)、[Vite GitHub Pages 部署](https://vite.dev/guide/static-deploy.html#github-pages)、[Google JavaScript origins 設定](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)。
+
+可選的訪客 AI 需求郵件使用 EmailJS，需額外設定四項 `VITE_AI_EMAILJS_*` repository variables 與固定 To 範本。詳見 [訪客郵件設定](setup-email.md)。不設定則停用郵件，不影響網站部署。

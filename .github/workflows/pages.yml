@@ -39,6 +39,10 @@ jobs:
           VITE_AI_FIREBASE_CONFIG: ${{ vars.VITE_AI_FIREBASE_CONFIG }}
           VITE_AI_MODEL: ${{ vars.VITE_AI_MODEL }}
           VITE_AI_APP_CHECK_SITE_KEY: ${{ vars.VITE_AI_APP_CHECK_SITE_KEY }}
+          VITE_AI_EMAILJS_ENABLED: ${{ vars.VITE_AI_EMAILJS_ENABLED || 'false' }}
+          VITE_AI_EMAILJS_SERVICE_ID: ${{ vars.VITE_AI_EMAILJS_SERVICE_ID }}
+          VITE_AI_EMAILJS_TEMPLATE_ID: ${{ vars.VITE_AI_EMAILJS_TEMPLATE_ID }}
+          VITE_AI_EMAILJS_PUBLIC_KEY: ${{ vars.VITE_AI_EMAILJS_PUBLIC_KEY }}
         run: |
           node -e 'for (const key of ["VITE_GOOGLE_SHEETS_API_KEY", "VITE_GOOGLE_SHEETS_CATALOG_ID"]) { if (!process.env[key]?.trim()) throw new Error("Missing repository configuration: " + key); }'
           npm run check
