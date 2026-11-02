@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ChatEntry } from './presentation.ts';
+import { thinkingDuration } from './presentation.ts';
 import styles from './ChatPanel.module.css';
 import { CopyMessageButton } from './CopyMessageButton';
 
@@ -9,6 +10,7 @@ export interface ChatPanelProps {
   disabled: boolean;
   status: string;
   thinking?: boolean;
+  partialText?: string;
   enterToSend?: boolean;
   error?: string;
   errorAction?: ReactNode;
@@ -24,24 +26,37 @@ export interface ChatPanelProps {
   onReset?(): void;
 }
 /** Portable controlled view: application owns the agent, permissions, modal and preview. */
-export function ChatPanel({ entries, disabled, status, thinking = false, enterToSend = true, error, errorAction, quotaExceeded = false, errorTone = 'default', modelSelector, notice, suggestions = [], preview, previewId,
+export function ChatPanel({ entries, disabled, status, thinking = false, partialText, enterToSend = true, error, errorAction, quotaExceeded = false, errorTone = 'default', modelSelector, notice, suggestions = [], preview, previewId,
   renderMessage = text => text, onSend, onReset }: ChatPanelProps) {
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [inputError, setInputError] = useState('');
+  const [thinkingSeconds, setThinkingSeconds] = useState(0);
   const input = useRef<HTMLTextAreaElement>(null), fileInput = useRef<HTMLInputElement>(null);
   const scroll = useRef<HTMLDivElement>(null), previewElement = useRef<HTMLDivElement>(null);
   const id = useId();
   const inFlight = useRef(false);
+  const followTail = useRef(true);
   const locked = disabled || sending;
   useEffect(() => {
+    setThinkingSeconds(0);
+    if (!thinking) return;
+    const started = performance.now();
+    const update = () => setThinkingSeconds(Math.floor((performance.now() - started) / 1000));
+    const timer = window.setInterval(update, 1000);
+    document.addEventListener('visibilitychange', update);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', update); };
+  }, [thinking]);
+  useEffect(() => {
     const region = scroll.current;
-    if (region) region.scrollTop = previewId && previewElement.current ? previewElement.current.offsetTop : region.scrollHeight;
-  }, [entries.length, previewId, status]);
+    if (region && previewId && previewElement.current) region.scrollTop = previewElement.current.offsetTop;
+    else if (region && followTail.current) region.scrollTop = region.scrollHeight;
+  }, [entries.length, previewId, status, partialText]);
   async function sendMessage(submitted: string, selected: File[], clearDraft: boolean) {
     if (locked || inFlight.current || (!submitted.trim() && !selected.length)) return;
     inFlight.current = true;
+    followTail.current = true;
     setSending(true); setInputError('');
     if (clearDraft) { setText(''); setFiles([]); }
     try { await onSend(submitted.trim() || '請從上傳檔案整理行程，日期不明的項目先詢問。', selected); }
@@ -55,7 +70,10 @@ export function ChatPanel({ entries, disabled, status, thinking = false, enterTo
     void sendMessage(text, files, true);
   }
   return <div className={styles.panel}>
-    <div ref={scroll} className={styles.scroll}>
+    <div ref={scroll} className={styles.scroll} onScroll={event => {
+      const region = event.currentTarget;
+      followTail.current = region.scrollHeight - region.scrollTop - region.clientHeight < 80;
+    }}>
       {!entries.length && <div className={styles.empty}>
         <h3 className={styles.welcomeTitle}>您好！ 我是您的 AI 助手</h3>
         <p>{notice || '輸入提示詞即可開始使用，或是可以先試試以下功能～'}</p>
@@ -70,13 +88,16 @@ export function ChatPanel({ entries, disabled, status, thinking = false, enterTo
           {entry.files.length > 0 && <ul className={styles.sentFiles} aria-label="已送出的附件">{entry.files.map((name, index) => <li key={index}>{name}</li>)}</ul>}
           {entry.role === 'model' && entry.text.trim() && <CopyMessageButton text={entry.text} />}
         </div>)}
+        {partialText && <div className={`${styles.message} ${styles.model}`} aria-label="正在產生的回覆">
+          <div className={`${styles.messageBody} ${styles.partialBody}`}>{partialText}</div>
+        </div>}
       </div>
       {preview && <div ref={previewElement} className={styles.preview}>{preview}</div>}
       {(error || inputError) && <p className={`${styles.error} ${quotaExceeded || errorTone === 'danger' ? styles.quotaError : ''}`} role="alert">{inputError || error}{!inputError && error && errorAction && <> {errorAction}</>}</p>}
     </div>
     <form className={styles.composer} onSubmit={submit}>
       {(status || onReset) && <div className={styles.statusRow}>
-        {status && <p role="status" className={styles.status}>{thinking && <span className={styles.spinner} aria-hidden="true" />}{status}</p>}
+        {status && <p role="status" className={styles.status}>{thinking && <span className={styles.spinner} aria-hidden="true" />}<span>{status}{thinking && <span role="timer" aria-live="off"> ({thinkingDuration(thinkingSeconds)})</span>}</span></p>}
         {onReset && <button type="button" className={styles.textButton} onClick={onReset} disabled={sending}>重新開始</button>}
       </div>}
       <label className={styles.srOnly} htmlFor={id}>訊息</label>

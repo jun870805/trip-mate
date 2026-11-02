@@ -5,7 +5,8 @@ export class ProviderRequestError extends Error {
   readonly details?: ProviderFailureDetails;
   constructor(message = 'AI 請求失敗，請重新確認後再試。', details?: ProviderFailureDetails) {
     super(message); this.name = 'ProviderRequestError';
-    this.details = details ? { code: redactDiagnosticText(details.code, 80), message: redactDiagnosticText(details.message) } : undefined;
+    this.details = details ? { code: redactDiagnosticText(details.code, 80), message: redactDiagnosticText(details.message),
+      ...(details.operation ? { operation: details.operation } : {}) } : undefined;
   }
 }
 /** Provider adapters normalize HTTP failures and carry only sanitized diagnostics. */

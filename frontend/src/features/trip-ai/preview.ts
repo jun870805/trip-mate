@@ -1,4 +1,18 @@
-import type { Change, ToolResult } from '../../ai/contracts.ts';
+import type { AgentActivity, Change, ToolResult } from '../../ai/contracts.ts';
+
+const toolActivities: Record<string, string> = {
+  itinerary_get_summary: '正在查詢旅程摘要…', itinerary_get_activities: '正在查詢行程…',
+  itinerary_search: '正在搜尋行程…', itinerary_missing_maps: '正在檢查地圖資訊…',
+  itinerary_add: '正在準備新增預覽…', itinerary_update: '正在準備修改預覽…',
+  itinerary_delete: '正在準備刪除預覽…', itinerary_move: '正在準備調整順序預覽…',
+  itinerary_import: '正在整理匯入預覽…', itinerary_apply_maps: '正在準備地圖預覽…',
+  itinerary_request_email: '正在準備郵件預覽…',
+};
+export function activityLabel(activity?: AgentActivity): string {
+  if (activity?.phase === 'responding') return '正在回覆…';
+  if (activity?.phase === 'tool') return toolActivities[activity.toolName || ''] || '正在處理資料…';
+  return '思考中...';
+}
 
 export function displayAIText(text: string, showIds: boolean): string {
   return showIds ? text : text.replace(/\b[TMFERBAHIP](?:\d{3}|[1-9]\d{3})\b/g, '該項目');

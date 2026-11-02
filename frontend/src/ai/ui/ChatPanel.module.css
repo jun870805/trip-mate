@@ -12,6 +12,7 @@
 .author { display: block; color: var(--muted, #796c60); font-size: 12px; margin-bottom: 4px; }
 .messageBody { font-size: 14px; line-height: 1.8; white-space: pre-wrap; }
 .model .messageBody { white-space: normal; }
+.model .partialBody { white-space: pre-wrap; }
 .sentFiles, .selectedFiles { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12px; color: var(--muted, #796c60); overflow-wrap: anywhere; }
 .selectedFiles { display: grid; gap: 4px; }
 .selectedFiles li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }

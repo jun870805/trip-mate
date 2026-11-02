@@ -66,3 +66,17 @@ it('normalizes Firebase 404 as model unavailable without misclassifying other HT
     await assert.rejects(provider.generate(request),value=>value instanceof ProviderRequestError && !(value instanceof ProviderModelUnavailableError) && value.details?.code===String(status));
   }
 });
+
+it('leaves Lite thinking at provider defaults and uses LOW for other models', async () => {
+  const { firebaseGenerationConfig } = await import('../providers/firebase-runtime.ts');
+  for (const model of ['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite-preview', 'models/gemini-3.1-flash-lite']) {
+    const config = firebaseGenerationConfig(model);
+    assert.equal(config.maxOutputTokens, 4096);
+    assert.equal(Object.hasOwn(config, 'thinkingConfig'), false);
+  }
+  for (const model of ['gemini-3.5-flash', 'gemini-3.8-flash']) {
+    const config = firebaseGenerationConfig(model);
+    assert.equal(config.maxOutputTokens, 4096);
+    assert.equal(config.thinkingConfig?.thinkingLevel, 'LOW');
+  }
+});

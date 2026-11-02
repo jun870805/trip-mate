@@ -24,3 +24,12 @@ it('renders safe tool status only through a host formatter and binary attachment
   assert.equal(entries[1].text,'未執行修改');
   assert.ok(!JSON.stringify(entries).includes('base64'));
 });
+
+it('formats elapsed thinking time across minute boundaries without rounding up', async () => {
+  const { thinkingDuration } = await import('../ui/presentation.ts');
+  assert.equal(thinkingDuration(0), '0秒');
+  assert.equal(thinkingDuration(59.9), '59秒');
+  assert.equal(thinkingDuration(60), '1分0秒');
+  assert.equal(thinkingDuration(125), '2分5秒');
+  assert.equal(thinkingDuration(3600), '60分0秒');
+});

@@ -1,4 +1,5 @@
 import { getAI, getGenerativeModel, GoogleAIBackend, ThinkingLevel } from '@firebase/ai';
+import type { GenerationConfig } from '@firebase/ai';
 import { initializeApp, getApps } from '@firebase/app';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from '@firebase/app-check';
 import type { FirebaseOptions } from '@firebase/app';
@@ -13,6 +14,14 @@ export interface FirebaseProviderConfig {
   appName?: string;
 }
 const initializedApps = new WeakMap<object, string>();
+
+/** Lite models keep their own default thinking level; other models use LOW. */
+export function firebaseGenerationConfig(model: string): GenerationConfig {
+  return {
+    maxOutputTokens: 4096,
+    ...(/(?:^|[-_/])lite(?:$|[-_/])/i.test(model) ? {} : { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
+  };
+}
 
 /** Lazy and explicit: no environment access, initialization, or network calls on import. */
 export async function initializeFirebaseProvider(config: FirebaseProviderConfig): Promise<Provider> {
@@ -32,10 +41,7 @@ export async function initializeFirebaseProvider(config: FirebaseProviderConfig)
   const ai = getAI(app, { backend: new GoogleAIBackend() });
   const model = getGenerativeModel(ai, {
     model: config.model,
-    generationConfig: {
-      maxOutputTokens: 4096,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-    },
+    generationConfig: firebaseGenerationConfig(config.model),
   });
   return createFirebaseProvider(model);
 }

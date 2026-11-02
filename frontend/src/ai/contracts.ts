@@ -56,11 +56,14 @@ export interface ProviderRequest {
   messages: Message[];
   tools: ToolDeclaration[];
   signal: AbortSignal;
+  /** Visible answer text deltas only; never thoughts, signatures or tool arguments. */
+  onText?(delta: string): void;
 }
 export interface Provider { generate(request: ProviderRequest): Promise<Omit<Message, 'role'>> }
 export type AgentStatus = 'idle' | 'running' | 'awaiting_confirmation' | 'committing' | 'error' | 'disposed';
-export interface ProviderFailureDetails { code: string; message: string }
+export interface ProviderFailureDetails { code: string; message: string; operation?: 'generateContent' | 'streamGenerateContent' }
 export interface ProviderFailure extends ProviderFailureDetails { id: string }
+export interface AgentActivity { phase: 'thinking' | 'responding' | 'tool'; toolName?: string }
 export interface AgentState {
   status: AgentStatus;
   messages: Message[];
@@ -70,6 +73,9 @@ export interface AgentState {
   errorCode?: 'rate_limit' | 'model_unavailable';
   /** Sanitized provider diagnostics for display/reporting; never part of saved conversations. */
   failure?: ProviderFailure;
+  /** Transient progress; never added to conversation history or persistence. */
+  activity?: AgentActivity;
+  partialText?: string;
 }
 export interface AgentOptions {
   provider: Provider;

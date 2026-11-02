@@ -21,6 +21,8 @@ export function createAgent(options: AgentOptions) {
   let aborter = new AbortController(), epoch = 0, turns = 0, calls = 0;
   let hasFiles = false;
   let pending: { prepared: PreparedChange; tool: Tool } | undefined;
+  let stopProgress = () => {};
+  function clearProgress() { stopProgress(); state.activity = undefined; state.partialText = undefined; }
   const listeners = new Set<() => void>();
   const emit = () => { for (const listener of listeners) { try { listener(); } catch { /* observers cannot interrupt writes */ } } };
   const snapshot = () => structuredClone(state);
@@ -32,6 +34,7 @@ export function createAgent(options: AgentOptions) {
   }
   function active(token: number) { return token === epoch && !aborter.signal.aborted && state.status !== 'disposed'; }
   function fail(message = 'AI 請求失敗，請重新確認後再試。', errorCode?: AgentState['errorCode'], details?: ProviderFailureDetails) {
+    clearProgress();
     pending = undefined;
     state = { ...state, status: 'error', pending: undefined,
       error: details ? `${message} (錯誤代碼：${details.code}，錯誤訊息:${details.message})` : message,
@@ -50,9 +53,31 @@ export function createAgent(options: AgentOptions) {
         const current = context();
         if (new TextEncoder().encode(JSON.stringify(state.messages)).byteLength > 16 * 1024 * 1024)
           throw new Error('AI 對話資料超過上限，請建立新對話。');
-        const response = await options.provider.generate({ system: [BASE_RULES, options.system].filter(Boolean).join('\n'),
-          context: current, messages: structuredClone(state.messages), tools: registry.declarations(current), signal: aborter.signal });
+        clearProgress(); state.activity = { phase: 'thinking' }; emit();
+        let text = '', receiving = true, timer: ReturnType<typeof setTimeout> | undefined;
+        const flush = () => {
+          timer = undefined;
+          if (!active(token) || !receiving) return;
+          state.partialText = text; state.activity = { phase: 'responding' }; emit();
+        };
+        const stop = () => { clearTimeout(timer); timer = undefined; };
+        stopProgress = stop;
+        let response: Omit<import('../contracts.ts').Message, 'role'>;
+        try {
+          response = await options.provider.generate({ system: [BASE_RULES, options.system].filter(Boolean).join('\n'),
+            context: current, messages: structuredClone(state.messages), tools: registry.declarations(current), signal: aborter.signal,
+            onText(delta) {
+              if (!active(token) || !receiving || !delta) return;
+              context();
+              if (typeof delta !== 'string' || text.length + delta.length > 64000) throw new Error('模型回應超過本次顯示上限。');
+              text += delta;
+              if (!state.partialText) flush();
+              else if (timer === undefined) timer = setTimeout(flush, 50);
+            },
+          });
+        } finally { receiving = false; stop(); }
         if (!active(token)) return;
+        state.partialText = undefined; state.activity = undefined;
         context();
         if (!Array.isArray(response.parts) || response.parts.length > maxCalls + 20)
           throw new Error('模型回應格式不正確。');
@@ -69,6 +94,7 @@ export function createAgent(options: AgentOptions) {
           const parsed = tool.schema.safeParse(call.args);
           if (!parsed.success) { record(call.name, { status: 'validation_error', message: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ').slice(0, 2000) }); continue; }
           try {
+            state.activity = { phase: 'tool', toolName: tool.name }; emit();
             if (tool.risk === 'read') {
               const result = await tool.execute!(structuredClone(parsed.data), latest, aborter.signal);
               if (!active(token)) return;
@@ -79,6 +105,7 @@ export function createAgent(options: AgentOptions) {
               if (!active(token)) return;
               context();
               pending = { prepared, tool };
+              clearProgress();
               state = { ...state, status: 'awaiting_confirmation', pending: {
                 ...structuredClone(prepared.preview), id: crypto.randomUUID(), scopeId: bound.scopeId, toolName: tool.name,
               } };
@@ -89,7 +116,7 @@ export function createAgent(options: AgentOptions) {
             record(call.name, { status: 'error', message: '工具處理失敗，未確認任何修改；請檢查輸入或重新讀取。' });
           }
         }
-        if (!requested.length) { state.status = 'idle'; emit(); return; }
+        if (!requested.length) { clearProgress(); state.status = 'idle'; emit(); return; }
         emit();
       }
     } catch (error) {
@@ -105,6 +132,7 @@ export function createAgent(options: AgentOptions) {
     if (state.status !== 'awaiting_confirmation' || !pending || id !== state.pending?.id)
       throw new Error('確認操作不存在或已處理。');
     const selected = pending;
+    clearProgress();
     pending = undefined;
     state = { ...state, pending: undefined, status: approved ? 'committing' : 'running' };
     emit();
@@ -124,6 +152,7 @@ export function createAgent(options: AgentOptions) {
   function cancel() {
     if (state.status === 'committing') throw new Error('寫入中不能取消；取消不代表回滾。');
     if (state.status === 'disposed') return;
+    clearProgress();
     epoch++; aborter.abort(); aborter = new AbortController(); pending = undefined;
     // Clear function-call history so a cancelled call cannot be silently replayed.
     hasFiles = false;
@@ -163,6 +192,7 @@ export function createAgent(options: AgentOptions) {
     },
     approve: (id: string) => decide(id, true), reject: (id: string) => decide(id, false), cancel,
     dispose() {
+      clearProgress();
       epoch++; aborter.abort(); pending = undefined;
       state = { status: 'disposed', messages: [], results: [] }; emit(); listeners.clear();
     },

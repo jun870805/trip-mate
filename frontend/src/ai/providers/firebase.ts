@@ -9,6 +9,10 @@ export interface FirebaseModel {
   generateContent(request: GenerateContentRequest, options?: SingleRequestOptions): Promise<{
     response: { candidates?: { content: Content }[] };
   }>;
+  generateContentStream?(request: GenerateContentRequest, options?: SingleRequestOptions): Promise<{
+    stream: AsyncIterable<{ candidates?: { content: Content }[] }>;
+    response: Promise<{ candidates?: { content: Content }[] }>;
+  }>;
 }
 export function firebaseSchema(value: Record<string, unknown>): Schema {
   const description = typeof value.description === 'string' ? value.description : undefined;
@@ -52,11 +56,28 @@ export function createFirebaseProvider(model: FirebaseModel): Provider {
       parameters: firebaseSchema(tool.parameters) as ReturnType<typeof Schema.object>,
     })) }] : undefined;
     let response: Awaited<ReturnType<FirebaseModel['generateContent']>>;
+    let operation: 'generateContent' | 'streamGenerateContent' = 'generateContent';
     try {
-      response = await model.generateContent({ contents, tools,
-        systemInstruction: `${request.system}\n應用提供的目前範圍：${JSON.stringify(request.context)}` }, { signal: request.signal });
+      const input = { contents, tools, systemInstruction: `${request.system}\n應用提供的目前範圍：${JSON.stringify(request.context)}` };
+      if (request.onText && model.generateContentStream) {
+        operation = 'streamGenerateContent';
+        const result = await model.generateContentStream(input, { signal: request.signal });
+        // Attach a rejection handler immediately: the aggregate and iterator may fail separately.
+        const completed = result.response.then(value => ({ value }), error => ({ error }));
+        for await (const chunk of result.stream) {
+          request.signal.throwIfAborted();
+          for (const part of chunk.candidates?.[0]?.content?.parts || []) {
+            if ('text' in part && typeof part.text === 'string' && !('thought' in part && part.thought)) request.onText(part.text);
+          }
+        }
+        const final = await completed;
+        if ('error' in final) throw final.error;
+        response = { response: final.value };
+      } else {
+        response = await model.generateContent(input, { signal: request.signal });
+      }
     } catch (error) {
-      const details = providerFailureDetails(error);
+      const details = { ...providerFailureDetails(error), operation };
       if (details.code === '404') throw new ProviderModelUnavailableError(details);
       if (details.code === '429') throw new ProviderRateLimitError(details);
       throw new ProviderRequestError(undefined, details);
@@ -66,7 +87,11 @@ export function createFirebaseProvider(model: FirebaseModel): Provider {
     if (!candidate?.parts?.length) throw new ProviderRequestError(undefined, { code: 'empty_response', message: '模型沒有可用回應，可能受到內容限制。' });
     const parts: Part[] = [];
     for (const part of candidate.parts) {
-      if ('text' in part && typeof part.text === 'string' && !('thought' in part && part.thought)) parts.push({ text: part.text });
+      if ('text' in part && typeof part.text === 'string' && !('thought' in part && part.thought)) {
+        const previous = parts.at(-1);
+        if (previous && 'text' in previous) previous.text += part.text;
+        else parts.push({ text: part.text });
+      }
       else if ('functionCall' in part && part.functionCall) parts.push({ call: { name: part.functionCall.name, args: part.functionCall.args } });
     }
     if (!parts.length) throw new ProviderRequestError(undefined, { code: 'empty_response', message: '模型沒有可用文字或工具回應。' });

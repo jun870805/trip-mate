@@ -220,7 +220,7 @@ import { chatEntries } from './ai/ui/presentation';
 />
 ```
 
-上例的 state、statusLabel、結果格式化與 preview renderer 由 Host 提供。本專案處理中狀態為「思考中...」並搭配旋轉指示，遵循減少動態效果。輸入框與一般訊息角色名稱只保留無障礙標示，placeholder 為「問問 AI助手」。`enterToSend` 預設 true；本專案 Host 傳入桌面判斷（701px 起），桌面 Enter 送出、Shift＋Enter 換行，手機（700px 以下）Enter 換行並使用送出按鈕送出；組字中的 Enter 不送出，Ctrl／Command＋Enter 仍可送出。其他專案可明確設 false 保留一般 Enter 換行。模板提示詞點擊直接呼叫 onSend，與表單共用鎖定及防重送流程，不夾帶未送出的附件。`renderMessage` 可注入專案自己的安全 Markdown renderer；預設為純文字。不要顯示 Provider `opaque`、Function Call／Response 原文或文件抽取 JSON。旅程 Host 額外移除非超級使用者可見文字中的業務 ID，依真實工具結果顯示儲存狀態，且模型 Markdown 不自動載入遠端圖片。
+上例的 state、statusLabel、結果格式化與 preview renderer 由 Host 提供。本專案處理中狀態為「思考中... (x秒)」，滿一分鐘改顯示「思考中... (x分x秒)」，並搭配旋轉指示；每次 `thinking` 開始重新計時，使用單調時鐘與每秒更新，切回頁面校正，結束或卸載清除計時器與監聽，僅保留當次記憶體，遵循減少動態效果。輸入框與一般訊息角色名稱只保留無障礙標示，placeholder 為「問問 AI助手」。`enterToSend` 預設 true；本專案 Host 傳入桌面判斷（701px 起），桌面 Enter 送出、Shift＋Enter 換行，手機（700px 以下）Enter 換行並使用送出按鈕送出；組字中的 Enter 不送出，Ctrl／Command＋Enter 仍可送出。其他專案可明確設 false 保留一般 Enter 換行。模板提示詞點擊直接呼叫 onSend，與表單共用鎖定及防重送流程，不夾帶未送出的附件。`renderMessage` 可注入專案自己的安全 Markdown renderer；預設為純文字。不要顯示 Provider `opaque`、Function Call／Response 原文或文件抽取 JSON。旅程 Host 額外移除非超級使用者可見文字中的業務 ID，依真實工具結果顯示儲存狀態，且模型 Markdown 不自動載入遠端圖片。
 
 本專案 `features/trip-ai/TripAIEntry.tsx` 負責 portal、桌面側欄／手機 modal 語意、背景捲動鎖、Lazy Provider 與動態 session/data ref。單一 ChatPanel 跨尺寸保留輸入；縮小／Escape 保留當次 agent，清空對話才刪除上下文、輸入與附件。儲存中禁止縮小／清空。桌面側欄不鎖背景；左側行程內文可直接展開，手機仍使用原本詳情 dialog。
 
@@ -271,7 +271,7 @@ AI 回覆下方左側的小型無邊框複製圖示由可移植的 `ai/ui/CopyMe
 
 ## 多模型與配額錯誤
 
-Firebase runtime 目前統一設定 `generationConfig.thinkingConfig.thinkingLevel = ThinkingLevel.LOW`，套用到所有選用模型，供比較回應速度；`maxOutputTokens` 維持 4096。這是程式設定，無需新增 env，正式站需重新建置部署。模型須支援 thinking level；Flash-Lite 原本預設可能為 MINIMAL，設 LOW 不保證更快，實際速度仍須測量。
+Firebase runtime 的 `firebaseGenerationConfig(model)` 依模型名稱產生設定：Lite 模型（名稱含獨立 `lite` 區段，含 preview 等後綴）不傳 `thinkingConfig`，使用模型預設，讓目前 Flash-Lite 保留預設 MINIMAL；其他模型設定 `thinkingLevel: ThinkingLevel.LOW`。`maxOutputTokens` 皆維持 4096，無需新增 env；正式站需重新建置部署，實際速度仍須測量。
 
 模型選擇屬於 Host：本專案由 `features/trip-ai/model-options.ts` 解析 `VITE_AI_DEFAULT_MODEL`（預設／推薦）與 `VITE_AI_MODELS`（額外允許的模型 JSON 陣列）。Provider config 注入選中的 model ID，不把 Vite env 帶入核心。Host 的 createConfiguredTripAgent 第三個參數可指定清單內模型，清單外名稱被拒絕。
 
@@ -290,3 +290,14 @@ Firebase adapter 將 HTTP 或 SDK 例外轉為 `ProviderRequestError`，404／42
 Controller 在 `state.failure` 提供 id／code／message，並在原提示後附上 `(錯誤代碼：code，錯誤訊息:message)`。此資料不放進模型訊息、opaque 或已完成對話暫存，下一輪／清空即移除。Host 可使用 `ChatPanel.errorAction` 注入回報按鈕；核心與可移植 UI 不依賴 EmailJS。
 
 本專案 `features/trip-ai/ErrorReportButton.tsx` 延遲載入，點擊「回報錯誤」才呼叫 `error-report.ts`，沿用既有 EmailJS 公開設定與固定收件人範本。只傳最後一則真正使用者訊息（最多 6000 字，過長標示截斷）、指定 API／旅程資訊與時間，排除先前對話及附件。姓名參數為「錯誤回報」，title 為旅程名稱。每個 failure id 僅提交一次，不自動重試或透過模型寄信；設定缺漏停用，200／OK 才顯示原生成功彈窗。正式投遞仍須另行實測，見 `docs/setup-email.md`。
+
+
+## 串流回答與執行進度
+
+`ProviderRequest.onText?(delta)` 是可選公開回答文字 callback，原有只實作 `generate()` 的 Provider 可忽略。Firebase adapter 在 callback 存在時使用 SDK `generateContentStream`，逐段回傳非 thought 的文字；其他情況保留 `generateContent`。不因串流失敗改走非串流重試。聚合 response 的候選內容完整保留在 opaque（包含 thought signatures），連續公開文字合併成同一 part，工具呼叫只從完整回應解析，不能由部分參數觸發工具或寫入。
+
+Controller 的 `activity` 為 `thinking`／`responding`／`tool`（包含內部 toolName），Host 對照 `features/trip-ai/preview.ts` 的易讀標籤，並傳入原有 status 列；思考、工具執行、回答串流共用同一次 `thinking` 計時，不因階段切換歸零。`partialText` 僅在本次 running 狀態呈現：第一段立即更新，其餘約 50ms 合併一次，限制 64000 字；正式完成後只保留一則完整訊息。取消、dispose、scope 變更或錯誤清除部分文字，忽略晚到 callback，不寫入 sessionStorage 或下次模型歷史。
+
+`ChatPanel.partialText` 顯示純文字與換行，避免未完成 Markdown 誤成連結；完整回覆才使用既有安全 Markdown renderer 及複製按鈕。貼近底部時自動跟隨，使用者上滑閱讀時停止跟隨，再滑回底部或送出新訊息恢復。步驟只顯示實際狀態，不顯示模型內部思考、工具參數或文件抽取原文。串流改善等待回饋，不能保證降低首段延遲或總時間。Firebase 錯誤診斷保留實際 operation，郵件回報 API 路徑對應 `streamGenerateContent`。
+
+參考：[Firebase 串流回覆](https://firebase.google.com/docs/ai-logic/stream-responses)。

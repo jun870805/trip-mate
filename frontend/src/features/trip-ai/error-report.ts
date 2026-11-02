@@ -23,7 +23,8 @@ export function createAIErrorReporter(config: EmailConfig, fetcher: typeof fetch
     const snapshot = structuredClone(report);
     const safe = (value: string, limit = 2000) => redactDiagnosticText(value, limit);
     const time = formatEmailTime(new Date());
-    const endpoint = `https://firebasevertexai.googleapis.com/v1beta/projects/${encodeURIComponent(snapshot.projectId)}/models/${encodeURIComponent(snapshot.model)}:generateContent`;
+    const operation = snapshot.failure.operation === 'streamGenerateContent' ? 'streamGenerateContent' : 'generateContent';
+    const endpoint = `https://firebasevertexai.googleapis.com/v1beta/projects/${encodeURIComponent(snapshot.projectId)}/models/${encodeURIComponent(snapshot.model)}:${operation}`;
     const message = [
       `旅程：${safe(snapshot.tripName, 200)}`, `旅程 ID：${safe(snapshot.tripId, 80)}`, `時間：${time}`,
       `回報編號：${safe(snapshot.failure.id, 80)}`, `頁面：${safe(snapshot.pageUrl, 500)}`,

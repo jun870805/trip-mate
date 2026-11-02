@@ -16,7 +16,7 @@ import type { Trip, TripData } from '../../data/portal';
 import type { createTripAgent } from './index';
 import { EmailPreview } from './EmailPreview';
 import { ChangePreview } from './ChangePreview';
-import { displayAIText, writeResultLabel } from './preview';
+import { activityLabel, displayAIText, writeResultLabel } from './preview';
 import styles from './TripAIEntry.module.css';
 
 type TripAgent = ReturnType<typeof createTripAgent>;
@@ -216,7 +216,7 @@ export function TripAIEntry(props: TripAIEntryProps) {
   const showIds = isSuperUser(props.session, props.config);
   const entries = chatEntries(state.messages, writeResultLabel).map(entry => ({ ...entry, text: displayAIText(entry.text, showIds) }));
   const status = connecting ? '正在連線…' : parsing ? '正在解析檔案…' : writing ? '正在提交，請勿關閉視窗…' : props.loading ? '正在更新行程…' :
-    state.status === 'running' ? '思考中...' : state.status === 'awaiting_confirmation' ? state.pending?.toolName === 'itinerary_request_email' ? '等待你確認寄送' : '等待你確認變更' : !ready ? 'AI 尚未就緒' :
+    state.status === 'running' ? activityLabel(state.activity) : state.status === 'awaiting_confirmation' ? state.pending?.toolName === 'itinerary_request_email' ? '等待你確認寄送' : '等待你確認變更' : !ready ? 'AI 尚未就緒' :
     '';
   const modelLocked=connecting || parsing || props.loading || ['running','committing','awaiting_confirmation'].includes(state.status);
   let projectId = '';
@@ -248,7 +248,9 @@ export function TripAIEntry(props: TripAIEntryProps) {
           errorTone={state.errorCode === 'model_unavailable' ? 'danger' : 'default'} quotaExceeded={state.errorCode === 'rate_limit'} modelSelector={modelChoices.models.length > 0 && <select className={styles.modelSelect} aria-label="語言模型" title={selectedModel} value={selectedModel} disabled={modelLocked} onChange={event => changeModel(event.target.value)}>
             {modelChoices.models.map(model => <option key={model} value={model}>{model}{model === modelChoices.defaultModel ? ' (推薦)' : ''}</option>)}
           </select>}
-          status={status} thinking={status === '思考中...'} enterToSend={desktop} error={error || state.error} notice={notice} suggestions={suggestions}
+          status={status} thinking={state.status === 'running' && !connecting && !parsing && !props.loading}
+          partialText={state.partialText ? displayAIText(state.partialText, showIds) : undefined}
+          enterToSend={desktop} error={error || state.error} notice={notice} suggestions={suggestions}
           errorAction={!error && state.failure && <Suspense fallback={null}><ErrorReportButton key={state.failure.id} guideEmail={props.config.emails[0]} report={{ failure: state.failure,
             lastMessage: lastUserMessage(state.messages),
             tripName: props.trip.name, tripId: props.trip.id, model: selectedModel, projectId,
