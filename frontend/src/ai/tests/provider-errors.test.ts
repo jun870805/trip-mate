@@ -2,6 +2,16 @@ import { it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFirebaseProvider } from '../providers/firebase.ts';
 import { createAgent } from '../core/controller.ts';
+import { redactDiagnosticText } from '../core/diagnostics.ts';
+
+it('redacts pasted debug tokens, credentials, JWTs and URL credentials from diagnostic text',()=>{
+  const values=['VITE_AI_APP_CHECK_DEBUG_TOKEN=private-debug-value','client_secret=private-client-value','password:private-password-value',
+    'token=private-token-value','https://user:private-url-value@example.com/path?secret=private-query-value',
+    'eyJheader.eyJpayload.signature'];
+  const safe=redactDiagnosticText(values.join('\n'));
+  for(const forbidden of ['private-debug-value','private-client-value','private-password-value','private-token-value','private-url-value','private-query-value','eyJpayload']) assert.ok(!safe.includes(forbidden));
+  assert.equal(redactDiagnosticText('https://%invalid'),'[URL removed]');
+});
 
 it('keeps API code and sanitized response in a reportable failure without credentials or opaque data',async()=>{
   const secret='AIza'+'x'.repeat(35);

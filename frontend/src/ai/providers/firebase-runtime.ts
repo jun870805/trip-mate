@@ -1,4 +1,4 @@
-import { getAI, getGenerativeModel, GoogleAIBackend } from '@firebase/ai';
+import { getAI, getGenerativeModel, GoogleAIBackend, ThinkingLevel } from '@firebase/ai';
 import { initializeApp, getApps } from '@firebase/app';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from '@firebase/app-check';
 import type { FirebaseOptions } from '@firebase/app';
@@ -30,6 +30,12 @@ export async function initializeFirebaseProvider(config: FirebaseProviderConfig)
     initializedApps.set(app, config.appCheckSiteKey);
   }
   const ai = getAI(app, { backend: new GoogleAIBackend() });
-  const model = getGenerativeModel(ai, { model: config.model, generationConfig: { maxOutputTokens: 4096 } });
+  const model = getGenerativeModel(ai, {
+    model: config.model,
+    generationConfig: {
+      maxOutputTokens: 4096,
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+    },
+  });
   return createFirebaseProvider(model);
 }

@@ -271,6 +271,8 @@ AI 回覆下方左側的小型無邊框複製圖示由可移植的 `ai/ui/CopyMe
 
 ## 多模型與配額錯誤
 
+Firebase runtime 目前統一設定 `generationConfig.thinkingConfig.thinkingLevel = ThinkingLevel.LOW`，套用到所有選用模型，供比較回應速度；`maxOutputTokens` 維持 4096。這是程式設定，無需新增 env，正式站需重新建置部署。模型須支援 thinking level；Flash-Lite 原本預設可能為 MINIMAL，設 LOW 不保證更快，實際速度仍須測量。
+
 模型選擇屬於 Host：本專案由 `features/trip-ai/model-options.ts` 解析 `VITE_AI_DEFAULT_MODEL`（預設／推薦）與 `VITE_AI_MODELS`（額外允許的模型 JSON 陣列）。Provider config 注入選中的 model ID，不把 Vite env 帶入核心。Host 的 createConfiguredTripAgent 第三個參數可指定清單內模型，清單外名稱被拒絕。
 
 `ChatPanel` 的 `modelSelector` 是可選 React 插槽，放在送出按鈕左側，送出期間也會停用此區控制項。模型、範圍與授權的切換規則仍由 Host 負責；模型歷史按各自 key 隔離，切換不混用 opaque。

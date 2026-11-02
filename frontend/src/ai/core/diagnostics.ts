@@ -3,7 +3,7 @@ import type { ProviderFailureDetails } from '../contracts.ts';
 /** Diagnostics are plain text, bounded, and never include request headers or SDK objects. */
 export function redactDiagnosticText(value: string, limit = 2000): string {
   const clean = value.slice(0, 100000)
-    .replace(/\b(?:authorization|x-firebase-appcheck|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|app[_ -]?check[_ -]?token|FIREBASE_APPCHECK_DEBUG_TOKEN)["']?\s*[:=]\s*["']?(?:Bearer\s+)?[^\s,;"'}]+/gi, '[credential removed]')
+    .replace(/\b(?:authorization|x-firebase-appcheck|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|app[_ -]?check[_ -]?token|FIREBASE_APPCHECK_DEBUG_TOKEN|VITE_AI_APP_CHECK_DEBUG_TOKEN|client[_-]?secret|password|debug[_-]?token|token)["']?\s*[:=]\s*["']?(?:Bearer\s+)?[^\s,;"'}]+/gi, '[credential removed]')
     .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, 'Bearer [removed]')
     .replace(/\bAIza[A-Za-z0-9_-]{15,}\b/g, '[API key removed]')
     .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[token removed]')
