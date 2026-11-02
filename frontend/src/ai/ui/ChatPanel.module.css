@@ -27,10 +27,17 @@
 .secondary { border-radius: 4px; }
 .preview { margin-top: 12px; }
 .error { color: var(--orange, #a95e38); font-size: 13px; line-height: 1.7; margin-top: 12px; }
-@media (max-width: 700px) { .user { max-width: 94%; } .composer textarea { font-size: 16px; } }
+@media (max-width: 700px) {
+  .user { max-width: 94%; }
+  /* Keep the computed font at 16px for iOS focus, with a visible 14px size. */
+  .inputFrame { height: 82px; min-width: 0; overflow: hidden; border-radius: 4px; }
+  .inputFrame:has(textarea:focus-visible) { outline: 3px solid var(--orange); outline-offset: 4px; }
+  .composer textarea { font-size: 16px; width: calc(100% / .875); height: calc(100% / .875); min-height: 0; max-height: none; padding: calc(6px / .875) calc(10px / .875); transform: scale(.875); transform-origin: top left; resize: none; }
+}
 @media (forced-colors: active) { .user, .result { border: 1px solid CanvasText; } .primary { background: ButtonFace; color: ButtonText; border-color: ButtonText; } }
 
 @media (max-height: 480px) { .scroll { max-height: 35dvh; min-height: 80px; flex: auto; } .composer textarea { min-height: 48px; } }
+@media (max-width: 700px) and (max-height: 480px) { .inputFrame { height: 48px; } }
 
 .spinner { flex: none; width: 14px; height: 14px; border: 2px solid var(--line, #dfd0bf); border-top-color: var(--brown, #795d48); border-radius: 50%; animation: thinking-spin 0.8s linear infinite; }
 @keyframes thinking-spin { to { transform: rotate(360deg); } }

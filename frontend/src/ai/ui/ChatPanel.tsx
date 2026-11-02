@@ -79,12 +79,14 @@ export function ChatPanel({ entries, disabled, status, thinking = false, enterTo
         {onReset && <button type="button" className={styles.textButton} onClick={onReset} disabled={sending}>重新開始</button>}
       </div>}
       <label className={styles.srOnly} htmlFor={id}>訊息</label>
+      <div className={styles.inputFrame}>
       <textarea id={id} ref={input} value={text} onChange={event => setText(event.target.value)}
         rows={3} maxLength={20000} disabled={locked} placeholder="問問 AI助手"
         onKeyDown={event => {
           if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
           if (enterToSend || event.ctrlKey || event.metaKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
         }} />
+      </div>
       {files.length > 0 && <ul className={styles.selectedFiles} aria-label="待上傳附件">
         {files.map((file, index) => <li key={index}><span>{file.name}</span><button type="button" disabled={locked} aria-label={`移除附件 ${file.name}`} onClick={() => setFiles(files.filter((_, i) => i !== index))}>移除</button></li>)}
       </ul>}
