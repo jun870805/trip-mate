@@ -123,3 +123,19 @@ it('email time uses Taiwan calendar date and 24-hour time at UTC day boundaries'
   assert.equal(formatEmailTime(new Date('2026-11-02T16:00:01Z')),'2026/11/03 00:00:01');
   assert.equal(formatEmailTime(new Date('2026-11-02T01:02:03Z')),'2026/11/02 09:02:03');
 });
+
+it('email decisions finish without a model follow-up that asks to send again',async()=>{
+  for (const approved of [true,false]) {
+    const f=fixture();f.replies.push(call(),call());
+    await f.agent.send('請幫我寄送午餐調整需求');
+    const id=f.agent.getState().pending!.id;
+    if(approved) await f.agent.approve(id); else await f.agent.reject(id);
+    assert.equal(f.modelRequests.length,1);
+    assert.equal(f.agent.getState().status,'idle');
+    assert.equal(f.agent.getState().pending,undefined);
+    assert.equal(f.requests.length,approved?1:0);
+    // A later, explicit request may still prepare a new email.
+    await f.agent.send('另外有新的需求，請準備另一封郵件');
+    assert.ok(f.agent.getState().pending);
+  }
+});

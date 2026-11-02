@@ -102,3 +102,19 @@ VITE_AI_APP_CHECK_SITE_KEY=<reCAPTCHA Enterprise site key>
 ### 模型 API 404
 
 模型 API 回傳 HTTP 404 時，顯示正紅色「此模型目前無法使用，請更換語言模型或聯絡導遊。」。可能是模型名稱／版本錯誤、專案無法存取，或服務設定缺漏，不能只憑 404 判定模型永久不支援。使用者可手動換模型，不會自動切換／重送；400、403 等錯誤保留通用處理。EmailJS 的 HTTP 錯誤仍屬寄送結果，不提示換模型。
+
+
+## 9. 正式站 401：Firebase App Check token is invalid
+
+此錯誤來自 AI 的 App Check 驗證，不是 Google 導遊登入，也不是模型配額；切換模型或重新登入導遊不會修正 App Check 設定。
+
+排查時先確認：
+
+1. Google Cloud 的 **Fraud Defense**（包含 reCAPTCHA Enterprise）中，key 為 Web／Score-based，沒有勾選 checkbox challenge；允許網域使用正式站 hostname，例如 `jun870805.github.io`，不含 `https://` 或 `/trip-mate/` 路徑。
+2. Firebase App Check → Apps，對 `VITE_AI_FIREBASE_CONFIG.appId` 對應的同一個 Web App 註冊 reCAPTCHA Enterprise，site key 與 GitHub Pages 的 `VITE_AI_APP_CHECK_SITE_KEY` 相同；Firebase config、key 與 App Check 註冊必須屬於正確專案。
+3. Firebase App Check → APIs → Firebase AI Logic，區分 Baseline protection 與 Replay protection。當前程式使用一般 session token；若 Replay protection 為 Enforced，必須先修改程式使用 limited-use tokens 才相容。不要把關閉整個 App Check 當成正式解法。
+4. 用無痕視窗重測，排除舊 token／舊部署快取。DevTools → Network 篩選 `firebaseappcheck.googleapis.com`，查看 `exchangeRecaptchaEnterpriseToken` 的狀態：若換票本身失敗，先依該請求的錯誤檢查 key、domain、App 註冊與 API Key restrictions；若換票成功但 AI 請求仍 401，再檢查 Replay protection、token 所屬 App／project 及當前部署版本。
+
+分享診斷資訊時只需提供請求名稱、HTTP status 與錯誤 message；不要貼 App Check token、reCAPTCHA token、OAuth token 或整份含驗證 header 的 HAR。現有程式只在 DEV 明確設定時使用 debug token，正式站不應使用 debug token。
+
+參考：[Web App Check／Fraud Defense 設定](https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider)、[Replay protection 與 limited-use tokens](https://firebase.google.com/docs/ai-logic/app-check)。

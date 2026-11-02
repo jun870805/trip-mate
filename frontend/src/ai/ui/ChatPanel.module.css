@@ -27,7 +27,7 @@
 .secondary { border-radius: 4px; }
 .preview { margin-top: 12px; }
 .error { color: var(--orange, #a95e38); font-size: 13px; line-height: 1.7; margin-top: 12px; }
-@media (max-width: 700px) { .user { max-width: 94%; } }
+@media (max-width: 700px) { .user { max-width: 94%; } .composer textarea { font-size: 16px; } }
 @media (forced-colors: active) { .user, .result { border: 1px solid CanvasText; } .primary { background: ButtonFace; color: ButtonText; border-color: ButtonText; } }
 
 @media (max-height: 480px) { .scroll { max-height: 35dvh; min-height: 80px; flex: auto; } .composer textarea { min-height: 48px; } }

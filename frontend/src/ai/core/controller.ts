@@ -112,6 +112,7 @@ export function createAgent(options: AgentOptions) {
       if (!active(token)) return;
       record(selected.tool.name, result);
       if (result.status !== 'success' && result.status !== 'cancelled') { fail(result.message); return; }
+      if (selected.tool.finishAfterDecision) { state.status = 'idle'; emit(); return; }
       state.status = 'running'; emit();
       await loop(token);
     } catch { if (active(token)) fail('操作未確認成功，請重新讀取資料與權限後再試；不要直接重送。'); }

@@ -107,7 +107,7 @@ agent.dispose();
 - 預設文字輸入 20,000 字元、對話 80 則內部訊息；送出模型前訊息序列化資料最多 16 MiB。Function Call／Response 也算內部訊息。達上限請建立新 agent，不默默刪掉需要配對的工具歷史。
 - `getContext` 每次處理與確認時重新取得；scope／scopeId 不同即拒絕。切換資源必須 dispose 舊 agent，再建立新 agent。
 - 工具名稱白名單、嚴格 Zod schema、當前權限都由應用檢查；模型無法透過參數傳入另一個 scope，未知欄位必須由工具採 `z.strictObject` 拒絕。
-- `reject` 將 `cancelled` 結果送回模型，不執行 commit。重複確認或舊 approval ID 拒絕。提交參數保留在私有 closure 中，不從模型或 UI 重新取值。
+- `reject` 記錄 `cancelled` 結果，不執行 commit；預設繼續交給模型回覆。工具可設 `finishAfterDecision: true`，在成功／取消後直接結束該輪，由 Host 顯示工具結果，避免模型重複提出已處理的操作；失敗仍進入錯誤狀態。重複確認或舊 approval ID 拒絕。提交參數保留在私有 closure 中，不從模型或 UI 重新取值。
 - `cancel()` 中止目前推論／準備、清除對話與待確認操作；寫入中禁止 cancel。`dispose()` 可在卸載時呼叫，但已送出的寫入仍可能完成，不能視為回滾。Host 的結果處理仍會執行。
 - 訂閱函式拋錯不影響執行。結果以 `results` 的實際工具狀態為準，不能僅根據模型說「完成」顯示已儲存。
 - 沒有自動重送、持久化對話、表單草稿、beforeunload 或背景排程。未來 UI 的「縮小」應僅隱藏視窗並保留 agent；不要自動呼叫 approve。
@@ -209,7 +209,7 @@ import { chatEntries } from './ai/ui/presentation';
   disabled={state.status !== 'idle'}
   status={statusLabel}
   thinking={state.status === 'running'} // 顯示狀態旁的 loading
-  enterToSend // 所有尺寸皆 Enter 送出、Shift＋Enter 換行
+  enterToSend={desktop} // 701px 起 Enter 送出；700px 以下 Enter 換行
   error={state.error}
   preview={renderApplicationPreview(state.pending)}
   previewId={state.pending?.id}
@@ -220,7 +220,7 @@ import { chatEntries } from './ai/ui/presentation';
 />
 ```
 
-上例的 state、statusLabel、結果格式化與 preview renderer 由 Host 提供。本專案處理中狀態為「思考中...」並搭配旋轉指示，遵循減少動態效果。輸入框與一般訊息角色名稱只保留無障礙標示，placeholder 為「問問 AI助手」。`enterToSend` 預設 true，桌面／手機皆 Enter 送出、Shift＋Enter 換行；組字中的 Enter 不送出，Ctrl／Command＋Enter 仍可送出。其他專案可明確設 false 保留一般 Enter 換行。模板提示詞點擊直接呼叫 onSend，與表單共用鎖定及防重送流程，不夾帶未送出的附件。`renderMessage` 可注入專案自己的安全 Markdown renderer；預設為純文字。不要顯示 Provider `opaque`、Function Call／Response 原文或文件抽取 JSON。旅程 Host 額外移除非超級使用者可見文字中的業務 ID，依真實工具結果顯示儲存狀態，且模型 Markdown 不自動載入遠端圖片。
+上例的 state、statusLabel、結果格式化與 preview renderer 由 Host 提供。本專案處理中狀態為「思考中...」並搭配旋轉指示，遵循減少動態效果。輸入框與一般訊息角色名稱只保留無障礙標示，placeholder 為「問問 AI助手」。`enterToSend` 預設 true；本專案 Host 傳入桌面判斷（701px 起），桌面 Enter 送出、Shift＋Enter 換行，手機（700px 以下）Enter 換行並使用送出按鈕送出；組字中的 Enter 不送出，Ctrl／Command＋Enter 仍可送出。其他專案可明確設 false 保留一般 Enter 換行。模板提示詞點擊直接呼叫 onSend，與表單共用鎖定及防重送流程，不夾帶未送出的附件。`renderMessage` 可注入專案自己的安全 Markdown renderer；預設為純文字。不要顯示 Provider `opaque`、Function Call／Response 原文或文件抽取 JSON。旅程 Host 額外移除非超級使用者可見文字中的業務 ID，依真實工具結果顯示儲存狀態，且模型 Markdown 不自動載入遠端圖片。
 
 本專案 `features/trip-ai/TripAIEntry.tsx` 負責 portal、桌面側欄／手機 modal 語意、背景捲動鎖、Lazy Provider 與動態 session/data ref。單一 ChatPanel 跨尺寸保留輸入；縮小／Escape 保留當次 agent，清空對話才刪除上下文、輸入與附件。儲存中禁止縮小／清空。桌面側欄不鎖背景；左側行程內文可直接展開，手機仍使用原本詳情 dialog。
 
@@ -264,7 +264,7 @@ AI 回覆下方左側的小型無邊框複製圖示由可移植的 `ai/ui/CopyMe
 
 ## 訪客調整需求轉寄
 
-本專案另有旅程端 `features/trip-ai/guest-email.ts` 與 `emailjs.ts`，不屬於可移植核心。寄信工具使用獨立 `contact_guide` 權限及既有 prepare／approve／reject 流程；不授予訪客行程寫入權，也不擴充核心的郵件相依。確認後重驗訪客身份／旅程讀取，以 EmailJS 固定模板提交，不傳模型指定收件人。郵件預覽使用 `EmailPreview.tsx`，實際接受結果與 Sheets 儲存結果分開。
+本專案另有旅程端 `features/trip-ai/guest-email.ts` 與 `emailjs.ts`，不屬於可移植核心。寄信工具使用獨立 `contact_guide` 權限及既有 prepare／approve／reject 流程；不授予訪客行程寫入權，也不擴充核心的郵件相依。確認後重驗訪客身份／旅程讀取，以 EmailJS 固定模板提交，不傳模型指定收件人。郵件預覽使用 `EmailPreview.tsx`，實際接受結果與 Sheets 儲存結果分開。聊天已同意且需求足夠時直接準備預覽，不重複口頭詢問；工具設定 `finishAfterDecision: true`，成功／取消後直接顯示應用結果，不再讓模型追問寄送。
 
 啟用需要公開 EmailJS 設定及固定的第一位導遊 To 範本，見 [訪客郵件設定](../../../docs/setup-email.md)。不設定也可使用原有 AI 查詢／導遊編輯。測試使用替身，沒有真實投遞驗證。
 

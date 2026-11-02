@@ -25,7 +25,7 @@ export function createGuestEmailTool(options: TripHostOptions): Tool {
     check(context,signal);
     if (data.trip.id!==trip.id || data.trip.spreadsheetId!==trip.spreadsheetId || data.sectionErrors?.itinerary) throw new Error('旅程資料尚未就緒。');
   }
-  return {name:EMAIL_TOOL,description:'未登入訪客想調整行程時，整理需求並詢問是否寄送給第一位導遊。只準備郵件預覽，使用者按確認寄送才會送出；不會修改行程。姓名及回覆信箱僅可使用本人明確提供的資訊，可省略，不得臆造。',
+  return {name:EMAIL_TOOL,finishAfterDecision:true,description:'未登入訪客想調整行程時，整理需求並準備寄給第一位導遊的郵件預覽。使用者已同意或明確要求寄送且需求足夠時，立即呼叫本工具，不要再次口頭詢問是否寄送。只準備預覽，使用者按確認寄送才會送出；不會修改行程。姓名及回覆信箱僅可使用本人明確提供的資訊，可省略，不得臆造或強制追問。',
     risk:'write',schema,enabled:context=>context.permissions.includes('contact_guide') && guestEmailAvailable(options),
     async prepare(input,context,signal) {
       const draft=schema.parse(input);

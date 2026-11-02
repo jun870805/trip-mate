@@ -21,7 +21,7 @@ import styles from './TripAIEntry.module.css';
 
 type TripAgent = ReturnType<typeof createTripAgent>;
 const idle = (): AgentState => ({ status: 'idle', messages: [], results: [] });
-const suggestions = ['總結這趟行程', '看看哪一天安排太趕', '找出缺少地圖的景點'];
+const suggestions = ['總結這趟行程', '看看哪一天安排太趕', '我搭乘幾點的飛機'];
 export interface TripAIEntryProps {
   trip: Trip; source: 'trip' | 'demo'; data: TripData | null; available: boolean; loading: boolean;
   config: GuideConfig; session: GuideSession | null;
@@ -245,7 +245,7 @@ export function TripAIEntry(props: TripAIEntryProps) {
           errorTone={state.errorCode === 'model_unavailable' ? 'danger' : 'default'} quotaExceeded={state.errorCode === 'rate_limit'} modelSelector={modelChoices.models.length > 0 && <select className={styles.modelSelect} aria-label="語言模型" title={selectedModel} value={selectedModel} disabled={modelLocked} onChange={event => changeModel(event.target.value)}>
             {modelChoices.models.map(model => <option key={model} value={model}>{model}{model === modelChoices.defaultModel ? ' (推薦)' : ''}</option>)}
           </select>}
-          status={status} thinking={status === '思考中...'} enterToSend error={error || state.error} notice={notice} suggestions={suggestions}
+          status={status} thinking={status === '思考中...'} enterToSend={desktop} error={error || state.error} notice={notice} suggestions={suggestions}
           onSend={send}
           renderMessage={(text, role) => role === 'model' ? <MarkdownContent text={text} allowImages={false} /> : text}
           previewId={state.pending?.id} preview={state.pending && (state.pending.toolName === 'itinerary_request_email' ? <EmailPreview preview={state.pending} disabled={writing || props.loading} onApprove={() => void decide(true)} onReject={() => void decide(false)} /> : <ChangePreview preview={state.pending} showIds={showIds} disabled={writing || props.loading}

@@ -42,6 +42,8 @@ export interface Tool {
   name: string;
   description: string;
   risk: 'read' | 'write' | 'destructive';
+  /** Host renders decision results; finish the turn without a model follow-up. */
+  finishAfterDecision?: boolean;
   schema: z.ZodType;
   enabled(context: AgentContext): boolean;
   execute?(input: unknown, context: AgentContext, signal: AbortSignal): Promise<ToolResult>;

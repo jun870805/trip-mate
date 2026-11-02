@@ -53,4 +53,7 @@
 .mailDetails dt { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
 .mailDetails dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-.modelSelect { flex: 1; min-width: 0; max-width: 180px; width: 100%; padding: 6px 40px 6px 8px; border: 1px solid var(--line); border-radius: 4px; background-color: var(--paper); color: var(--brown); font-family: inherit; font-size: 12px; text-overflow: ellipsis; }
+.modelSelect { flex: 1; min-width: 0; max-width: 180px; width: 100%; padding: 6px 40px 6px 8px; border: 1px solid transparent; border-radius: 4px; background-color: var(--paper); color: var(--brown); font-family: inherit; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.modelSelect:focus { outline: none; box-shadow: none; }
+.modelSelect:focus-visible { background-color: color-mix(in srgb, var(--brown) 12%, var(--paper)); }
+.modelSelect:not([multiple]):not([size]) { background-position: right 20px center; }
