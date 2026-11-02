@@ -1,6 +1,7 @@
 import type { AgentContext, AgentOptions, AgentState, PreparedChange, Tool, ToolResult } from '../contracts.ts';
 import { readConversation } from './conversation.ts';
 import type { Conversation } from './conversation.ts';
+import { ProviderRateLimitError, ProviderModelUnavailableError } from './errors.ts';
 import { createRegistry } from './registry.ts';
 import { BASE_RULES } from '../prompts/base-rules.ts';
 
@@ -29,9 +30,9 @@ export function createAgent(options: AgentOptions) {
     return structuredClone(current);
   }
   function active(token: number) { return token === epoch && !aborter.signal.aborted && state.status !== 'disposed'; }
-  function fail(message = 'AI 請求失敗，請重新確認後再試。') {
+  function fail(message = 'AI 請求失敗，請重新確認後再試。', errorCode?: AgentState['errorCode']) {
     pending = undefined;
-    state = { ...state, status: 'error', pending: undefined, error: message };
+    state = { ...state, status: 'error', pending: undefined, error: message, errorCode };
     emit();
   }
   function record(name: string, result: ToolResult) {
@@ -89,7 +90,11 @@ export function createAgent(options: AgentOptions) {
         emit();
       }
     } catch (error) {
-      if (active(token)) fail(error instanceof Error && /上限|範圍|一次只能|格式/.test(error.message) ? error.message : undefined);
+      if (active(token)) {
+        if (error instanceof ProviderModelUnavailableError) fail(error.message,'model_unavailable');
+        else if (error instanceof ProviderRateLimitError) fail(error.message,'rate_limit');
+        else fail(error instanceof Error && /上限|範圍|一次只能|格式/.test(error.message) ? error.message : undefined);
+      }
     }
   }
   async function decide(id: string, approved: boolean) {
@@ -145,7 +150,7 @@ export function createAgent(options: AgentOptions) {
           part.attachment.data.length > 5600000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(part.attachment.data)) throw new Error('附件內容無效或過大。');
       }
       context();
-      state = { ...state, status: 'running', pending: undefined, error: undefined };
+      state = { ...state, status: 'running', pending: undefined, error: undefined, errorCode: undefined };
       hasFiles ||= attachments.length > 0;
       state.messages.push({ role: 'user', parts: [{ text }, ...structuredClone(attachments)] });
       turns = 0; calls = 0; emit();

@@ -64,8 +64,8 @@ it('rejected provider response stops and never retries',async()=>{
 });
 it('email configuration is opt-in and incomplete settings disable email only',()=>{
   assert.equal(readEmailConfig({}),null);
-  assert.equal(readEmailConfig({VITE_AI_EMAILJS_ENABLED:'true'}),null);
-  assert.deepEqual(readEmailConfig({VITE_AI_EMAILJS_ENABLED:'true',VITE_AI_EMAILJS_SERVICE_ID:' service_test ',VITE_AI_EMAILJS_TEMPLATE_ID:'template_test',VITE_AI_EMAILJS_PUBLIC_KEY:'public_test'}),mail);
+  assert.equal(readEmailConfig({VITE_EMAILJS_ENABLED:'true'}),null);
+  assert.deepEqual(readEmailConfig({VITE_EMAILJS_ENABLED:'true',VITE_EMAILJS_SERVICE_ID:' service_test ',VITE_EMAILJS_TEMPLATE_ID:'template_test',VITE_EMAILJS_PUBLIC_KEY:'public_test'}),mail);
 });
 it('sender validates status, response, size, cancellation and throttles without automatic retries',async()=>{
   let sends=0,now=0;

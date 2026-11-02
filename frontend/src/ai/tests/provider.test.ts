@@ -42,3 +42,27 @@ it('fails incomplete runtime configuration before any SDK initialization',async(
   const {initializeFirebaseProvider}=await import('../providers/firebase-runtime.ts');
   await assert.rejects(initializeFirebaseProvider({firebase:{},model:'',appCheckSiteKey:''}),/設定不完整/);
 });
+
+it('normalizes Firebase HTTP 429 without exposing raw provider error details',async()=>{
+  const {ProviderRateLimitError}=await import('../core/errors.ts');
+  for(const error of [{customErrorData:{status:429},message:'private key details'},{status:429}]){
+    const provider=createFirebaseProvider({async generateContent(){throw error;}});
+    await assert.rejects(provider.generate(request),ProviderRateLimitError);
+  }
+  const privateError=new Error('private SDK failure');
+  const provider=createFirebaseProvider({async generateContent(){throw privateError;}});
+  await assert.rejects(provider.generate(request),error=>error===privateError);
+});
+
+it('normalizes Firebase 404 as model unavailable while leaving unrelated errors unchanged',async()=>{
+  const {ProviderModelUnavailableError}=await import('../core/errors.ts');
+  for(const error of [{customErrorData:{status:404},message:'private model URL'},{status:404}]){
+    const provider=createFirebaseProvider({async generateContent(){throw error;}});
+    await assert.rejects(provider.generate(request),ProviderModelUnavailableError);
+  }
+  for(const status of [400,403,500]){
+    const error={customErrorData:{status},message:'private details'};
+    const provider=createFirebaseProvider({async generateContent(){throw error;}});
+    await assert.rejects(provider.generate(request),value=>value===error);
+  }
+});

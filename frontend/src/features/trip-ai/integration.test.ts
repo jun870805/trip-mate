@@ -146,8 +146,8 @@ it('configuration remains opt-in and rejects secrets or incomplete public config
   const options={trip,source:'trip' as const,config,getSession:()=>null,readData:async()=>parseTrip(trip,f.book)};
   assert.equal(await createConfiguredTripAgent(options,{}),null);
   assert.throws(()=>readFirebaseConfig({VITE_AI_ENABLED:'true'}));
-  assert.throws(()=>readFirebaseConfig({VITE_AI_ENABLED:'true',VITE_AI_FIREBASE_CONFIG:JSON.stringify({apiKey:'public',projectId:'p',appId:'app',secret:'no'}),VITE_AI_MODEL:'configured',VITE_AI_APP_CHECK_SITE_KEY:'public-site'}));
-  assert.equal(readFirebaseConfig({VITE_AI_ENABLED:'true',VITE_AI_FIREBASE_CONFIG:JSON.stringify({apiKey:'public',projectId:'p',appId:'app'}),VITE_AI_MODEL:'configured',VITE_AI_APP_CHECK_SITE_KEY:'public-site'})!.model,'configured');
+  assert.throws(()=>readFirebaseConfig({VITE_AI_ENABLED:'true',VITE_AI_FIREBASE_CONFIG:JSON.stringify({apiKey:'public',projectId:'p',appId:'app',secret:'no'}),VITE_AI_DEFAULT_MODEL:'configured',VITE_AI_APP_CHECK_SITE_KEY:'public-site'}));
+  assert.equal(readFirebaseConfig({VITE_AI_ENABLED:'true',VITE_AI_FIREBASE_CONFIG:JSON.stringify({apiKey:'public',projectId:'p',appId:'app'}),VITE_AI_DEFAULT_MODEL:'configured',VITE_AI_APP_CHECK_SITE_KEY:'public-site'})!.model,'configured');
 });
 
 it('disposal during revalidation prevents an undispatched write',async()=>{

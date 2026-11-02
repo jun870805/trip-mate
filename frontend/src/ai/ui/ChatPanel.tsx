@@ -11,6 +11,9 @@ export interface ChatPanelProps {
   thinking?: boolean;
   enterToSend?: boolean;
   error?: string;
+  quotaExceeded?: boolean;
+  errorTone?: 'default' | 'danger';
+  modelSelector?: ReactNode;
   notice?: string;
   suggestions?: readonly string[];
   preview?: ReactNode;
@@ -20,7 +23,7 @@ export interface ChatPanelProps {
   onReset?(): void;
 }
 /** Portable controlled view: application owns the agent, permissions, modal and preview. */
-export function ChatPanel({ entries, disabled, status, thinking = false, enterToSend = true, error, notice, suggestions = [], preview, previewId,
+export function ChatPanel({ entries, disabled, status, thinking = false, enterToSend = true, error, quotaExceeded = false, errorTone = 'default', modelSelector, notice, suggestions = [], preview, previewId,
   renderMessage = text => text, onSend, onReset }: ChatPanelProps) {
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -68,7 +71,7 @@ export function ChatPanel({ entries, disabled, status, thinking = false, enterTo
         </div>)}
       </div>
       {preview && <div ref={previewElement} className={styles.preview}>{preview}</div>}
-      {(error || inputError) && <p className={styles.error} role="alert">{inputError || error}</p>}
+      {(error || inputError) && <p className={`${styles.error} ${quotaExceeded || errorTone === 'danger' ? styles.quotaError : ''}`} role="alert">{inputError || error}</p>}
     </div>
     <form className={styles.composer} onSubmit={submit}>
       {(status || onReset) && <div className={styles.statusRow}>
@@ -96,7 +99,10 @@ export function ChatPanel({ entries, disabled, status, thinking = false, enterTo
             }} />
           <button type="button" className={styles.secondary} disabled={locked} onClick={() => fileInput.current?.click()}>上傳檔案</button>
         </div>
-        <button type="submit" className={styles.primary} disabled={locked || (!text.trim() && !files.length)}>送出</button>
+        <div className={styles.sendControls}>
+          {modelSelector && <fieldset className={styles.modelControl} disabled={sending}>{modelSelector}</fieldset>}
+          <button type="submit" className={styles.primary} disabled={locked || (!text.trim() && !files.length)}>送出</button>
+        </div>
       </div>
     </form>
   </div>;

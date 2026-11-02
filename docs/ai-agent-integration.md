@@ -68,3 +68,12 @@ AI 回覆下方左側的小型無邊框複製圖示由可移植的 `ai/ui/CopyMe
 `guest-email.ts` 重驗身份、範圍與目前公開資料；`emailjs.ts` 使用固定 API、公鑰與模板，無私鑰或自動重試。服務接受結果獨立呈現，不能當作行程儲存或導遊收件證明。EmailJS 範本的 To 必須固定為 `VITE_GUIDE_EMAILS` 第一筆；前端不傳動態 To，純前端也無法獨立核對遠端模板設定。
 
 設定步驟與已知限制見 [EmailJS 設定](setup-email.md)。本輪 Node 測試與瀏覽器 Provider／EmailJS／Sheets 替身驗證通過；未寄真實郵件、未設定 EmailJS 帳號或部署。
+
+
+## 模型選擇與限額提示
+
+`VITE_AI_DEFAULT_MODEL` 作為預設／推薦，`VITE_AI_MODELS` 設定額外可選模型；送出左側的下拉選單顯示推薦標示。切換保留 composer 草稿，重建 agent 並分模型恢復已完成紀錄；處理／待確認／提交期間禁止切換，沒有自動 fallback。各身份、旅程與模型隔離。
+
+Firebase adapter 正規化模型 HTTP 429，Controller 使用安全錯誤代碼，UI 以正紅色顯示「超過用量，請更換語言模型，或稍後再試。」。不顯示原始 SDK 資料，也不將 EmailJS 的 429 當模型限額。設定格式與限制見 [Firebase 設定](setup-ai.md#8-使用者切換模型與-429)。
+
+模型 API 404 另以 `model_unavailable` 安全代碼呈現紅字「此模型目前無法使用，請更換語言模型或聯絡導遊。」；不自動換模型、不重送，EmailJS 404 仍顯示郵件未確認成功。

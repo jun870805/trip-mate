@@ -63,6 +63,7 @@ export interface AgentState {
   results: ToolResult[];
   pending?: PendingPreview;
   error?: string;
+  errorCode?: 'rate_limit' | 'model_unavailable';
 }
 export interface AgentOptions {
   provider: Provider;

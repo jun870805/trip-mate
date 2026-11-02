@@ -37,10 +37,10 @@
 在 `frontend/.env.local` 加入以下公開設定（不提交本機檔）：
 
 ```dotenv
-VITE_AI_EMAILJS_ENABLED=true
-VITE_AI_EMAILJS_SERVICE_ID=service_xxxxx
-VITE_AI_EMAILJS_TEMPLATE_ID=template_xxxxx
-VITE_AI_EMAILJS_PUBLIC_KEY=你的EmailJS_Public_Key
+VITE_EMAILJS_ENABLED=true
+VITE_EMAILJS_SERVICE_ID=service_xxxxx
+VITE_EMAILJS_TEMPLATE_ID=template_xxxxx
+VITE_EMAILJS_PUBLIC_KEY=你的EmailJS_Public_Key
 ```
 
 沿用既有 `VITE_GUIDE_EMAILS='["第一位導遊@example.com","其他導遊@example.com"]'`，不新增第二份收件人名單。第一位導遊變更時，必須同步更改 EmailJS 範本的固定 To。

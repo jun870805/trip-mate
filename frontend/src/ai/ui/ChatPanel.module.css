@@ -42,3 +42,10 @@
 .copyButton:hover { color: var(--brown, #795d48); background: color-mix(in srgb, var(--brown, #795d48) 8%, transparent); }
 .copyError { font-size: 12px; color: var(--orange, #a95e38); line-height: 1.6; }
 @media (pointer: coarse) { .copyButton { width: 36px; height: 36px; } }
+
+.sendControls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 1; min-width: 0; }
+.sendControls .primary { flex: none; }
+.quotaError { color: #ff0000; }
+@media (forced-colors: active) { .quotaError { color: CanvasText; } }
+
+.modelControl { display: flex; flex: 1; min-width: 0; max-width: 180px; margin: 0; padding: 0; border: 0; }

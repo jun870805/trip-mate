@@ -17,6 +17,7 @@
 | `contracts.ts` | Context、訊息、檔案、工具、Provider、預覽及狀態契約 |
 | `core/registry.ts` | 工具白名單、重名檢查、依權限輸出模型可見宣告、Zod JSON Schema |
 | `prompts/base-rules.ts` | `BASE_RULES`：回答主題、委婉婉拒、資料可信邊界、確認及憑證規則 |
+| `core/errors.ts` | 可移植 ProviderRateLimitError／ProviderModelUnavailableError，對應安全的 rate_limit／model_unavailable 狀態 |
 | `core/controller.ts` | 有上限的模型／工具循環、單一待確認操作、取消及生命週期 |
 | `providers/firebase.ts` | Firebase SDK 請求／回應與 Schema 映射，保留原始模型內容及簽章等附帶資訊 |
 | `providers/firebase-runtime.ts` | 明確、延遲建立 Firebase App／App Check／模型；不在 import 時連線 |
@@ -266,3 +267,15 @@ AI 回覆下方左側的小型無邊框複製圖示由可移植的 `ai/ui/CopyMe
 本專案另有旅程端 `features/trip-ai/guest-email.ts` 與 `emailjs.ts`，不屬於可移植核心。寄信工具使用獨立 `contact_guide` 權限及既有 prepare／approve／reject 流程；不授予訪客行程寫入權，也不擴充核心的郵件相依。確認後重驗訪客身份／旅程讀取，以 EmailJS 固定模板提交，不傳模型指定收件人。郵件預覽使用 `EmailPreview.tsx`，實際接受結果與 Sheets 儲存結果分開。
 
 啟用需要公開 EmailJS 設定及固定的第一位導遊 To 範本，見 [訪客郵件設定](../../../docs/setup-email.md)。不設定也可使用原有 AI 查詢／導遊編輯。測試使用替身，沒有真實投遞驗證。
+
+
+## 多模型與配額錯誤
+
+模型選擇屬於 Host：本專案由 `features/trip-ai/model-options.ts` 解析 `VITE_AI_DEFAULT_MODEL`（預設／推薦）與 `VITE_AI_MODELS`（額外允許的模型 JSON 陣列）。Provider config 注入選中的 model ID，不把 Vite env 帶入核心。Host 的 createConfiguredTripAgent 第三個參數可指定清單內模型，清單外名稱被拒絕。
+
+`ChatPanel` 的 `modelSelector` 是可選 React 插槽，放在送出按鈕左側，送出期間也會停用此區控制項。模型、範圍與授權的切換規則仍由 Host 負責；模型歷史按各自 key 隔離，切換不混用 opaque。
+
+Provider adapter 可拋出 `ProviderRateLimitError` 表示 HTTP 429，Controller 保留安全提示及 `AgentState.errorCode = 'rate_limit'`。Firebase adapter 使用 SDK 的 `customErrorData.status`（或 HTTP status）辨識，不直接輸出 SDK 原始錯誤。UI 以 `quotaExceeded` 顯示正紅色提示，不自動重試／切模型。工具提交後的真實結果仍保留，不把後續模型錯誤當作回滾或再次執行的理由。
+
+
+模型 API 404 由 `ProviderModelUnavailableError` 表達，Controller 設定 `errorCode = 'model_unavailable'`，以安全提示引導換模型或聯絡導遊；不假設所有 404 都是永久不支援，也不將 400／403 一律分類為模型不存在。`ChatPanel.errorTone='danger'` 可呈現紅字；原有 `quotaExceeded` 仍保留相容。EmailJS 使用獨立 Host／結果流程，不受模型錯誤分類影響。

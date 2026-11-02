@@ -1,10 +1,11 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { AgentState } from '../../ai/contracts';
 import { trapDialogFocus } from '../../ai/ui/dialog-focus';
 import { ChatPanel } from '../../ai/ui/ChatPanel';
 import { chatEntries } from '../../ai/ui/presentation';
 import { createPortal } from 'react-dom';
 import { CloseButton } from '../../components/CloseButton';
+import { readModelOptions } from './model-options';
 import { conversationKey, conversationStorage } from './conversation-storage';
 import { useChatSurface } from './useChatSurface';
 import { Icon } from '../../components/Icon';
@@ -40,10 +41,18 @@ export function TripAIEntry(props: TripAIEntryProps) {
   const [notice, setNotice] = useState(''), [error, setError] = useState('');
   const title = useId();
   const desktop = useChatSurface(open, dialog, props.onExpanded);
+  const modelChoices=useMemo(() => {
+    try { return readModelOptions({VITE_AI_DEFAULT_MODEL:import.meta.env.VITE_AI_DEFAULT_MODEL,VITE_AI_MODELS:import.meta.env.VITE_AI_MODELS}); }
+    catch { return {defaultModel:import.meta.env.VITE_AI_DEFAULT_MODEL?.trim() || '',models:[] as string[]}; }
+  }, []);
+  const [selectedModel,setSelectedModel]=useState(modelChoices.defaultModel);
+  const previousModel=useRef(selectedModel);
   const [memory, setMemory] = useState('本分頁暫存');
   const storage = useRef(conversationStorage(() => window.sessionStorage)).current;
-  const storageKey = conversationKey([import.meta.env.BASE_URL, props.source, props.trip.id, props.trip.spreadsheetId,
-    props.session?.email.toLowerCase() || 'visitor', import.meta.env.VITE_AI_FIREBASE_CONFIG || '', import.meta.env.VITE_AI_MODEL || '']);
+  const storageScope=[import.meta.env.BASE_URL,props.source,props.trip.id,props.trip.spreadsheetId,
+    props.session?.email.toLowerCase() || 'visitor',import.meta.env.VITE_AI_FIREBASE_CONFIG || ''];
+  const storageKey=conversationKey([...storageScope,selectedModel]);
+  const previousScope=useRef(storageScope);
   const previousIdentity = useRef(props.session?.email);
   const previousKey = useRef(storageKey);
   function removeSaved(key = storageKey) {
@@ -57,12 +66,12 @@ export function TripAIEntry(props: TripAIEntryProps) {
       latest.current.onBusy(value);
     }
   }
-  function clear() {
+  function clear(resetPanel = true) {
     generation.current++; fileRead.current?.abort(); fileRead.current = null;
     unsubscribe.current?.(); unsubscribe.current = undefined;
     current.current?.agent.dispose(); current.current = null; ownRefresh.current = false;
     setState(idle()); setReady(false); setConnecting(false); setParsing(false); setError('');
-    setPanelKey(key => key + 1); updateBusy(false);
+    if (resetPanel) setPanelKey(key => key + 1); updateBusy(false);
   }
   async function connect(restore = true) {
     const token = ++generation.current;
@@ -86,13 +95,14 @@ export function TripAIEntry(props: TripAIEntryProps) {
       }, {
         VITE_AI_ENABLED: import.meta.env.VITE_AI_ENABLED,
         VITE_AI_FIREBASE_CONFIG: import.meta.env.VITE_AI_FIREBASE_CONFIG,
-        VITE_AI_MODEL: import.meta.env.VITE_AI_MODEL,
+        VITE_AI_DEFAULT_MODEL: import.meta.env.VITE_AI_DEFAULT_MODEL,
+        VITE_AI_MODELS: import.meta.env.VITE_AI_MODELS,
         VITE_AI_APP_CHECK_SITE_KEY: import.meta.env.VITE_AI_APP_CHECK_SITE_KEY,
-        VITE_AI_EMAILJS_ENABLED: import.meta.env.VITE_AI_EMAILJS_ENABLED,
-        VITE_AI_EMAILJS_SERVICE_ID: import.meta.env.VITE_AI_EMAILJS_SERVICE_ID,
-        VITE_AI_EMAILJS_TEMPLATE_ID: import.meta.env.VITE_AI_EMAILJS_TEMPLATE_ID,
-        VITE_AI_EMAILJS_PUBLIC_KEY: import.meta.env.VITE_AI_EMAILJS_PUBLIC_KEY,
-      });
+        VITE_EMAILJS_ENABLED: import.meta.env.VITE_EMAILJS_ENABLED,
+        VITE_EMAILJS_SERVICE_ID: import.meta.env.VITE_EMAILJS_SERVICE_ID,
+        VITE_EMAILJS_TEMPLATE_ID: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+        VITE_EMAILJS_PUBLIC_KEY: import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
+      },selectedModel);
       if (token !== generation.current) { instance?.agent.dispose(); return; }
       if (!instance) { setNotice('AI 助手尚未啟用，請聯絡導遊。'); return; }
       current.current = instance;
@@ -145,12 +155,24 @@ export function TripAIEntry(props: TripAIEntryProps) {
   useEffect(() => {
     if (previousIdentity.current !== props.session?.email) {
       removeSaved(previousKey.current);
+      for (const model of modelChoices.models) removeSaved(conversationKey([...previousScope.current,model]));
     }
-    previousIdentity.current = props.session?.email; previousKey.current = storageKey;
+    previousIdentity.current = props.session?.email; previousKey.current = storageKey; previousScope.current = storageScope;
     clear();
     if (open && latest.current.available) void connect();
     // Changes to mutable data/callbacks use latest; identity changes rebuild the host.
   }, [props.session?.email, props.session?.token, props.trip.id, props.trip.spreadsheetId, props.source]);
+  useEffect(() => {
+    if (previousModel.current===selectedModel) return;
+    previousModel.current=selectedModel; previousKey.current=storageKey;
+    clear(false);
+    if (open && latest.current.available) void connect();
+  }, [selectedModel]);
+  function changeModel(value: string) {
+    const active=current.current?.agent.getState().status;
+    if (!modelChoices.models.includes(value) || connecting || parsing || props.loading || (active && ['running','awaiting_confirmation','committing'].includes(active))) return;
+    setSelectedModel(value);
+  }
   useEffect(() => {
     if (!props.available) {
       setOpen(false); clear();
@@ -195,6 +217,7 @@ export function TripAIEntry(props: TripAIEntryProps) {
   const status = connecting ? '正在連線…' : parsing ? '正在解析檔案…' : writing ? '正在提交，請勿關閉視窗…' : props.loading ? '正在更新行程…' :
     state.status === 'running' ? '思考中...' : state.status === 'awaiting_confirmation' ? state.pending?.toolName === 'itinerary_request_email' ? '等待你確認寄送' : '等待你確認變更' : !ready ? 'AI 尚未就緒' :
     '';
+  const modelLocked=connecting || parsing || props.loading || ['running','committing','awaiting_confirmation'].includes(state.status);
   if (!props.available) return null;
   return <>
     <button ref={launcher} type="button" className={`no-print ${styles.launcher}`} aria-label={open ? 'AI 助手已開啟' : state.pending ? '開啟 AI 助手，尚有待確認變更' : '開啟 AI 助手'}
@@ -219,6 +242,9 @@ export function TripAIEntry(props: TripAIEntryProps) {
         </div>
         {memory !== '本分頁暫存' && memory !== '已恢復本分頁的完整對話' && <p className={styles.memoryNotice}>{memory}</p>}
         <ChatPanel key={panelKey} entries={entries} disabled={!ready || connecting || parsing || props.loading || ['running','committing','awaiting_confirmation'].includes(state.status)}
+          errorTone={state.errorCode === 'model_unavailable' ? 'danger' : 'default'} quotaExceeded={state.errorCode === 'rate_limit'} modelSelector={modelChoices.models.length > 0 && <select className={styles.modelSelect} aria-label="語言模型" title={selectedModel} value={selectedModel} disabled={modelLocked} onChange={event => changeModel(event.target.value)}>
+            {modelChoices.models.map(model => <option key={model} value={model}>{model}{model === modelChoices.defaultModel ? ' (推薦)' : ''}</option>)}
+          </select>}
           status={status} thinking={status === '思考中...'} enterToSend error={error || state.error} notice={notice} suggestions={suggestions}
           onSend={send}
           renderMessage={(text, role) => role === 'model' ? <MarkdownContent text={text} allowImages={false} /> : text}

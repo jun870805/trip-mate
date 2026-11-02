@@ -7,3 +7,4 @@ export { initializeFirebaseProvider } from './providers/firebase-runtime.ts';
 export type { FirebaseProviderConfig } from './providers/firebase-runtime.ts';
 export { prepareFiles, FILE_LIMITS } from './files/intake.ts';
 export type { Conversation } from './core/conversation.ts';
+export { ProviderRateLimitError, ProviderModelUnavailableError } from './core/errors.ts';

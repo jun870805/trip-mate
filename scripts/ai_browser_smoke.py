@@ -22,12 +22,19 @@ emails = []
 mail_status = 200
 sdk = """window.google={accounts:{oauth2:{initTokenClient(options){return {requestAccessToken(){options.callback({access_token:'mock-guide-token',expires_in:3600,scope:'openid email https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file'});}};}}}};"""
 provider = """
-export async function initializeFirebaseProvider() {
+import {ProviderRateLimitError,ProviderModelUnavailableError} from '/src/ai/core/errors.ts';
+export async function initializeFirebaseProvider(config) {
+  const selectedModel=config.model;
+  window.__activeModel=selectedModel;
   return { async generate(request) {
     window.__mockLastMessages=request.messages;
+    window.__modelRequests ||= [];
+    window.__modelRequests.push({model:selectedModel,messages:request.messages});
     const last=request.messages.at(-1), result=last.parts.find(p=>p.result)?.result;
     if(result) return {parts:[{text:result.response.status==='success'?'已收到實際操作結果。':'已取消，未執行修改。'}]};
     const text=last.parts[0].text;
+    if(text.includes('測試用量429')) throw new ProviderRateLimitError();
+    if(text.includes('測試模型404')) throw new ProviderModelUnavailableError();
     if(text.includes('慢')) {await new Promise(done=>setTimeout(done,600));return {parts:[{text:'較慢的回覆'}]};}
     if(text.includes('匯入') || text.includes('上傳檔案')) return {parts:[{call:{name:'itinerary_import',args:{activities:[{date:DATE,title:'檔案匯入景點',body:'  保留空白\\n\\n第二段'}],warnings:[]}}}]};
     if(text.includes('轉交') && request.tools.some(tool=>tool.name==='itinerary_request_email')) return {parts:[{call:{name:'itinerary_request_email',args:{request:'第二天午餐希望改成素食餐廳。',contactName:'測試訪客',replyTo:'visitor@example.com'}}}]};
@@ -131,6 +138,10 @@ with sync_playwright() as p:
             detail.click()
             expect(page.get_by_role('button',name='收合內文：').first).to_be_visible()
             expect(page.locator('dialog[open]')).to_have_count(0)
+        models=dialog.get_by_role('combobox',name='語言模型',exact=True)
+        expect(models).to_have_value('test-model')
+        expect(models.locator('option[value="test-model"]')).to_have_text('test-model (推薦)')
+        assert models.bounding_box()['x'] < dialog.get_by_role('button',name='送出',exact=True).bounding_box()['x']
         message = dialog.get_by_label('訊息', exact=False)
         expect(message).to_have_attribute('placeholder','問問 AI助手')
         assert dialog.locator('label').filter(has_text='訊息').evaluate('(el)=>getComputedStyle(el).clipPath') == 'inset(50%)'
@@ -168,6 +179,19 @@ with sync_playwright() as p:
             for label in dialog.get_by_role('log').get_by_text(author,exact=True).all():
                 assert label.evaluate('(el)=>getComputedStyle(el).clipPath') == 'inset(50%)'
         page.screenshot(path='/tmp/trip-ai-desktop.png')
+        message.fill('模型切換保留輸入')
+        models.select_option('test-model-alternative-with-long-name')
+        expect(message).to_be_enabled()
+        expect(message).to_have_value('模型切換保留輸入')
+        expect(dialog.get_by_role('log')).to_be_empty()
+        message.fill('替代模型問題');message.press('Enter')
+        expect(dialog.get_by_role('log')).to_contain_text('已收到實際操作結果')
+        assert page.evaluate('window.__modelRequests.at(-1).model')=='test-model-alternative-with-long-name'
+        assert not page.evaluate('window.__mockLastMessages.some(m=>m.parts.some(p=>p.text==="總結行程"))')
+        models.select_option('test-model')
+        expect(message).to_be_enabled()
+        expect(dialog.get_by_role('log')).to_contain_text('總結行程')
+        expect(dialog.get_by_role('log')).not_to_contain_text('替代模型問題')
         message.fill('縮小保留的輸入')
         page.keyboard.press('Escape')
         expect(dialog).not_to_be_visible()
@@ -186,6 +210,37 @@ with sync_playwright() as p:
         expect(dialog.get_by_role('log')).to_be_empty()
         expect(message).to_have_value('')
         expect(message).to_be_enabled()
+        before=page.evaluate('window.__modelRequests.length')
+        message.fill('測試用量429');message.press('Enter')
+        quota=dialog.get_by_role('alert')
+        expect(quota).to_have_text('超過用量，請更換語言模型，或稍後再試。')
+        assert quota.evaluate('(el)=>getComputedStyle(el).color')=='rgb(255, 0, 0)'
+        page.screenshot(path='/tmp/trip-ai-model-quota.png')
+        expect(models).to_be_enabled()
+        assert page.evaluate('window.__modelRequests.length')==before+1
+        expect(models).to_have_value('test-model')
+        models.select_option('test-model-alternative-with-long-name')
+        expect(message).to_be_enabled()
+        expect(dialog.get_by_role('alert')).to_have_count(0)
+        expect(dialog.get_by_role('log')).to_contain_text('替代模型問題')
+        assert page.evaluate('window.__modelRequests.length')==before+1
+        models.select_option('test-model')
+        expect(message).to_be_enabled()
+        expect(dialog.get_by_role('log')).to_be_empty()
+        before=page.evaluate('window.__modelRequests.length')
+        message.fill('測試模型404');message.press('Enter')
+        missing=dialog.get_by_role('alert')
+        expect(missing).to_have_text('此模型目前無法使用，請更換語言模型或聯絡導遊。')
+        assert missing.evaluate('(el)=>getComputedStyle(el).color')=='rgb(255, 0, 0)'
+        expect(models).to_be_enabled()
+        expect(models).to_have_value('test-model')
+        assert page.evaluate('window.__modelRequests.length')==before+1
+        models.select_option('test-model-alternative-with-long-name')
+        expect(message).to_be_enabled()
+        expect(dialog.get_by_role('alert')).to_have_count(0)
+        assert page.evaluate('window.__modelRequests.length')==before+1
+        models.select_option('test-model')
+        expect(message).to_be_enabled()
         template=dialog.get_by_role('button',name='總結這趟行程',exact=True)
         template.evaluate('(button)=>{button.click();button.click();}')
         expect(dialog.get_by_role('log')).to_contain_text('已收到實際操作結果')
@@ -199,6 +254,7 @@ with sync_playwright() as p:
         message.press('Enter')
         mail_preview=dialog.get_by_role('region',name='待確認的需求郵件')
         expect(mail_preview).to_be_visible()
+        expect(models).to_be_disabled()
         expect(mail_preview).to_contain_text('admin@example.com')
         expect(mail_preview).to_contain_text('第二天午餐希望改成素食餐廳。')
         expect(mail_preview).to_contain_text('visitor@example.com')
@@ -253,11 +309,13 @@ with sync_playwright() as p:
         expect(dialog.get_by_role('status')).to_have_count(0)
         expect(mail_preview).to_have_count(0)
         assert len(emails)==2
+        assert page.evaluate('Object.keys(sessionStorage).filter(k=>k.startsWith("trip-mate:ai-conversation:") && k.includes("visitor")).length')==0
         message.fill('修改第一筆行程')
         dialog.get_by_role('button', name='送出', exact=True).click()
         preview = dialog.get_by_role('region', name='待確認的行程變更')
         expect(preview).to_be_visible()
         expect(preview).not_to_contain_text(first['行程ID'])
+        expect(models).to_be_disabled()
         assert len(writes) == 0
         dialog.get_by_role('button', name='關閉 AI 助手').click()
         page.get_by_role('button', name='開啟 AI 助手，尚有待確認變更').click()
@@ -335,6 +393,7 @@ with sync_playwright() as p:
         message.fill('慢回覆')
         dialog.get_by_role('button',name='送出',exact=True).click()
         expect(dialog.get_by_role('status')).to_have_text('思考中...')
+        expect(models).to_be_disabled()
         spinner=dialog.get_by_role('status').locator('[aria-hidden="true"]')
         expect(spinner).to_be_visible()
         assert spinner.evaluate('(el)=>getComputedStyle(el).animationName') != 'none'
@@ -406,6 +465,6 @@ with sync_playwright() as p:
         expect(q.get_by_role('log')).to_be_empty()
         quota.close()
         assert not errors, errors
-        print('AI UI passed: guest email preview/cancel/approve, no replay, login invalidation, HTTP rejection;  refresh memory, clear, pending not replayed, responsive composer,  desktop/mobile, scroll/focus, minimize/restore, cancel/confirm, uploads, refresh results, ID privacy, stale replies and scope cleanup. Mock Sheets writes: 2.')
+        print('AI UI passed: model selection/draft/history isolation, recommended default, red 404/429 and no automatic retry;  guest email preview/cancel/approve, no replay, login invalidation, HTTP rejection;  refresh memory, clear, pending not replayed, responsive composer,  desktop/mobile, scroll/focus, minimize/restore, cancel/confirm, uploads, refresh results, ID privacy, stale replies and scope cleanup. Mock Sheets writes: 2.')
     finally:
         browser.close()

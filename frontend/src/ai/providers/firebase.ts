@@ -1,3 +1,4 @@
+import { ProviderRateLimitError, ProviderModelUnavailableError } from '../core/errors.ts';
 import { Schema } from '@firebase/ai';
 import type { Content, GenerateContentRequest, SingleRequestOptions } from '@firebase/ai';
 import type { Provider, Part } from '../contracts.ts';
@@ -49,8 +50,16 @@ export function createFirebaseProvider(model: FirebaseModel): Provider {
       name: tool.name, description: tool.description,
       parameters: firebaseSchema(tool.parameters) as ReturnType<typeof Schema.object>,
     })) }] : undefined;
-    const response = await model.generateContent({ contents, tools,
-      systemInstruction: `${request.system}\n應用提供的目前範圍：${JSON.stringify(request.context)}` }, { signal: request.signal });
+    let response: Awaited<ReturnType<FirebaseModel['generateContent']>>;
+    try {
+      response = await model.generateContent({ contents, tools,
+        systemInstruction: `${request.system}\n應用提供的目前範圍：${JSON.stringify(request.context)}` }, { signal: request.signal });
+    } catch (error) {
+      const details=error as {status?:unknown;customErrorData?:{status?:unknown}} | null;
+      if (details?.status===404 || details?.customErrorData?.status===404) throw new ProviderModelUnavailableError();
+      if (details?.status===429 || details?.customErrorData?.status===429) throw new ProviderRateLimitError();
+      throw error;
+    }
     request.signal.throwIfAborted();
     const candidate = response.response.candidates?.[0]?.content;
     if (!candidate?.parts?.length) throw new Error('模型沒有可用回應，可能受到內容限制。');

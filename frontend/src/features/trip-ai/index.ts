@@ -30,8 +30,8 @@ export async function createFirebaseTripAgent(options: TripHostOptions, config: 
   return createTripAgent({ ...options, provider: await initializeFirebaseProvider(config) });
 }
 
-export async function createConfiguredTripAgent(options: TripHostOptions, env: Record<string, string | undefined>) {
+export async function createConfiguredTripAgent(options: TripHostOptions, env: Record<string, string | undefined>, selectedModel?: string) {
   const { readFirebaseConfig } = await import('./config.ts');
-  const config = readFirebaseConfig(env);
+  const config = readFirebaseConfig(env,selectedModel);
   return config ? createFirebaseTripAgent({...options,email:readEmailConfig(env) ?? undefined}, config) : null;
 }

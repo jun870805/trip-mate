@@ -16,7 +16,7 @@ AI 入口已接在每趟旅程的「行程」分頁。尚未設定時可開啟�
 1. Firebase Console 進入「AI Logic」，按開始設定。
 2. 本專案的 adapter 使用 `GoogleAIBackend`，選 **Gemini Developer API**。
 3. 依控制台流程啟用所需 API 與建立／連結 Gemini API 存取。Gemini 服務金鑰留在 Firebase 管理流程內；**不要貼進 `.env` 或前端程式**。
-4. 在專案可用模型中選擇同時支援文字、Function Calling、PDF／圖片輸入的模型，把完整 model ID 填入 `VITE_AI_MODEL`。不要選只有圖片生成／即時語音用途的模型，也不要把顯示名稱當成 model ID。
+4. 在專案可用模型中選擇同時支援文字、Function Calling、PDF／圖片輸入的模型，把預設模型的完整 model ID 填入 `VITE_AI_DEFAULT_MODEL`。不要選只有圖片生成／即時語音用途的模型，也不要把顯示名稱當成 model ID。
 5. 模型供應與計費條件可能調整，以控制台與 [支援模型表](https://firebase.google.com/docs/ai-logic/models) 為準。本專案不硬編碼模型名稱。
 
 若要求連結帳單，先確認模型與用量方案，並設定用量／配額與費用警示；費用取決於實際模型與功能。詳細條件見 [官方計費說明](https://firebase.google.com/docs/ai-logic/pricing)。
@@ -39,11 +39,13 @@ AI 入口已接在每趟旅程的「行程」分頁。尚未設定時可開啟�
 ```dotenv
 VITE_AI_ENABLED=true
 VITE_AI_FIREBASE_CONFIG='{"apiKey":"<Firebase Web API key>","projectId":"<project ID>","appId":"<Web App ID>"}'
-VITE_AI_MODEL=<控制台提供的完整 model ID>
+VITE_AI_DEFAULT_MODEL=<預設模型的完整 model ID>
+# 選填：允許切換的模型 ID JSON 陣列，預設模型會自動加入
+VITE_AI_MODELS='["model-a","model-b"]'
 VITE_AI_APP_CHECK_SITE_KEY=<reCAPTCHA Enterprise site key>
 ```
 
-這四個值都是公開前端設定。Firebase private key、Gemini／其他 LLM Secret、OAuth access token、App Check debug token 不放入 `VITE_*`。變更 env 後重新啟動 `npm run dev`；正式站必須重新建置／部署，不會動態讀本機 env。
+上述都是公開前端設定；`model-a`／`model-b` 是格式示例，請換成專案可用的實際 model ID。Firebase private key、Gemini／其他 LLM Secret、OAuth access token、App Check debug token 不放入 `VITE_*`。變更 env 後重新啟動 `npm run dev`；正式站必須重新建置／部署，不會動態讀本機 env。
 
 ## 5. 本機 App Check Debug Provider
 
@@ -65,10 +67,11 @@ VITE_AI_APP_CHECK_SITE_KEY=<reCAPTCHA Enterprise site key>
 | --- | --- |
 | `VITE_AI_ENABLED` | `true` |
 | `VITE_AI_FIREBASE_CONFIG` | 一行合法 JSON 物件，外層**不要加 shell 單引號** |
-| `VITE_AI_MODEL` | 完整 model ID |
+| `VITE_AI_DEFAULT_MODEL` | 預設／推薦模型的完整 model ID |
+| `VITE_AI_MODELS` | 選填 JSON 字串陣列，例如 `["model-a","model-b"]`，不加 shell 外層單引號 |
 | `VITE_AI_APP_CHECK_SITE_KEY` | 公開 site key |
 
-`.github/workflows/pages.yml` 已接入以上四個 variables；未設定時 AI 預設停用。原本 Sheets／GIS variables／secret 保留。設定完成後自行重新執行部署工作流程；本次沒有替你部署或修改 Firebase Console。
+`.github/workflows/pages.yml` 已接入以上 variables；未設定時 AI 預設停用。原本 Sheets／GIS variables／secret 保留。設定完成後自行重新執行部署工作流程；本次沒有替你部署或修改 Firebase Console。
 
 ## 7. 啟用後驗證
 
@@ -77,7 +80,25 @@ VITE_AI_APP_CHECK_SITE_KEY=<reCAPTCHA Enterprise site key>
 3. 導遊登入後要求改一筆行程，先檢查日期、項目、欄位前後差異與警告；按取消，核對 Sheets 完全未變更。
 4. 再測試確認儲存，核對網站操作結果、頁面更新與實際 Sheets；不要僅憑模型說「完成」判斷成功。
 5. 分別上傳自己可傳送給模型的 TXT／CSV／XLSX、PDF 與圖片，核對解析與預覽；不確定資料需人工確認。
-6. 測試縮小恢復、X／Escape 結束、切換旅程／登出、App Check 拒絕及 OAuth 過期。
+6. 測試縮小恢復、X／Escape 縮小保留對話、切換旅程／登出、App Check 拒絕及 OAuth 過期。
 7. 在 Firebase console 核對 App Check metrics 與模型用量。不要開啟自動重送不明寫入結果的機制。
 
 本次已透過測試替身驗證 UI／工具／模擬 Sheets 流程，但尚未執行你的真實 Firebase／App Check、Google 寫入或部署驗證。
+
+
+## 8. 使用者切換模型與 429
+
+- `VITE_AI_DEFAULT_MODEL` 為每次頁面載入的預設模型，下拉選項會標示 `(推薦)`。
+- `VITE_AI_MODELS` 為 JSON 字串陣列，最多設定 20 筆；自動去除前後空白與重複，預設模型一定會加入，即使不在陣列內。未設定或空陣列時只顯示預設模型。格式不正確會讓 AI 設定驗證失敗。
+- 選單位於「送出」左側，桌面／手機皆可使用。候選模型須在同一專案可用，並支援目前工具呼叫、PDF／圖片輸入；列入清單不代表已替你驗證模型可用性或取得額度。
+- 切換時保留當次未送出的文字與附件，重建 agent 並載入該模型自己的已完成 checkpoint；不同模型的 opaque／簽章與歷史不互相帶入。重新整理回預設模型，可再手動選回其他模型的已完成對話。
+- 連線、檔案處理、模型請求、待確認變更／郵件及提交期間停用切換，避免重複副作用。
+- 模型 API HTTP 429 顯示正紅色「超過用量，請更換語言模型，或稍後再試。」。不會自動切換模型、重送訊息、重播 Sheets 寫入或郵件。
+- 此為模型 API 的限額提示；EmailJS 的 429 仍沿用郵件寄送失敗流程，不提示更換語言模型。
+
+模型清單是前端選項驗證，不能取代服務端防濫用或配額限制。更換模型不會重設 Firebase AI Logic 共用的每使用者／區域 RPM，也不會重設專案費用或 spend cap；見 [配額說明](https://firebase.google.com/docs/ai-logic/quotas)。
+
+
+### 模型 API 404
+
+模型 API 回傳 HTTP 404 時，顯示正紅色「此模型目前無法使用，請更換語言模型或聯絡導遊。」。可能是模型名稱／版本錯誤、專案無法存取，或服務設定缺漏，不能只憑 404 判定模型永久不支援。使用者可手動換模型，不會自動切換／重送；400、403 等錯誤保留通用處理。EmailJS 的 HTTP 錯誤仍屬寄送結果，不提示換模型。

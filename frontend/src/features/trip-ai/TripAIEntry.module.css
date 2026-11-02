@@ -52,3 +52,5 @@
 .mailDetails { display: grid; gap: 12px; margin: 12px 0; }
 .mailDetails dt { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
 .mailDetails dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.modelSelect { flex: 1; min-width: 0; max-width: 180px; width: 100%; padding: 6px 40px 6px 8px; border: 1px solid var(--line); border-radius: 4px; background-color: var(--paper); color: var(--brown); font-family: inherit; font-size: 12px; text-overflow: ellipsis; }

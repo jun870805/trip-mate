@@ -140,3 +140,23 @@ it('enforces call limits, disabled tools and handles throwing readers/preparers'
     assert.equal(agent.getState().results[0].status,variant==='disabled'?'permission_denied':'error');
   }
 });
+
+it('keeps a typed rate limit result and does not automatically retry the provider',async()=>{
+  const {ProviderRateLimitError}=await import('../core/errors.ts');
+  let calls=0;
+  const agent=createAgent({provider:{async generate(){calls++;throw new ProviderRateLimitError();}},tools:[],getContext:()=>context});
+  await agent.send('問題');
+  assert.equal(calls,1);assert.equal(agent.getState().errorCode,'rate_limit');
+  assert.equal(agent.getState().error,'超過用量，請更換語言模型，或稍後再試。');
+  agent.cancel();assert.equal(agent.getState().errorCode,undefined);
+});
+
+it('reports model unavailable safely on 404 without retrying or switching models',async()=>{
+  const {ProviderModelUnavailableError}=await import('../core/errors.ts');
+  let calls=0;
+  const agent=createAgent({provider:{async generate(){calls++;throw new ProviderModelUnavailableError();}},tools:[],getContext:()=>context});
+  await agent.send('問題');
+  assert.equal(calls,1);assert.equal(agent.getState().errorCode,'model_unavailable');
+  assert.equal(agent.getState().error,'此模型目前無法使用，請更換語言模型或聯絡導遊。');
+  agent.cancel();assert.equal(agent.getState().errorCode,undefined);
+});

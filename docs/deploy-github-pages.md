@@ -29,7 +29,7 @@
 | VITE_GUIDE_EMAILS | `["你的email@gmail.com"]`，可放多個 email |
 | VITE_BASE_PATH | 一般專案可留空；使用自訂網域時填 `/` |
 
-要啟用 AI 助手，另依 [Firebase 設定](setup-ai.md#6-github-pages-設定) 新增 `VITE_AI_ENABLED`、`VITE_AI_FIREBASE_CONFIG`、`VITE_AI_MODEL`、`VITE_AI_APP_CHECK_SITE_KEY` 四個公開 variables；workflow 已接入，未設預設停用。
+要啟用 AI 助手，另依 [Firebase 設定](setup-ai.md#6-github-pages-設定) 新增 `VITE_AI_ENABLED`、`VITE_AI_FIREBASE_CONFIG`、`VITE_AI_DEFAULT_MODEL`、`VITE_AI_APP_CHECK_SITE_KEY` 四個必要公開 variables，以及選填模型清單 `VITE_AI_MODELS`；workflow 已接入，未設預設停用。
 
 GitHub 網頁的值直接貼上，不要加 shell 使用的外層單引號。例如 email 清單填 `["a@gmail.com","b@gmail.com"]`，不要填 `'["a@gmail.com"]'`。
 
@@ -73,4 +73,4 @@ repository → Settings → Pages → Build and deployment → Source 選 **GitH
 
 來源：[GitHub Pages workflow](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)、[Vite GitHub Pages 部署](https://vite.dev/guide/static-deploy.html#github-pages)、[Google JavaScript origins 設定](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)。
 
-可選的訪客 AI 需求郵件使用 EmailJS，需額外設定四項 `VITE_AI_EMAILJS_*` repository variables 與固定 To 範本。詳見 [訪客郵件設定](setup-email.md)。不設定則停用郵件，不影響網站部署。
+可選的訪客 AI 需求郵件使用 EmailJS，需額外設定四項 `VITE_EMAILJS_*` repository variables 與固定 To 範本。詳見 [訪客郵件設定](setup-email.md)。不設定則停用郵件，不影響網站部署。
