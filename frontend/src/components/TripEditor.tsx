@@ -352,7 +352,7 @@ export function TripEditor({
         ) {
           event.preventDefault();
           event.stopPropagation();
-          requestClose();
+          if (!event.repeat) requestClose();
         }
       }}
       onCancel={(event) => {

@@ -118,6 +118,8 @@ with sync_playwright() as p:
                     expect(editor).to_be_visible()
                     expect(editor.get_by_role('button',name=add_name,exact=True)).to_be_visible()
                     expect(field).to_have_count(0)
+                    editor.evaluate('(node)=>node.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",repeat:true,bubbles:true,cancelable:true}))')
+                    expect(editor).to_be_visible()
                     assert len(close_policy['messages'])==before_prompts+1
                     assert len(writes)==before_writes
                     assert page.evaluate('document.body.style.position')=='fixed'
@@ -384,6 +386,7 @@ with sync_playwright() as p:
         dialog.get_by_role('button', name='儲存', exact=True).click()
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
         dialog.get_by_role('button', name='關閉', exact=True).click()
+        readonly_writes=len(writes)
         page.get_by_role('navigation', name='旅程功能').get_by_role('link', name='行程', exact=True).click()
         page.get_by_role('combobox', name='行程日期', exact=True).select_option(start)
         view_more=page.get_by_role('button', name='查看更多：新增景點測試', exact=True)
@@ -461,8 +464,8 @@ with sync_playwright() as p:
         expect(details).not_to_be_visible()
         page.get_by_role('button', name='登出', exact=True).click()
         expect(page.get_by_role('button', name='編輯行程', exact=True)).to_have_count(0)
-        assert len(writes) == previous_writes + 1, len(writes)
+        assert len(writes) == readonly_writes, len(writes)
         assert not errors, errors
-        print('Trip editor browser smoke checks passed with mocked Google APIs.')
+        print('Trip editor browser smoke checks passed: add/edit X and Escape return to lists with confirmation in all three scopes; cancelled prompts preserve input, nested pickers stay independent, no writes on close. All Google APIs mocked.')
     finally:
         browser.close()
