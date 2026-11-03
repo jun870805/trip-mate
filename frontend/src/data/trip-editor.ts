@@ -17,6 +17,7 @@ import type { GuideConfig, GuideSession } from "./guide-auth.ts";
 import { assertGuideSession, isSuperUser, WRITE_SCOPE } from "./guide-auth.ts";
 import {
   assertRecordId,
+  compareRecordIds,
   nextRecordId,
   nextRecordIdFromRows,
 } from "./record-id.ts";
@@ -154,7 +155,7 @@ export function automaticTripIds<T extends TripMutation>(
 }
 export function readRows(book: Workbook, sheet: TripSheetName): Row[] {
   const headers = book[sheet]?.[0]?.map((value) => String(value).trim()) || [];
-  return (book[sheet] || [])
+  const rows = (book[sheet] || [])
     .slice(1)
     .filter((row) => row.some((value) => String(value).trim()))
     .map((row) =>
@@ -167,6 +168,7 @@ export function readRows(book: Workbook, sheet: TripSheetName): Row[] {
         ]),
       ),
     );
+  return sheet === "團員" ? rows.sort((a, b) => compareRecordIds(a["團員ID"], b["團員ID"])) : rows;
 }
 export function validateEditorBook(
   trip: Trip,

@@ -547,7 +547,6 @@ type Field = {
 const fields: Record<BasicSheet, Field[]> = {
   團員: [
     { key: "顯示名稱", required: true },
-    { key: "排序", type: "number" },
   ],
   開團待辦: [
     { key: "事項", required: true },

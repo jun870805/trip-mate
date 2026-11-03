@@ -1505,3 +1505,13 @@ it('saves an itinerary batch once, generates distinct IDs and refuses stale or m
   await assert.rejects(editor.saveItineraryBatch(session, next, []), /筆數/);
   assert.equal(api.writes, 1);
 });
+
+
+it('reads members in numeric ID order without moving spreadsheet rows or changing legacy order values', () => {
+  const book=structuredClone(demo) as Workbook;
+  book['團員']=[['排序','顯示名稱','團員ID'],['1','千號','M1000'],['99','三號','M003'],['2','九九九號','M999']];
+  const original=structuredClone(book);
+  assert.deepEqual(readRows(book,'團員').map(row=>row['團員ID']),['M003','M999','M1000']);
+  assert.deepEqual(book,original);
+  assert.equal(readRows(book,'團員')[0]['排序'],'99');
+});

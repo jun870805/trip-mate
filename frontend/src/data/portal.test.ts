@@ -186,15 +186,15 @@ describe("data validation", () => {
     ];
     assert.throws(() => parseCatalog(catalog), /ID.*T001/);
   });
-  it("respects member display order independently of accounting", () => {
+  it("orders members by numeric ID regardless of the legacy sort column, without changing balances", () => {
     const book = fixture();
     book["團員"][1][2] = 5;
     const data = parseTrip(trip, book);
     assert.deepEqual(
       data.members.map((m) => m.id),
-      ["M002", "M003", "M001"],
+      ["M001", "M002", "M003"],
     );
-    assert.equal(data.members[2].balance, 1666);
+    assert.equal(data.members.find(member => member.id === "M001")?.balance, 1666);
   });
   for (const [label, change] of Object.entries({
     "missing headers": (b: Workbook) => {

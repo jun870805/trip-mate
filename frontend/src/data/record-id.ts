@@ -3,6 +3,11 @@ import type { SheetRows } from "./sheets.ts";
 
 export type RecordKind = keyof typeof rules;
 
+/** Compare same-prefix business IDs numerically, including the 999 → 1000 boundary. */
+export function compareRecordIds(left: string, right: string): number {
+  return left.charAt(0).localeCompare(right.charAt(0)) || Number(left.slice(1)) - Number(right.slice(1));
+}
+
 const columnKinds = new Map<string, RecordKind>();
 for (const kind of Object.keys(rules) as RecordKind[]) {
   const rule = rules[kind];

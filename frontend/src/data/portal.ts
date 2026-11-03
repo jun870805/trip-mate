@@ -2,7 +2,7 @@ import itineraryCategories from "./itinerary-categories.json" with { type: "json
 import { normalizeTimezone, validateFlightTimes } from "./timezone.ts";
 import schema from "./schema.json" with { type: "json" };
 import type { SheetRows } from "./sheets.ts";
-import { assertRecordIds } from "./record-id.ts";
+import { assertRecordIds, compareRecordIds } from "./record-id.ts";
 
 export type Row = Record<string, string>;
 export type Workbook = Record<string, SheetRows>;
@@ -267,7 +267,7 @@ export function parseTrip(trip: Trip, book: Workbook): TripData {
   for (const row of tables["團員"])
     ensure(Number.isFinite(Number(row["排序"] || 0)), "團員排序必須為數字。");
   tables["團員"].sort(
-    (a, b) => Number(a["排序"] || 0) - Number(b["排序"] || 0),
+    (a, b) => compareRecordIds(a["團員ID"], b["團員ID"]),
   );
   const members: Member[] = tables["團員"].map((row) => {
     required(row, ["顯示名稱"], "團員");
