@@ -279,6 +279,12 @@
   align-items: center;
   gap: 12px;
 }
+.participant-options { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 16px; }
+.participant-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.participant-options .participant-row { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; max-width: 100%; }
+.participant-options .checkbox-label { min-width: 0; overflow-wrap: anywhere; }
+.participant-options .checkbox-label input { flex-shrink: 0; }
+.participant-amounts { display: grid; gap: 8px; }
 .receipt-allocation {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

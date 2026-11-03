@@ -17,6 +17,7 @@ import type { RecordKind } from "../data/record-id";
 import { dateInTimezone, normalizeLocalDateTime } from "../data/timezone";
 import { DatePicker } from "./DatePicker";
 import { RequiredMark } from "./RequiredMark";
+import { commonFundAmount, equalFundShares, fundTypeLabel } from "../data/fund-payments";
 import {
   tripDates,
   itinerarySubtitle,
@@ -500,7 +501,7 @@ export function TripEditor({
                                     row["出發時間"] ||
                                     "",
                                 )}{" "}
-                                {row["類型"] || row["狀態"] || ""}
+                                {entity === "公積金" ? fundTypeLabel(row["類型"] || "") : row["類型"] || row["狀態"] || ""}
                               </small>
                             </div>
                             <div className="editor-row-actions">
@@ -703,6 +704,14 @@ export function TripForm({
             }))
         : [],
   );
+  const [perPersonAmount, setPerPersonAmount] = useState(() => entity === "公積金" ? commonFundAmount(shares, currency) : "");
+  const [originalPayment] = useState(() => row && entity === "公積金" && ["儲值", "退款"].includes(row["類型"])
+    ? { type: row["類型"], shares: structuredClone(shares) } : null);
+  const equalPayment = entity === "公積金" && ["儲值", "退款"].includes(values["類型"]);
+  const checkboxOnly = entity === "公積金" && values["類型"] !== "調整";
+  const existingUnequal = originalPayment && originalPayment.type === values["類型"] && !commonFundAmount(originalPayment.shares, currency)
+    ? originalPayment.shares : undefined;
+  const preservingUnequal = !!(existingUnequal && !perPersonAmount && shares.every(share => existingUnequal.some(original => original.memberId === share.memberId)));
   const [expense, setExpense] = useState<Row>(() =>
     row && entity === "公積金"
       ? readRows(book, "支出明細").find(
@@ -809,7 +818,7 @@ export function TripForm({
             {[
               ...new Set([...options, ...(values[key] ? [values[key]] : [])]),
             ].map((option) => (
-              <option key={option}>{option}</option>
+              <option key={option} value={option}>{entity === "公積金" && key === "類型" ? fundTypeLabel(option) : option}</option>
             ))}
           </select>
         ) : type === "date" || type === "datetime-local" || type === "time" ? (
@@ -859,7 +868,7 @@ export function TripForm({
           mode: row ? "edit" : "add",
           id: row?.["交易ID"],
           values,
-          shares,
+          shares: equalPayment ? equalFundShares(shares, perPersonAmount, currency, existingUnequal) : shares,
           expense,
         };
       else if (entity === "行前費用")
@@ -928,12 +937,14 @@ export function TripForm({
       entity === "公積金" &&
       values["類型"] !== "支出" &&
       shares.length &&
-      shares.every((share) => share.amount)
-    )
+      (equalPayment || shares.every((share) => share.amount))
+    ) {
+      const amounts = equalPayment ? equalFundShares(shares, perPersonAmount, currency, existingUnequal) : shares;
       preview = `合計 ${money(
-        shares.reduce((sum, share) => sum + toMinor(share.amount, currency), 0),
+        amounts.reduce((sum, share) => sum + toMinor(share.amount, currency), 0),
         currency,
       )}`;
+    }
     if (
       entity === "行前費用" &&
       shares.length &&
@@ -993,6 +1004,12 @@ export function TripForm({
                 label: `${entity === "行前費用" ? "實際刷卡金額" : "實際支出金額"}（${entity === "行前費用" ? "TWD" : currency}）`,
                 required: true,
               })}
+            {equalPayment && <label>
+              <span>{values["類型"] === "退款" ? "每人退款金額" : "每人收款金額"}（{currency}）{!preservingUnequal && <RequiredMark />}</span>
+              <input type="text" inputMode="numeric" pattern="[0-9]+" required={!preservingUnequal}
+                value={perPersonAmount} placeholder={preservingUnequal ? "保留既有金額" : undefined}
+                onChange={event => { if (isPersonalAmountInput(event.target.value)) setPerPersonAmount(event.target.value); }} />
+            </label>}
             {entity === "行前費用" &&
               renderField({ key: "分類", required: true })}
             {entity === "公積金" && values["類型"] === "支出" && (
@@ -1040,17 +1057,25 @@ export function TripForm({
               </>
             )}
             <div className="participant-fields">
+              <div className="participant-heading">
               <h4>
                 {entity === "行前費用"
                   ? "個人應繳（TWD）"
-                  : values["類型"] === "支出"
+                    : checkboxOnly
                     ? "實際參與者"
                     : `個人金額（${currency}）`}
                 <RequiredMark />
               </h4>
+              {checkboxOnly && <button type="button" className="quiet-button"
+                disabled={busy || !members.length || members.every(member => shares.some(share => share.memberId === member["團員ID"]))}
+                onClick={() => setShares(current => members.map(member =>
+                  current.find(share => share.memberId === member["團員ID"]) || { memberId: member["團員ID"], amount: "" },
+                ))}>全選</button>}
+              </div>
               {!members.length && (
                 <p className="muted">請先在團員管理新增團員。</p>
               )}
+              <div className={checkboxOnly ? "participant-options" : "participant-amounts"}>
               {members.map((member) => {
                 const share = shares.find(
                   (item) => item.memberId === member["團員ID"],
@@ -1075,13 +1100,11 @@ export function TripForm({
                         }
                       />
                       {member["顯示名稱"]}
-                      {share &&
-                        !(entity === "公積金" && values["類型"] === "支出") && (
+                      {share && !checkboxOnly && (
                           <RequiredMark />
                         )}
                     </label>
-                    {share &&
-                      !(entity === "公積金" && values["類型"] === "支出") && (
+                    {share && !checkboxOnly && (
                         <input
                           required
                           type="text"
@@ -1106,18 +1129,21 @@ export function TripForm({
                           }}
                         />
                       )}
+                    {preservingUnequal && share && <small>{money(toMinor(existingUnequal!.find(original => original.memberId === share.memberId)!.amount, currency), currency)}</small>}
                   </div>
                 );
               })}
+              </div>
+              {preservingUnequal && <p className="muted">此筆交易各人金額不同；未填每人金額會保留原值，填入後將統一套用至勾選團員。</p>}
             </div>
             {preview && (
               <p role="status" className="muted">
                 {preview}
               </p>
             )}
-            {entity === "公積金" && values["類型"] !== "支出" && (
+            {entity === "公積金" && values["類型"] === "調整" && (
               <p className="muted">
-                交易金額由個人金額加總；退款請填正數，調整可填正負金額且須說明原因。
+                交易金額由個人金額加總；調整可填正負金額且須說明原因。
               </p>
             )}
             {renderField({

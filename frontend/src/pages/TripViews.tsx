@@ -25,6 +25,7 @@ import bookingStyles from "../components/BookingCards.module.css";
 import { displayDate, flightDayOffset } from "../data/display-date";
 import { useTripToday } from "../hooks/useTripToday";
 import { useState } from "react";
+import { fundTypeLabel } from "../data/fund-payments";
 import {
   safeUrl,
   money,
@@ -552,7 +553,7 @@ export function Fund({ data }: { data: TripData }) {
         <div>
           <h2>公積金</h2>
           <p className="muted">
-            當地貨幣儲值，每趟獨立結算，結束退還當地貨幣。
+            收取當地貨幣，每趟獨立結算，結束退還當地貨幣。
           </p>
         </div>
       </div>
@@ -560,7 +561,7 @@ export function Fund({ data }: { data: TripData }) {
         <Stat
           label="現金餘額"
           value={money(totals.cash, data.currency)}
-          note="儲值、支出、退款及調整後"
+          note="收款、支出、退款及調整後"
         />
         <Stat
           label="實際消費"
@@ -650,7 +651,7 @@ export function Fund({ data }: { data: TripData }) {
           {transactions.map((t) => (
             <article className="ledger-row" key={t.id}>
               <div className="ledger-main">
-                <Badge soft>{t.type}</Badge>
+                <Badge soft>{fundTypeLabel(t.type)}</Badge>
                 <div>
                   <strong>{t.title}</strong>
                   <small>{displayDate(t.date)}</small>

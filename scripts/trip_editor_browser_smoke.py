@@ -15,6 +15,9 @@ root = Path(__file__).resolve().parents[1]
 book = json.loads((root / 'frontend/src/data/demo.json').read_text())
 headers = {'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*'}
 grids = [{'sheetId': index + 1, 'title': title, 'gridProperties': {'rowCount': 1000, 'columnCount': 26}} for index, title in enumerate(name for name in book if name != '旅程清單')]
+# Unequal historical receipt: editing metadata must preserve each member's amount.
+book['公積金交易'].append(['F090','2027-05-01','儲值','舊不同金額收款','300',''])
+book['公積金分攤'].extend([['F090','M001','100'],['F090','M003','200']])
 writes = []
 sdk = """window.google={accounts:{oauth2:{initTokenClient(options){return {requestAccessToken(){options.callback({access_token:'mock-guide-token',expires_in:3600,scope:'openid email https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file'});}};}}}};"""
 with sync_playwright() as p:
@@ -175,6 +178,60 @@ with sync_playwright() as p:
         dialog.get_by_role('button', name='關閉', exact=True).click()
         page.get_by_role('button', name='編輯帳務', exact=True).click()
         dialog = page.get_by_role('dialog', name='編輯帳務')
+        # Equal receipts/refunds use one amount, selection-only participants, and signed totals.
+        for type_value, label, title, amount, expected in [
+            ('儲值','每人收款金額（JPY）','共同收款測試','100',200),
+            ('退款','每人退款金額（JPY）','共同退款測試','50',-100),
+        ]:
+            dialog.get_by_role('button',name='新增公積金交易',exact=True).click()
+            types=dialog.get_by_role('combobox',name='類型',exact=True)
+            expect(types.get_by_role('option',name='收款',exact=True)).to_have_count(1)
+            types.select_option(type_value)
+            dialog.get_by_role('textbox',name='項目',exact=True).fill(title)
+            dialog.get_by_role('textbox',name=label,exact=True).fill(amount)
+            select_all=dialog.get_by_role('button',name='全選',exact=True)
+            before_select=len(writes)
+            select_all.click()
+            expect(dialog.locator('.participant-options input:checked')).to_have_count(3)
+            expect(select_all).to_be_disabled()
+            dialog.get_by_role('checkbox',name='範例團員 B',exact=True).uncheck()
+            expect(dialog.locator('.participant-options input:checked')).to_have_count(2)
+            expect(select_all).to_be_enabled()
+            assert len(writes)==before_select
+            for name in ['範例團員 A','範例團員 C']:
+                dialog.get_by_role('checkbox',name=name,exact=True).check()
+                expect(dialog.get_by_role('textbox',name=name+'金額',exact=True)).to_have_count(0)
+            a=dialog.get_by_role('checkbox',name='範例團員 A',exact=True).bounding_box()
+            b=dialog.get_by_role('checkbox',name='範例團員 B',exact=True).bounding_box()
+            assert abs(a['y']-b['y'])<2, 'Participant checkboxes should share a row on mobile'
+            assert dialog.evaluate('(node)=>node.scrollWidth<=node.clientWidth')
+            if type_value=='儲值':page.screenshot(path='/tmp/fund-equal-receipt-mobile.png')
+            before=len(writes)
+            transaction_id=dialog.get_by_role('textbox',name='公積金交易 ID',exact=True).input_value()
+            dialog.get_by_role('button',name='儲存',exact=True).click()
+            expect(dialog.locator('.editor-record').filter(has_text=title)).to_be_visible()
+            assert len(writes)==before+1
+            headers_fund=book['公積金交易'][0]
+            saved=next(row for row in book['公積金交易'][1:] if row and row[headers_fund.index('交易ID')]==transaction_id)
+            assert int(saved[headers_fund.index('記帳金額')])==expected
+            rows=[row for row in book['公積金分攤'][1:] if row and row[0]==transaction_id]
+            assert len(rows)==2 and all(int(row[2])==expected//2 for row in rows)
+        legacy=dialog.locator('.editor-record').filter(has_text='舊不同金額收款')
+        legacy.get_by_role('button',name='編輯',exact=True).click()
+        common=dialog.get_by_role('textbox',name='每人收款金額（JPY）',exact=True)
+        expect(common).to_have_value('')
+        expect(common).to_have_attribute('placeholder','保留既有金額')
+        dialog.get_by_role('textbox',name='備註',exact=True).fill('只調整備註')
+        dialog.get_by_role('button',name='儲存',exact=True).click()
+        expect(legacy).to_be_visible()
+        assert [int(row[2]) for row in book['公積金分攤'][1:] if row and row[0]=='F090']==[100,200]
+        legacy.get_by_role('button',name='編輯',exact=True).click()
+        dialog.get_by_role('checkbox',name='範例團員 B',exact=True).check()
+        assert not common.evaluate('(input)=>input.checkValidity()')
+        common.fill('75')
+        dialog.get_by_role('button',name='儲存',exact=True).click()
+        expect(legacy).to_be_visible()
+        assert sorted(int(row[2]) for row in book['公積金分攤'][1:] if row and row[0]=='F090')==[75,75,75]
         dialog.get_by_role('button', name='新增公積金交易', exact=True).click()
         dialog.get_by_role('textbox', name='日期', exact=True).fill(start)
         dialog.get_by_role('textbox', name='項目', exact=True).fill('共同午餐測試')
@@ -183,6 +240,8 @@ with sync_playwright() as p:
         fund_id = dialog.get_by_role('textbox', name='公積金交易 ID', exact=True).input_value()
         expense_id = dialog.get_by_role('textbox', name='支出 ID', exact=True).input_value()
         dialog.get_by_role('textbox', name='實際支出金額（JPY）', exact=True).fill('1000')
+        dialog.get_by_role('button',name='全選',exact=True).click()
+        expect(dialog.locator('.participant-options input:checked')).to_have_count(3)
         for member in ['範例團員 A', '範例團員 B', '範例團員 C']:
             dialog.get_by_label(member, exact=True).check()
         expect(dialog.get_by_role('status')).to_contain_text('334')

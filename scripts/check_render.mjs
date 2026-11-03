@@ -402,7 +402,7 @@ try {
           if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址') && form.includes('訂房網站') && form.includes('價格') && form.includes('副標題'))
           if(entity==='每日行程') { assert.ok(form.includes('類別') && ['未分類','三餐','活動','交通','購物'].every(category=>form.includes('<option>'+category+'</option>') || form.includes('>'+category+'</option>'))); assert.ok(form.includes('選擇既有標籤') && ['交通','住宿','景點','自由活動'].every(tag=>form.includes('>'+tag+'</span>')), 'Tag picker includes saved tags from every day'); const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','標題','副標','內文','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('D3 - 5/3(一)')); }
           if(entity==='航班') {assert.ok(form.includes('出發航廈') && form.includes('抵達航廈'));assert.ok(form.includes('出發當地時間') && form.includes('抵達當地時間'));assert.ok(!form.includes('時差'));}
-          if(entity==='公積金') assert.ok(form.includes('個人金額') && form.includes('checkbox'))
+          if(entity==='公積金') { assert.ok(form.includes('每人收款金額') && form.includes('checkbox') && form.includes('participant-options')); assert.ok(form.includes('>全選</button>'), 'Fund participants must offer select all'); assert.ok(form.includes('value="儲值"') && form.includes('>收款</option>')); assert.ok(!form.includes('交易金額由個人金額加總')); }
           if(entity==='行前費用') assert.ok(form.includes('實際刷卡金額') && form.includes('TWD'))
           if(entity==='收款') assert.ok(form.includes('繳款團員') && form.includes('加入收款項目'))
         }
@@ -413,7 +413,7 @@ try {
           assert.ok(!form.includes('undefined') && !form.includes('NaN'))
           const dateKey = {開團待辦:'截止日期',每日行程:'日期',飯店:'入住日期',公積金:'日期',行前費用:'日期',收款:'收款日期',航班:'出發時間'}[entity]
           if(dateKey && row[dateKey]) assert.ok(form.includes('value="'+(entity==='每日行程'?row[dateKey]:pickerInputDisplay(entity==='航班'?row[dateKey].slice(0,16):row[dateKey]))+'"'), 'Editing must preserve the existing date')
-          if(entity==='公積金'||entity==='行前費用'){ assert.ok(!/<label>金額<input/.test(form)); assert.ok(form.includes('pattern="-?[0-9]+"')); assert.ok(form.includes('aria-label=')); }
+          if(entity==='公積金'||entity==='行前費用'){ assert.ok(!/<label>金額<input/.test(form)); assert.ok(form.includes(entity==='公積金'?'pattern="[0-9]+"':'pattern="-?[0-9]+"')); assert.ok(form.includes('aria-label=')); }
         }
         for(const entity of ['團員','開團待辦','每日行程','航班','飯店','公積金','行前費用','收款']) {
           const form=renderToStaticMarkup(createElement(TripForm,{trip,book:demo,entity,row:null,busy:false,canEditIds:false,...editingHandlers}))
