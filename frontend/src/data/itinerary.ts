@@ -192,18 +192,21 @@ export function appendItineraryTag(value: string, selected: string): string {
 export function matchesItineraryTag(row: Row, tag: string): boolean {
   return !tag || itineraryTags([row]).includes(tag);
 }
-export function tripDayNumber(date: string, start: string): number | null {
+export function tripDayNumber(date: string, start: string, end: string): number | null {
   const current = new Date(date + "T00:00:00Z"),
-    first = new Date(start + "T00:00:00Z");
+    first = new Date(start + "T00:00:00Z"),
+    last = new Date(end + "T00:00:00Z");
   if (
     !Number.isFinite(current.getTime()) ||
     !Number.isFinite(first.getTime()) ||
+    !Number.isFinite(last.getTime()) ||
     current.toISOString().slice(0, 10) !== date ||
-    first.toISOString().slice(0, 10) !== start
+    first.toISOString().slice(0, 10) !== start ||
+    last.toISOString().slice(0, 10) !== end
   )
     return null;
   const day = (current.getTime() - first.getTime()) / 86400000 + 1;
-  return day >= 1 ? day : null;
+  return day >= 1 && current <= last ? day : null;
 }
 
 /** Compact local calendar labels for daily itinerary controls; never changes ISO data. */
@@ -211,13 +214,14 @@ export function itineraryDateText(
   date: string,
   start: string,
   end: string,
+  includeYear = false,
 ): string {
-  if (tripDayNumber(date, date) === null) return date;
+  if (tripDayNumber(date, date, date) === null) return date;
   const local = new Date(date + "T00:00:00Z");
   const sameYear =
     start.slice(0, 4) === end.slice(0, 4) &&
     date.slice(0, 4) === start.slice(0, 4);
-  const calendar = `${sameYear ? "" : date.slice(0, 4) + "/"}${local.getUTCMonth() + 1}/${local.getUTCDate()}`;
+  const calendar = `${sameYear && !includeYear ? "" : date.slice(0, 4) + "/"}${local.getUTCMonth() + 1}/${local.getUTCDate()}`;
   return `${calendar}(${["日", "一", "二", "三", "四", "五", "六"][local.getUTCDay()]})`;
 }
 export function itineraryDateLabel(
@@ -225,7 +229,7 @@ export function itineraryDateLabel(
   start: string,
   end: string,
 ): string {
-  const day = tripDayNumber(date, start);
+  const day = tripDayNumber(date, start, end);
   return `${day === null ? "" : `D${day} - `}${itineraryDateText(date, start, end)}`;
 }
 

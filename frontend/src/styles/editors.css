@@ -319,3 +319,34 @@
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
+
+.editor-record small.editor-record-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.editor-record-meta .editor-record-amount {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.editor-date-groups {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+}
+.editor-date-groups .editor-records {
+  gap: 12px;
+  margin-top: 0;
+}
+.editor-date-groups .editor-record {
+  position: relative;
+}
+.editor-date-groups .editor-record + .editor-record::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--line);
+}

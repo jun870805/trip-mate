@@ -5,6 +5,7 @@ import demo from "./demo.json" with { type: "json" };
 import { parseCatalog, parseTrip, summarize } from "./portal.ts";
 import {
   mutateTripBook,
+  equalPretripShares,
   automaticTripIds,
   readRows,
   editorSheets,
@@ -1514,4 +1515,37 @@ it('reads members in numeric ID order without moving spreadsheet rows or changin
   assert.deepEqual(readRows(book,'團員').map(row=>row['團員ID']),['M003','M999','M1000']);
   assert.deepEqual(book,original);
   assert.equal(readRows(book,'團員')[0]['排序'],'99');
+});
+
+it('adds equally split pretrip expenses from participant selection and keeps the expense total exact', () => {
+  const selected=[{memberId:'M001',amount:''},{memberId:'M002',amount:''},{memberId:'M003',amount:''}];
+  assert.deepEqual(equalPretripShares(selected,'300'),selected.map(row=>({...row,amount:'100.00'})));
+  assert.throws(()=>equalPretripShares(selected,'300.01'),/整除/);
+  assert.throws(()=>equalPretripShares([],'300'),/團員/);
+  assert.throws(()=>equalPretripShares(selected,'0'),/大於零/);
+  const next=mutateTripBook(trip,demo,{kind:'expense',mode:'add',equalSplit:true,values:{支出ID:'E099',日期:'2027-04-01',項目:'均分費用',分類:'活動',金額:'300'},shares:selected});
+  const dues=parseTrip(trip,next).dues.filter(due=>due.expenseId==='E099');
+  assert.deepEqual(dues.map(due=>due.expected),[10000,10000,10000]);
+});
+it('adds receipts for multiple members with separate batches and unique receipt IDs in one cloud write', async () => {
+  const api=fakeApi(),editor=createTripEditor(trip,'accounting',config,api.fetcher);
+  const before=await editor.read(session);
+  const next=await editor.save(session,before,{kind:'receipt',mode:'add',memberIds:['M001','M003'],values:{收款日期:'2027-04-03',備註:'多人收款'},allocations:[{expenseId:'E001',amount:'100',id:''},{expenseId:'E002',amount:'50',id:''}]});
+  assert.equal(api.writes,1);
+  const rows=readRows(next.book,'收款明細').filter(row=>row['備註']==='多人收款');
+  assert.equal(rows.length,4);
+  assert.equal(new Set(rows.map(row=>row['收款明細ID'])).size,4);
+  assert.equal(new Set(rows.map(row=>row['收款批次ID'])).size,2);
+  for(const memberId of ['M001','M003']) assert.equal(new Set(rows.filter(row=>row['團員ID']===memberId).map(row=>row['收款批次ID'])).size,1);
+  assert.ok(!readRows(before.book,'收款明細').some(row=>row['備註']==='多人收款'));
+});
+it('rejects invalid group receipts without partial writes or modifying the source', async () => {
+  const api=fakeApi(),editor=createTripEditor(trip,'accounting',config,api.fetcher);
+  const before=await editor.read(session),original=structuredClone(before.book);
+  for(const memberIds of [[],['M001','M001'],['M001','M099']]) {
+    await assert.rejects(editor.save(session,before,{kind:'receipt',mode:'add',memberIds,values:{收款日期:'2027-04-03'},allocations:[{expenseId:'E001',amount:'100',id:''}]}));
+    assert.equal(api.writes,0);
+    assert.deepEqual(before.book,original);
+  }
+  assert.throws(()=>mutateTripBook(trip,demo,{kind:'receipt',mode:'edit',id:'B001',memberIds:['M001','M003'],values:{收款日期:'2027-04-03'},allocations:[{expenseId:'E001',amount:'100',id:''}]}),/新增/);
 });

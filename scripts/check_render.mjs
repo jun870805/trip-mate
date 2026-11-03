@@ -130,8 +130,63 @@ try {
         assert.ok(!partialOverview.includes('公積金現金餘額') && !partialOverview.includes('行前尚待收款'), 'Invalid accounting must not appear as valid zero totals')
         const fundHtml = renderToStaticMarkup(createElement(Fund, {data}))
         assert.ok(fundHtml.includes('公積金對帳') && fundHtml.includes('個人餘額合計'))
+        const groupedFund = renderToStaticMarkup(createElement(Fund, {data:{...data, trip:{...data.trip,start:'2027-05-01',end:'2027-05-03'}, transactions:[
+          {...data.transactions[0],id:'F903',date:'2027-05-02',title:'later-transaction'},
+          {...data.transactions[0],id:'F902',date:'2027-05-01',title:'first-same-day'},
+          {...data.transactions[0],id:'F904',date:'2027-05-01',title:'second-same-day'},
+          {...data.transactions[0],id:'F901',date:'2026-12-31',title:'before-trip'},
+        ]}}))
+        assert.equal((groupedFund.match(/class="day-group"/g)||[]).length,3, 'Fund groups transactions once per date')
+        assert.ok(groupedFund.indexOf('before-trip') < groupedFund.indexOf('first-same-day') && groupedFund.indexOf('second-same-day') < groupedFund.indexOf('later-transaction'), 'Fund dates sort oldest first')
+        assert.ok(groupedFund.indexOf('first-same-day') < groupedFund.indexOf('second-same-day'), 'Same-day transaction order is preserved')
+        assert.ok(groupedFund.includes('DAY 1') && groupedFund.includes('5/1 (六)') && groupedFund.includes('2026/12/31 (四)') && !groupedFund.includes('DAY 0'), 'Fund headings follow itinerary calendar rules')
+        for(const type of ['支出','儲值','退款','調整']) {
+          const ledgerHtml=renderToStaticMarkup(createElement(Fund,{data:{...data,transactions:[{...data.transactions[0],type,amount:-1000,shares:[{memberId:'M001',amount:-501},{memberId:'M002',amount:-501}]}]}}))
+          const rowHtml=ledgerHtml.slice(ledgerHtml.indexOf('<article class="ledger-row"'))
+          assert.ok(rowHtml.includes('class="ledger-shares"'), 'Every transaction type retains participant details: '+type)
+          if(type==='支出') assert.ok(rowHtml.indexOf('公共餘款增加') < rowHtml.indexOf('</small>') && rowHtml.indexOf('</small>') < rowHtml.indexOf('class="ledger-shares"'), 'Complete allocation summary must precede participant details')
+        }
+        for(const [shareAmount, showsSummary] of [[-500,false],[-501,true]]) {
+          const transaction={...data.transactions[0],type:'支出',amount:-1000,shares:[{memberId:'M001',amount:shareAmount},{memberId:'M002',amount:shareAmount}]}
+          const html=renderToStaticMarkup(createElement(Fund,{data:{...data,transactions:[transaction]}}))
+          assert.equal(html.includes('ledger-summary'),showsSummary,'Show allocation summary only for nonzero surplus')
+          assert.ok(html.includes('class="ledger-shares"'),'Hiding the zero-surplus summary must retain participants')
+        }
+        for(const [amounts, equal] of [[[1000,1000],true],[[1000,2000],false]]) {
+          const html=renderToStaticMarkup(createElement(Fund,{data:{...data,currency:'IDR',members:[{id:'M001',name:'蕃薯',balance:0},{id:'M002',name:'蕾蕾',balance:0}],transactions:[{...data.transactions[0],type:'儲值',amount:amounts[0]+amounts[1],shares:amounts.map((amount,index)=>({memberId:index?'M002':'M001',amount}))}]}}))
+          const participants=html.slice(html.indexOf('<div class="ledger-shares">')).split('</div>')[0]
+          if(equal) {
+            assert.ok(participants.includes('每人') && participants.includes('參與人員：蕃薯、蕾蕾'),'Equal shares display the amount once followed by participant names')
+            assert.equal((participants.match(/IDR/g)||[]).length,1)
+          } else {
+            assert.ok(!participants.includes('每人') && participants.includes('蕃薯') && participants.includes('蕾蕾'),'Unequal legacy shares retain individual amounts')
+            assert.equal((participants.match(/IDR/g)||[]).length,2)
+          }
+        }
         const expenseHtml = renderToStaticMarkup(createElement(Expenses, {data}))
         assert.ok(expenseHtml.includes('團員收款摘要') && expenseHtml.includes('只看未收齊'))
+        assert.ok(expenseHtml.indexOf('<h3>所有費用</h3>') < expenseHtml.indexOf('<h3>團員收款摘要</h3>'), 'Expense list must appear before member collection summary')
+        const categoryExpenses=renderToStaticMarkup(createElement(Expenses,{data:{...data,expenses:[
+          {...data.expenses[0],id:'E901',date:'2027-05-02',title:'category-transport-first',category:'交通'},
+          {...data.expenses[0],id:'E902',date:'2027-04-01',title:'category-meal',category:'餐飲'},
+          {...data.expenses[0],id:'E903',date:'2027-04-03',title:'category-transport-second',category:'交通'},
+          {...data.expenses[0],id:'E904',title:'fund-item-hidden',method:'公積金'},
+        ],transactions:[
+          {...data.transactions[0],type:'支出',amount:-1000,shares:[{memberId:'M001',amount:-334},{memberId:'M002',amount:-334},{memberId:'M003',amount:-334}]},
+          {...data.transactions[0],type:'支出',amount:-1000,shares:[{memberId:'M001',amount:-334},{memberId:'M002',amount:-334},{memberId:'M003',amount:-334}]},
+        ]}}))
+        const expenseList=categoryExpenses.slice(categoryExpenses.indexOf('<h3>所有費用</h3>'),categoryExpenses.indexOf('<h3>團員收款摘要</h3>'))
+        assert.equal((expenseList.match(/class="expense-category-group"/g)||[]).length,3,'Expense list groups by category and aggregates fund items')
+        assert.ok(expenseList.indexOf('category-transport-first')<expenseList.indexOf('category-transport-second') && expenseList.indexOf('category-transport-second')<expenseList.indexOf('category-meal'),'Category items stay together in source order')
+        assert.ok(!expenseList.includes('2027/') && !expenseList.includes('D1 -') && !expenseList.includes('fund-item-hidden'),'No dates or individual fund expenses in summary')
+        assert.equal((expenseList.match(/<strong>公積金支出<[/]strong>/g)||[]).length,1)
+        assert.ok(expenseList.includes('JPY 668'),'Fund cost rounds up each share before summing')
+        assert.ok(/class="badge soft">交通<[/]span>/.test(expenseList),'Expense category uses a badge')
+        const perPersonExpenses=renderToStaticMarkup(createElement(Expenses,{data:{...data,expenses:[{...data.expenses[0],id:'E001',amount:100001,category:'其他',title:'existing-other'}],dues:['M001','M002','M003'].map(memberId=>({expenseId:'E001',memberId,expected:1,received:0,status:'未收'}))}}))
+        const perPersonList=perPersonExpenses.slice(perPersonExpenses.indexOf('<h3>所有費用</h3>'),perPersonExpenses.indexOf('<h3>團員收款摘要</h3>'))
+        assert.ok(perPersonList.includes('TWD 333.34'),'Pretrip expense uses its participant count and rounds up')
+        assert.equal((perPersonList.match(/class="expense-category-group"/g)||[]).length,1,'Fund spending merges into existing Other category')
+        assert.ok(perPersonList.includes('公積金支出') && !perPersonList.includes('每人全部參加') && !perPersonList.includes('不含公共尾差'),'Fund row omits explanatory subtitle')
         const itineraryHtml = renderToStaticMarkup(createElement(Itinerary, {data}))
         assert.ok(itineraryHtml.includes('<small>T1</small>') && itineraryHtml.includes('<small>T2</small>'))
         for (const [departure, arrival] of [['', 'T2'], ['T1', ''], ['', '']]) {
@@ -147,6 +202,11 @@ try {
         for(const tag of ['交通','住宿','景點','自由活動']) assert.ok(tagSelect.includes('value="'+tag+'"'), 'Tag choices include every itinerary date')
         assert.ok(itineraryHtml.includes('>DAY 1</span><h3>5/1 (六)</h3>') && itineraryHtml.includes('>DAY 3</span><h3>5/3 (一)</h3>'))
         assert.ok(itineraryHtml.includes('<option value="2027-05-01">D1 - 5/1(六)</option>'))
+        const outsideDates=['2027-04-30','2027-05-04']
+        const outsideItinerary=renderToStaticMarkup(createElement(Itinerary,{data:{...data,tables:{...data.tables,每日行程:outsideDates.map((date,index)=>({...data.tables['每日行程'][0],日期:date,行程ID:'I90'+index}))}}}))
+        assert.ok(!outsideItinerary.includes('DAY 4') && !outsideItinerary.includes('D4 -') && outsideItinerary.includes('<option value="2027-05-04">5/4(二)</option>'), 'Itinerary and date selector omit day numbers after the trip')
+        const outsideFund=renderToStaticMarkup(createElement(Fund,{data:{...data,transactions:outsideDates.map((date,index)=>({...data.transactions[0],date,id:'F90'+index}))}}))
+        assert.ok(!outsideFund.includes('DAY ') && outsideFund.includes('4/30 (五)') && outsideFund.includes('5/4 (二)'), 'Fund omits day numbers before and after the trip')
         const sharedMetadata=renderToStaticMarkup(createElement(TripMetadata,{data}))
         assert.ok(itineraryHtml.includes(sharedMetadata), 'PDF header must reuse the website metadata component')
         assert.ok(sharedMetadata.includes('匯率：1 TWD = 4.5 JPY') && sharedMetadata.includes('時差：+1 小時'))
@@ -403,9 +463,14 @@ try {
           if(entity==='每日行程') { assert.ok(form.includes('類別') && ['未分類','三餐','活動','交通','購物'].every(category=>form.includes('<option>'+category+'</option>') || form.includes('>'+category+'</option>'))); assert.ok(form.includes('選擇既有標籤') && ['交通','住宿','景點','自由活動'].every(tag=>form.includes('>'+tag+'</span>')), 'Tag picker includes saved tags from every day'); const timeInput=form.match(/<input[^>]*aria-label="時間"[^>]*>/)?.[0]; assert.ok(timeInput && !/readonly/i.test(timeInput), 'Daily itinerary time must support typing alongside the wheel'); for(const field of ['關聯航班','關聯飯店','結束時間','排序','地點','地圖網址']) assert.ok(!form.includes(field)); for(const field of ['日期','時間','標題','副標','內文','標籤']) assert.ok(form.includes(field)); assert.ok(form.includes('<select') && form.includes('D3 - 5/3(一)')); }
           if(entity==='航班') {assert.ok(form.includes('出發航廈') && form.includes('抵達航廈'));assert.ok(form.includes('出發當地時間') && form.includes('抵達當地時間'));assert.ok(!form.includes('時差'));}
           if(entity==='公積金') { assert.ok(form.includes('每人收款金額') && form.includes('checkbox') && form.includes('participant-options')); assert.ok(form.includes('>全選</button>'), 'Fund participants must offer select all'); assert.ok(form.includes('value="儲值"') && form.includes('>收款</option>')); assert.ok(!form.includes('交易金額由個人金額加總')); }
-          if(entity==='行前費用') assert.ok(form.includes('實際刷卡金額') && form.includes('TWD'))
-          if(entity==='收款') assert.ok(form.includes('繳款團員') && form.includes('加入收款項目'))
+          if(entity==='行前費用') { assert.ok(form.includes('實際刷卡金額') && form.includes('TWD')); assert.ok(form.includes('participant-options') && form.includes('實際參與者') && form.includes('>全選</button>') && !form.includes('participant-amounts'), 'New pretrip expenses select participants without individual amount inputs'); }
+          if(entity==='收款') assert.ok(form.includes('繳款團員') && form.includes('加入收款項目') && form.includes('participant-options') && form.includes('>全選</button>'), 'New collection batches allow member selection')
         }
+        const fundExpenseRow = {...data.tables['公積金交易'][0],類型:'支出'}
+        const fundExpenseForm=renderToStaticMarkup(createElement(TripForm,{trip,book:demo,entity:'公積金',row:fundExpenseRow,busy:false,canEditIds:true,...editingHandlers}))
+        const categorySelect=fundExpenseForm.match(/分類<span[^>]*>.*?<[/]span><[/]span><select[^>]*>(.*?)<[/]select>/)?.[1]
+        assert.ok(categorySelect, 'Fund expense category must be a select')
+        for(const category of ['交通','餐飲','住宿','活動','小費','其他']) assert.ok(categorySelect.includes('>'+category+'</option>'))
         for(const [entity,sheet] of [['團員','團員'],['開團待辦','開團待辦'],['每日行程','每日行程'],['航班','航班'],['飯店','飯店'],['公積金','公積金交易'],['行前費用','支出明細'],['收款','收款明細']]) {
           const headers = demo[sheet][0], row=Object.fromEntries(headers.map((key,index)=>[key,String(demo[sheet][1][index]??'')]))
           const form = renderToStaticMarkup(createElement(TripForm,{trip,book:demo,entity,row,busy:false,canEditIds:true,...editingHandlers}))

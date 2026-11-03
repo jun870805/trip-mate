@@ -164,9 +164,10 @@
   font-variant-numeric: tabular-nums;
 }
 .member-card small {
-  display: block;
+  display: inline;
   color: var(--muted);
-  margin-top: 3px;
+  font-weight: 400;
+  white-space: nowrap;
 }
 .member-card.selected {
   border-color: var(--brown);
@@ -195,8 +196,9 @@
   font-size: 12px;
 }
 .ledger {
+  --ledger-gap: 28px;
   display: grid;
-  gap: 28px;
+  gap: var(--ledger-gap);
   padding: var(--card-padding);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -204,7 +206,16 @@
   background: var(--paper);
 }
 .ledger-row {
+  position: relative;
   min-width: 0;
+}
+.ledger-row + .ledger-row::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--ledger-gap) / -2);
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--line);
 }
 .ledger-main {
   display: flex;
@@ -224,13 +235,19 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.ledger-summary.muted {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
 .ledger-shares {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 18px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
-  margin: 14px 0 7px;
+  margin: 0;
+  padding-top: 8px;
 }
 .ledger-shares b {
   font-weight: 500;
@@ -244,6 +261,7 @@
 }
 .expense-row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   font-size: 14px;
@@ -366,21 +384,25 @@ progress::-webkit-progress-value {
   }
   .member-grid {
     grid-template-columns: 1fr;
+    gap: 8px;
   }
   .member-card {
     padding: var(--card-padding);
   }
   .member-card > span:last-child {
     flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 8px;
+  }
+  .member-card > span:last-child > span {
+    overflow-wrap: anywhere;
   }
   .member-card strong {
-    display: inline-block;
-    float: right;
     margin-top: 0;
     font-size: 18px;
-  }
-  .member-card small {
-    margin-top: 7px;
   }
   .filter-label {
     flex-shrink: 0;
@@ -402,15 +424,11 @@ progress::-webkit-progress-value {
     padding: 4px 7px;
   }
   .ledger {
+    --ledger-gap: 24px;
     padding: var(--card-padding);
-    gap: 24px;
   }
   .ledger-main {
     gap: 9px;
-    font-size: 13px;
-  }
-  .ledger-amount {
-    font-size: 12px;
   }
   .ledger-main .badge {
     font-size: 10px;
@@ -462,11 +480,15 @@ progress::-webkit-progress-value {
 .member-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 24px;
+  gap: 12px;
   margin-top: 20px;
 }
 .member-summary article {
+  font-size: 14px;
   line-height: 1.8;
+}
+.member-summary article > strong {
+  font-size: 16px;
 }
 .inline-check {
   display: flex;
@@ -488,4 +510,73 @@ progress::-webkit-progress-value {
   .print-excluded {
     display: none !important;
   }
+}
+
+.stats-grid.accounting-stats {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.accounting-stats + .panel {
+  margin-top: 0;
+}
+@media (max-width: 700px) {
+  .stats-grid.accounting-stats {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+}
+
+.expense-member-summary {
+  margin-top: 12px;
+}
+@media (max-width: 700px) {
+  .expense-member-summary {
+    margin-top: 8px;
+  }
+}
+
+.expense-category-heading {
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.expense-category-rows {
+  display: grid;
+  gap: 12px;
+}
+.expense-title {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: start;
+  gap: 4px 8px;
+  overflow-wrap: anywhere;
+}
+.expense-title .badge {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.section-heading.fund-ledger-heading {
+  margin: 0;
+  padding: 24px 0 0;
+}
+.footnote.fund-ledger-note {
+  margin-bottom: 16px;
+  padding-bottom: 0;
+}
+.fund-ledger {
+  display: grid;
+  gap: 16px;
+}
+.fund-ledger .day-group {
+  margin: 0;
+  padding: 0;
+}
+.fund-ledger .day-label {
+  margin-bottom: 12px;
+}
+.ledger-main .ledger-title {
+  font-size: 16px;
 }

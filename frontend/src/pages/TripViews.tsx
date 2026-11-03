@@ -26,6 +26,7 @@ import { displayDate, flightDayOffset } from "../data/display-date";
 import { useTripToday } from "../hooks/useTripToday";
 import { useState } from "react";
 import { fundTypeLabel } from "../data/fund-payments";
+import { fullParticipationFundCost, perPersonPretripCost } from "../data/expense-summary";
 import {
   safeUrl,
   money,
@@ -152,7 +153,7 @@ export function Itinerary({ data, inlineDetails = false }: { data: TripData; inl
   const tags = itineraryTags(data.tables["每日行程"]);
   const activeTag = tags.includes(tag) ? tag : "";
   const dayPrefix = (date: string) => {
-    const number = tripDayNumber(date, data.trip.start);
+    const number = tripDayNumber(date, data.trip.start, data.trip.end);
     return number === null ? "" : `DAY ${number} `;
   };
   const [detailsId, setDetailsId] = useState<string | null>(null);
@@ -538,6 +539,24 @@ export function Itinerary({ data, inlineDetails = false }: { data: TripData; inl
     </section>
   );
 }
+function FundParticipants({ data, transaction, memberId }: {
+  data: TripData;
+  transaction: TripData["transactions"][number];
+  memberId: string;
+}) {
+  const shares = transaction.shares.filter(share => memberId === "all" || share.memberId === memberId);
+  const equal = shares.length > 0 && shares.every(share => share.amount === shares[0].amount);
+  const memberName = (id: string) => data.members.find(member => member.id === id)?.name || "";
+  return (
+    <div className="ledger-shares">
+      {equal ? (
+        <span>每人 <b>{money(shares[0].amount, data.currency)}</b>，參與人員：{shares.map(share => memberName(share.memberId)).join("、")}</span>
+      ) : shares.map(share => (
+        <span key={share.memberId}>{memberName(share.memberId)} <b>{money(share.amount, data.currency)}</b></span>
+      ))}
+    </div>
+  );
+}
 export function Fund({ data }: { data: TripData }) {
   const [memberId, setMemberId] = useState("all");
   const totals = summarize(data);
@@ -546,7 +565,8 @@ export function Fund({ data }: { data: TripData }) {
       (t) =>
         memberId === "all" || t.shares.some((s) => s.memberId === memberId),
     )
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const dates = [...new Set(transactions.map((transaction) => transaction.date))];
   return (
     <section className="no-print">
       <div className="section-heading">
@@ -557,7 +577,7 @@ export function Fund({ data }: { data: TripData }) {
           </p>
         </div>
       </div>
-      <div className="stats-grid">
+      <div className="stats-grid accounting-stats">
         <Stat
           label="現金餘額"
           value={money(totals.cash, data.currency)}
@@ -614,11 +634,11 @@ export function Fund({ data }: { data: TripData }) {
             >
               <span className="avatar">{m.name.slice(-1)}</span>
               <span>
-                {m.name}
+                <span>{m.name}</span>
                 <strong className={m.balance < 0 ? "negative" : ""}>
                   {money(m.balance, data.currency)}
+                  {m.balance < 0 && <small>（待補繳）</small>}
                 </strong>
-                {m.balance < 0 && <small>待補繳</small>}
               </span>
             </button>
           ))}
@@ -626,7 +646,7 @@ export function Fund({ data }: { data: TripData }) {
       ) : (
         <Empty>尚未填寫團員。</Empty>
       )}
-      <div className="section-heading">
+      <div className="section-heading fund-ledger-heading">
         <h3>收支明細</h3>
         <label className="filter-label">
           <span className="sr-only">團員</span>
@@ -643,48 +663,50 @@ export function Fund({ data }: { data: TripData }) {
           </select>
         </label>
       </div>
-      <p className="muted footnote">
+      <p className="muted footnote fund-ledger-note">
         消費只由參與者均分，每人向上取至幣別最小單位；多出的金額留在公共餘款。
       </p>
       {transactions.length ? (
-        <div className="ledger">
-          {transactions.map((t) => (
-            <article className="ledger-row" key={t.id}>
-              <div className="ledger-main">
-                <Badge soft>{fundTypeLabel(t.type)}</Badge>
-                <div>
-                  <strong>{t.title}</strong>
-                  <small>{displayDate(t.date)}</small>
-                </div>
-                <strong className="ledger-amount">
-                  {money(t.amount, data.currency)}
-                </strong>
+        <div className="fund-ledger">
+          {dates.map((date) => (
+            <section className="day-group" key={date}>
+              <div className="day-label">
+                {tripDayNumber(date, data.trip.start, data.trip.end) !== null && (
+                  <span>DAY {tripDayNumber(date, data.trip.start, data.trip.end)}</span>
+                )}
+                <h3>{itineraryDateText(date, data.trip.start, data.trip.end).replace("(", " (")}</h3>
               </div>
-              <div className="ledger-shares">
-                {t.shares
-                  .filter((s) => memberId === "all" || s.memberId === memberId)
-                  .map((s) => (
-                    <span key={s.memberId}>
-                      {data.members.find((m) => m.id === s.memberId)?.name}{" "}
-                      <b>{money(s.amount, data.currency)}</b>
-                    </span>
-                  ))}
+              <div className="ledger">
+                {transactions.filter((transaction) => transaction.date === date).map((t) => (
+                  <article className="ledger-row" key={t.id}>
+                    <div className="ledger-main">
+                      <Badge soft>{fundTypeLabel(t.type)}</Badge>
+                      <div>
+                        <strong className="ledger-title">{t.title}</strong>
+                      </div>
+                      <strong className="ledger-amount">
+                        {money(t.amount, data.currency)}
+                      </strong>
+                    </div>
+                    {t.type === "支出" && -t.shares.reduce((sum, s) => sum + s.amount, 0) + t.amount !== 0 && (
+                      <small className="muted ledger-summary">
+                        分攤合計{" "}
+                        {money(
+                          -t.shares.reduce((sum, s) => sum + s.amount, 0),
+                          data.currency,
+                        )}
+                        ，公共餘款增加{" "}
+                        {money(
+                          -t.shares.reduce((sum, s) => sum + s.amount, 0) + t.amount,
+                          data.currency,
+                        )}
+                      </small>
+                    )}
+                    <FundParticipants data={data} transaction={t} memberId={memberId} />
+                  </article>
+                ))}
               </div>
-              {t.type === "支出" && (
-                <small className="muted">
-                  分攤合計{" "}
-                  {money(
-                    -t.shares.reduce((sum, s) => sum + s.amount, 0),
-                    data.currency,
-                  )}
-                  ，公共餘款增加{" "}
-                  {money(
-                    -t.shares.reduce((sum, s) => sum + s.amount, 0) + t.amount,
-                    data.currency,
-                  )}
-                </small>
-              )}
-            </article>
+            </section>
           ))}
         </div>
       ) : (
@@ -703,6 +725,11 @@ export function Expenses({
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [memberId, setMemberId] = useState("all");
   const totals = summarize(data);
+  const pretripExpenses = data.expenses.filter((expense) => expense.method === "行前收款");
+  const expenseCategories = [...new Set(pretripExpenses.map((expense) => expense.category))];
+  const hasFundSpending = data.transactions.some((transaction) => transaction.type === "支出");
+  const fullFundCost = fullParticipationFundCost(data.transactions);
+  if (hasFundSpending && !expenseCategories.includes("其他")) expenseCategories.push("其他");
   const dues = data.dues.filter(
     (d) =>
       (memberId === "all" || d.memberId === memberId) &&
@@ -716,7 +743,7 @@ export function Expenses({
           <p className="muted">行前費用收台幣，到店支付的費用由公積金支出。</p>
         </div>
       </div>
-      <div className="stats-grid">
+      <div className="stats-grid accounting-stats">
         <Stat
           label="行前費用"
           value={money(totals.pretrip, "TWD")}
@@ -729,15 +756,50 @@ export function Expenses({
         />
         <Stat
           label="整趟參考花費"
-          value={new Intl.NumberFormat("zh-TW", {
-            style: "currency",
-            currency: "TWD",
+          value={`TWD ${new Intl.NumberFormat("zh-TW", {
+            minimumFractionDigits: 2,
             maximumFractionDigits: 2,
-          }).format(totals.totalTwd)}
-          note={`行前費用＋當地消費 ÷ ${data.rate}；不含公共尾差`}
+          }).format(totals.totalTwd)}`}
+          note={`行前費用＋當地消費 ÷ ${data.rate}`}
         />
       </div>
       <section className="panel">
+        <h3>所有費用</h3>
+        {pretripExpenses.length || hasFundSpending ? (
+          <div className="expense-list">
+            {expenseCategories.map((category) => (
+              <section className="expense-category-group" key={category}>
+                <h4 className="expense-category-heading"><Badge soft>{category}</Badge></h4>
+                <div className="expense-category-rows">
+                  {pretripExpenses.filter((expense) => expense.category === category).map((e) => {
+                    const cost = perPersonPretripCost(e, data.dues);
+                    return (
+                      <div className="expense-row" key={e.id}>
+                        <div className="expense-title"><strong>{e.title}</strong></div>
+                        <div>
+                          <strong>{cost === null ? "無法計算" : money(cost, e.currency)}</strong>
+                          <small>{e.method}</small>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {category === "其他" && hasFundSpending && (
+                    <div className="expense-row">
+                      <div className="expense-title"><strong>公積金支出</strong></div>
+                      <div>
+                        <strong>{fullFundCost === null ? "無法計算" : money(fullFundCost, data.currency)}</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <Empty>尚未填寫支出。</Empty>
+        )}
+      </section>
+      <section className="panel expense-member-summary">
         <h3>團員收款摘要</h3>
         <div className="member-summary">
           {summarizeMembers(data)
@@ -756,29 +818,6 @@ export function Expenses({
               </article>
             ))}
         </div>
-      </section>
-      <section className="panel">
-        <h3>所有費用</h3>
-        {data.expenses.length ? (
-          <div className="expense-list">
-            {data.expenses.map((e) => (
-              <div className="expense-row" key={e.id}>
-                <div>
-                  <strong>{e.title}</strong>
-                  <small>
-                    {displayDate(e.date)} - {e.category}
-                  </small>
-                </div>
-                <div>
-                  <strong>{money(e.amount, e.currency)}</strong>
-                  <small>{e.method}</small>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Empty>尚未填寫支出。</Empty>
-        )}
       </section>
       <div className="section-heading">
         <div>

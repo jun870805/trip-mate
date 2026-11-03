@@ -58,6 +58,7 @@ export type TripMutation =
     }
   | {
       kind: "expense";
+      equalSplit?: boolean;
       mode: Mode;
       id?: string;
       values: Row;
@@ -65,6 +66,7 @@ export type TripMutation =
     }
   | {
       kind: "receipt";
+      memberIds?: string[];
       mode: Mode;
       id?: string;
       values: Row;
@@ -299,11 +301,35 @@ function identifier(
   }
   return value;
 }
+/** New pretrip expenses use equal shares; totals must remain equal to the actual charge. */
+export function equalPretripShares(selected: readonly ShareInput[], amount: string): ShareInput[] {
+  check(selected.length > 0, "請至少選擇一位團員。");
+  check(new Set(selected.map(share => share.memberId)).size === selected.length, "團員不可重複。");
+  const total = toMinor(amount, "TWD");
+  check(total > 0, "實際刷卡金額須大於零。");
+  check(total % selected.length === 0, "總金額無法由參與人數整除，請調整金額或參與者。");
+  return selected.map(share => ({ memberId: share.memberId, amount: minorInput(total / selected.length, "TWD") }));
+}
 export function mutateTripBook(
   trip: Trip,
   before: Workbook,
   mutation: TripMutation,
 ): Workbook {
+  if (mutation.kind === "receipt" && mutation.memberIds !== undefined) {
+    check(mutation.mode === "add", "多人收款只支援新增批次。");
+    check(mutation.memberIds.length > 0, "請至少選擇一位繳款團員。");
+    check(new Set(mutation.memberIds).size === mutation.memberIds.length, "繳款團員不可重複。");
+    let next = before;
+    for (const [index, memberId] of mutation.memberIds.entries()) {
+      next = mutateTripBook(trip, next, {
+        ...mutation,
+        memberIds: undefined,
+        values: { ...mutation.values, 團員ID: memberId, 收款批次ID: index === 0 ? mutation.values["收款批次ID"] || "" : "" },
+        allocations: mutation.allocations.map(allocation => ({ ...allocation, id: index === 0 ? allocation.id : "" })),
+      });
+    }
+    return next;
+  }
   const book = structuredClone(before),
     scope = mutationScope(mutation);
   const settings = readRows(book, "旅程設定")[0],
@@ -524,6 +550,9 @@ export function mutateTripBook(
       } else erase(book, "支出明細", (row) => row["公積金交易ID"] === id);
     }
   } else if (mutation.kind === "expense") {
+    const shares = mutation.equalSplit && mutation.mode !== "delete"
+      ? equalPretripShares(mutation.shares, mutation.values["金額"])
+      : mutation.shares;
     const id = identifier(
       book,
       "支出明細",
@@ -549,7 +578,7 @@ export function mutateTripBook(
     } else {
       for (const receipt of receipts)
         check(
-          mutation.shares.some((share) => share.memberId === receipt["團員ID"]),
+          shares.some((share) => share.memberId === receipt["團員ID"]),
           "已有收款的團員不能直接移除，請先處理收款。",
         );
       put(
@@ -570,7 +599,7 @@ export function mutateTripBook(
         book,
         "行前費用分攤",
         (row) => row["支出ID"] === id,
-        mutation.shares.map((share) => ({
+        shares.map((share) => ({
           支出ID: id,
           團員ID: share.memberId,
           應繳金額: share.amount,

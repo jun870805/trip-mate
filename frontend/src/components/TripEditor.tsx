@@ -1,7 +1,9 @@
+import { groupRowsByDate } from "../data/date-groups";
 import itineraryCategories from "../data/itinerary-categories.json" with { type: "json" };
 import { ItineraryTagInput } from "./ItineraryTagInput";
 import { confirmTripEditorClose } from "../data/editor-close";
 import { ItineraryList } from "./ItineraryList";
+import itineraryListStyles from "./ItineraryList.module.css";
 import { CloseButton } from "./CloseButton";
 import bookingStyles from "./BookingCards.module.css";
 import { displayDate, displayDateTime } from "../data/display-date";
@@ -22,6 +24,8 @@ import {
   tripDates,
   itinerarySubtitle,
   itineraryDateLabel,
+  itineraryDateText,
+  tripDayNumber,
   itineraryTags,
   orderedItinerary,
 } from "../data/itinerary";
@@ -30,6 +34,7 @@ import {
   readRows,
   TripEditApiError,
   mutateTripBook,
+  equalPretripShares,
   isPersonalAmountInput,
 } from "../data/trip-editor";
 import type {
@@ -40,6 +45,8 @@ import type {
   ShareInput,
   ReceiptInput,
 } from "../data/trip-editor";
+
+const fundExpenseCategories = ["交通", "餐飲", "住宿", "活動", "小費", "其他"];
 
 type Entity = BasicSheet | "公積金" | "行前費用" | "收款";
 const entities: Record<EditorScope, Entity[]> = {
@@ -91,9 +98,9 @@ function items(book: Workbook, entity: Entity): Row[] {
 function itemId(entity: Entity, row: Row) {
   return row[rules[entityKind[entity]].column];
 }
-function itemLabel(entity: Entity, row: Row, book: Workbook) {
+function itemLabel(entity: Entity, row: Row, book: Workbook, includeDate = true) {
   if (entity === "收款")
-    return `${readRows(book, "團員").find((member) => member["團員ID"] === row["團員ID"])?.["顯示名稱"] || ""} - ${displayDate(row["收款日期"])}`;
+    return `${readRows(book, "團員").find((member) => member["團員ID"] === row["團員ID"])?.["顯示名稱"] || ""}${includeDate ? ` - ${displayDate(row["收款日期"])}` : ""}`;
   return (
     row["標題"] ||
     row["項目"] ||
@@ -338,6 +345,11 @@ export function TripEditor({
       else onClose();
     }
   }
+  const listRows = snapshot ? items(snapshot.book, entity) : [];
+  const groupByDate = scope === "accounting" && entity !== "團員";
+  const listGroups = groupByDate
+    ? groupRowsByDate(listRows, entity === "收款" ? "收款日期" : "日期")
+    : [{ date: "", rows: listRows }];
   return (
     <dialog
       ref={dialog}
@@ -476,66 +488,79 @@ export function TripEditor({
                         onReorder={(mutation) => void save(mutation)}
                       />
                     ) : (
-                      <div
-                        className={`editor-records${entity === "航班" || entity === "飯店" ? ` ${bookingStyles["booking-records"]}` : ""}`}
-                      >
-                        {items(snapshot.book, entity).map((row) => (
-                          <article
-                            className={`editor-record${entity === "航班" || entity === "飯店" ? ` ${bookingStyles["booking-card"]}` : ""}`}
-                            key={itemId(entity, row)}
-                          >
-                            <div>
-                              <strong>
-                                {itemLabel(entity, row, snapshot.book)}
-                              </strong>
-                              {itemAmount(entity, row, snapshot.book) && (
-                                <span className="editor-record-amount">
-                                  {itemAmount(entity, row, snapshot.book)}
-                                </span>
-                              )}
-                              <small>
-                                {displayDateTime(
-                                  row["日期"] ||
-                                    row["截止日期"] ||
-                                    row["入住日期"] ||
-                                    row["出發時間"] ||
-                                    "",
-                                )}{" "}
-                                {entity === "公積金" ? fundTypeLabel(row["類型"] || "") : row["類型"] || row["狀態"] || ""}
-                              </small>
-                            </div>
-                            <div className="editor-row-actions">
-                              {scope === "itinerary" && (
-                                <button
-                                  type="button"
-                                  className="quiet-button"
-                                  disabled={busy}
-                                  onClick={() => duplicate(row)}
+                      <div className={groupByDate ? "editor-date-groups" : undefined}>
+                        {listGroups.map(({ date, rows }) => (
+                          <section key={date}>
+                            {groupByDate && (
+                              <h3 className={`${itineraryListStyles.dayHeading} editor-date-heading`}>
+                                {tripDayNumber(date, trip.start, trip.end) === null
+                                  ? itineraryDateText(date, trip.start, trip.end, true)
+                                  : itineraryDateLabel(date, trip.start, trip.end)}
+                              </h3>
+                            )}
+                            <div className={`editor-records${groupByDate ? " panel" : ""}${entity === "航班" || entity === "飯店" ? ` ${bookingStyles["booking-records"]}` : ""}`}>
+                              {rows.map((row) => (
+                                <article
+                                  className={`editor-record${entity === "航班" || entity === "飯店" ? ` ${bookingStyles["booking-card"]}` : ""}`}
+                                  key={itemId(entity, row)}
                                 >
-                                  複製
-                                </button>
-                              )}
-                              <button
-                                className="quiet-button"
-                                disabled={busy}
-                                onClick={() => {
-                                  setNotice("");
-                                  setTarget({ entity, row });
-                                }}
-                              >
-                                編輯
-                              </button>
-                              <button
-                                className="quiet-button delete-button"
-                                disabled={busy}
-                                onClick={() => remove(row)}
-                              >
-                                刪除
-                              </button>
+                                  <div>
+                                    <strong>
+                                      {itemLabel(entity, row, snapshot.book, !groupByDate)}
+                                    </strong>
+                                    <small className={scope === "accounting" ? "editor-record-meta" : undefined}>
+                                      {(!groupByDate || entity === "公積金" || row["類型"] || row["狀態"]) && <span>
+                                      {!groupByDate && displayDateTime(
+                                        row["日期"] ||
+                                          row["截止日期"] ||
+                                          row["入住日期"] ||
+                                          row["出發時間"] ||
+                                          "",
+                                      )}{" "}
+                                      {entity === "公積金" ? fundTypeLabel(row["類型"] || "") : row["類型"] || row["狀態"] || ""}
+                                      </span>}
+                                      {itemAmount(entity, row, snapshot.book) && (
+                                        <span className="editor-record-amount">
+                                          {itemAmount(entity, row, snapshot.book)}
+                                        </span>
+                                      )}
+                                    </small>
+                                  </div>
+                                  <div className="editor-row-actions">
+                                    {scope === "itinerary" && (
+                                      <button
+                                        type="button"
+                                        className="quiet-button"
+                                        disabled={busy}
+                                        onClick={() => duplicate(row)}
+                                      >
+                                        複製
+                                      </button>
+                                    )}
+                                    <button
+                                      className="quiet-button"
+                                      disabled={busy}
+                                      onClick={() => {
+                                        setNotice("");
+                                        setTarget({ entity, row });
+                                      }}
+                                    >
+                                      編輯
+                                    </button>
+                                    <button
+                                      className="quiet-button delete-button"
+                                      disabled={busy}
+                                      onClick={() => remove(row)}
+                                    >
+                                      刪除
+                                    </button>
+                                  </div>
+                                </article>
+                              ))}
                             </div>
-                          </article>
+                          </section>
                         ))}
-                        {!items(snapshot.book, entity).length && (
+                        {!listRows.length && (
                           <p className="muted">尚無{names[entity]}。</p>
                         )}
                       </div>
@@ -708,7 +733,22 @@ export function TripForm({
   const [originalPayment] = useState(() => row && entity === "公積金" && ["儲值", "退款"].includes(row["類型"])
     ? { type: row["類型"], shares: structuredClone(shares) } : null);
   const equalPayment = entity === "公積金" && ["儲值", "退款"].includes(values["類型"]);
-  const checkboxOnly = entity === "公積金" && values["類型"] !== "調整";
+  const equalPretrip = entity === "行前費用" && !row;
+  const checkboxOnly = (entity === "公積金" && values["類型"] !== "調整") || equalPretrip;
+  const [receiptMemberIds, setReceiptMemberIds] = useState<string[]>([]);
+  const multipleReceipts = entity === "收款" && !row;
+  const receiptParticipants = multipleReceipts ? receiptMemberIds : [values["團員ID"]];
+  const receiptExpenses = readRows(book, "行前費用分攤");
+  const availableReceiptExpenses = readRows(book, "支出明細").filter(expense =>
+    receiptParticipants.length > 0 && receiptParticipants.every(memberId => receiptExpenses.some(due =>
+      due["支出ID"] === expense["支出ID"] && due["團員ID"] === memberId)),
+  );
+  function changeReceiptMembers(next: string[]) {
+    setReceiptMemberIds(next);
+    setAllocations(current => current.filter(allocation => !allocation.expenseId ||
+      next.length > 0 && next.every(memberId => receiptExpenses.some(due =>
+        due["支出ID"] === allocation.expenseId && due["團員ID"] === memberId))));
+  }
   const existingUnequal = originalPayment && originalPayment.type === values["類型"] && !commonFundAmount(originalPayment.shares, currency)
     ? originalPayment.shares : undefined;
   const preservingUnequal = !!(existingUnequal && !perPersonAmount && shares.every(share => existingUnequal.some(original => original.memberId === share.memberId)));
@@ -874,6 +914,7 @@ export function TripForm({
       else if (entity === "行前費用")
         mutation = {
           kind: "expense",
+          equalSplit: equalPretrip,
           mode: row ? "edit" : "add",
           id: row?.["支出ID"],
           values,
@@ -882,6 +923,7 @@ export function TripForm({
       else if (entity === "收款")
         mutation = {
           kind: "receipt",
+          memberIds: multipleReceipts ? receiptMemberIds : undefined,
           mode: row ? "edit" : "add",
           id: row?.["收款批次ID"],
           values,
@@ -945,22 +987,19 @@ export function TripForm({
         currency,
       )}`;
     }
-    if (
-      entity === "行前費用" &&
-      shares.length &&
-      shares.every((share) => share.amount)
-    )
-      preview = `個人應繳合計 ${money(
-        shares.reduce((sum, share) => sum + toMinor(share.amount, "TWD"), 0),
-        "TWD",
-      )}`;
+    if (equalPretrip && values["金額"] && shares.length) {
+      const split = equalPretripShares(shares, values["金額"]);
+      preview = `${split.length} 人，每人應繳 ${money(toMinor(split[0].amount, "TWD"), "TWD")}`;
+    } else if (entity === "行前費用" && shares.length && shares.every(share => share.amount)) {
+      preview = `個人應繳合計 ${money(shares.reduce((sum, share) => sum + toMinor(share.amount, "TWD"), 0), "TWD")}`;
+    }
     if (
       entity === "收款" &&
       allocations.length &&
       allocations.every((item) => item.amount)
     )
-      preview = `本批次合計 ${money(
-        allocations.reduce((sum, item) => sum + toMinor(item.amount, "TWD"), 0),
+      preview = `${multipleReceipts ? "本次收款合計" : "本批次合計"} ${money(
+        allocations.reduce((sum, item) => sum + toMinor(item.amount, "TWD"), 0) * (multipleReceipts ? receiptMemberIds.length : 1),
         "TWD",
       )}`;
   } catch {
@@ -1043,7 +1082,7 @@ export function TripForm({
                     分類
                     <RequiredMark />
                   </span>
-                  <input
+                  <select
                     required
                     value={expense["分類"]}
                     onChange={(event) =>
@@ -1052,7 +1091,14 @@ export function TripForm({
                         分類: event.target.value,
                       }))
                     }
-                  />
+                  >
+                    {expense["分類"] && !fundExpenseCategories.includes(expense["分類"]) && (
+                      <option value={expense["分類"]}>{expense["分類"]}</option>
+                    )}
+                    {fundExpenseCategories.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
                 </label>
               </>
             )}
@@ -1060,7 +1106,7 @@ export function TripForm({
               <div className="participant-heading">
               <h4>
                 {entity === "行前費用"
-                  ? "個人應繳（TWD）"
+                  ? "實際參與者"
                     : checkboxOnly
                     ? "實際參與者"
                     : `個人金額（${currency}）`}
@@ -1159,12 +1205,27 @@ export function TripForm({
         ) : entity === "收款" ? (
           <>
             {renderField({ key: "收款日期", type: "date", required: true })}
-            {renderField({
-              key: "團員ID",
-              label: "繳款團員",
-              relation: "團員",
-              required: true,
-            })}
+            {multipleReceipts ? (
+              <div className="participant-fields">
+                <div className="participant-heading">
+                  <h4>繳款團員<RequiredMark /></h4>
+                  <button type="button" className="quiet-button"
+                    disabled={busy || !members.length || receiptMemberIds.length === members.length}
+                    onClick={() => changeReceiptMembers(members.map(member => member["團員ID"]))}>全選</button>
+                </div>
+                <div className="participant-options">
+                  {members.map(member => (
+                    <label className="checkbox-label" key={member["團員ID"]}>
+                      <input type="checkbox" checked={receiptMemberIds.includes(member["團員ID"])}
+                        onChange={event => changeReceiptMembers(event.target.checked
+                          ? [...receiptMemberIds, member["團員ID"]]
+                          : receiptMemberIds.filter(id => id !== member["團員ID"]))} />
+                      {member["顯示名稱"]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : renderField({ key: "團員ID", label: "繳款團員", relation: "團員", required: true })}
             <div className="receipt-allocations">
               <h4>本次收款項目（TWD）</h4>
               {allocations.map((allocation, index) => (
@@ -1188,23 +1249,14 @@ export function TripForm({
                       }
                     >
                       <option value="">選擇項目</option>
-                      {readRows(book, "行前費用分攤")
-                        .filter((item) => item["團員ID"] === values["團員ID"])
-                        .map((item) => (
-                          <option key={item["支出ID"]} value={item["支出ID"]}>
-                            {
-                              readRows(book, "支出明細").find(
-                                (expense) =>
-                                  expense["支出ID"] === item["支出ID"],
-                              )?.["項目"]
-                            }
-                          </option>
-                        ))}
+                      {availableReceiptExpenses.map(expense => (
+                        <option key={expense["支出ID"]} value={expense["支出ID"]}>{expense["項目"]}</option>
+                      ))}
                     </select>
                   </label>
                   <label>
                     <span>
-                      實收金額
+                      {multipleReceipts ? "每人實收金額" : "實收金額"}
                       <RequiredMark />
                     </span>
                     <input
@@ -1260,6 +1312,7 @@ export function TripForm({
               <button
                 type="button"
                 className="button secondary"
+                disabled={multipleReceipts && (!receiptMemberIds.length || !availableReceiptExpenses.length)}
                 onClick={() => {
                   try {
                     const id = nextRecordId("receipt", [

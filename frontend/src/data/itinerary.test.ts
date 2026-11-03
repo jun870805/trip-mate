@@ -170,13 +170,13 @@ it("lists tags from all dates without duplicates or empty tags and filters exact
   assert.equal(matchesItineraryTag({ 類型: "交通餐飲" }, "交通"), false);
 });
 it("numbers trip days from the start date across months and leap years independently of filters", () => {
-  assert.equal(tripDayNumber("2027-05-01", "2027-05-01"), 1);
-  assert.equal(tripDayNumber("2027-05-03", "2027-05-01"), 3);
-  assert.equal(tripDayNumber("2028-03-01", "2028-02-28"), 3);
-  assert.equal(tripDayNumber("2028-01-01", "2027-12-31"), 2);
-  assert.equal(tripDayNumber("2027-04-30", "2027-05-01"), null);
-  assert.equal(tripDayNumber("bad", "2027-05-01"), null);
-  assert.equal(tripDayNumber("2027-02-30", "2027-02-01"), null);
+  assert.equal(tripDayNumber("2027-05-01", "2027-05-01", "2028-12-31"), 1);
+  assert.equal(tripDayNumber("2027-05-03", "2027-05-01", "2028-12-31"), 3);
+  assert.equal(tripDayNumber("2028-03-01", "2028-02-28", "2028-12-31"), 3);
+  assert.equal(tripDayNumber("2028-01-01", "2027-12-31", "2028-12-31"), 2);
+  assert.equal(tripDayNumber("2027-04-30", "2027-05-01", "2028-12-31"), null);
+  assert.equal(tripDayNumber("bad", "2027-05-01", "2028-12-31"), null);
+  assert.equal(tripDayNumber("2027-02-30", "2027-02-01", "2028-12-31"), null);
 });
 
 it("renders other web URLs separately from surrounding text and distinguishes Google Maps", () => {
@@ -326,4 +326,22 @@ it("appends picked tags without replacing current tags or adding duplicates", ()
   assert.equal(appendItineraryTag("", "自訂標籤"), "自訂標籤");
   assert.equal(appendItineraryTag("景點", ""), "景點");
   assert.equal(appendItineraryTag("景點", "美食,交通"), "景點");
+});
+
+it("limits day numbers to both inclusive trip boundaries", () => {
+  assert.equal(tripDayNumber("2027-05-01", "2027-05-01", "2027-05-03"), 1);
+  assert.equal(tripDayNumber("2027-05-03", "2027-05-01", "2027-05-03"), 3);
+  for (const date of ["2027-04-30", "2027-05-04"]) {
+    assert.equal(tripDayNumber(date, "2027-05-01", "2027-05-03"), null);
+  }
+  assert.equal(tripDayNumber("2027-05-01", "2027-05-01", "bad"), null);
+  assert.equal(tripDayNumber("2027-05-01", "2027-05-01", "2027-02-30"), null);
+  assert.equal(tripDayNumber("2027-05-01", "2027-05-03", "2027-05-01"), null);
+  assert.equal(tripDayNumber("2028-01-03", "2027-12-31", "2028-01-02"), null);
+  assert.equal(itineraryDateLabel("2027-05-04", "2027-05-01", "2027-05-03"), "5/4(二)");
+});
+
+it("can retain full years for accounting dates outside the trip", () => {
+  assert.equal(itineraryDateText("2027-04-30", "2027-05-01", "2027-05-03", true), "2027/4/30(五)");
+  assert.equal(itineraryDateText("2027-05-04", "2027-05-01", "2027-05-03", true), "2027/5/4(二)");
 });

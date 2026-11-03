@@ -178,6 +178,18 @@ with sync_playwright() as p:
         dialog.get_by_role('button', name='關閉', exact=True).click()
         page.get_by_role('button', name='編輯帳務', exact=True).click()
         dialog = page.get_by_role('dialog', name='編輯帳務')
+        # Accounting dates group by each list's own date column; members remain ungrouped.
+        expect(dialog.locator('.editor-date-heading').first).to_be_visible()
+        for entity, heading in [('公積金','D1 - 5/1(六)'), ('行前費用','2027/4/1(四)'), ('收款','2027/4/3(六)')]:
+            dialog.get_by_role('combobox',name='資料類型',exact=True).select_option(entity)
+            expect(dialog.locator('.editor-date-heading').first).to_contain_text(heading)
+            expect(dialog.locator('.editor-date-heading').first).to_have_css('font-size','13px')
+            expect(dialog.locator('.editor-date-heading').first).to_have_css('margin-bottom','8px')
+            assert dialog.locator('.editor-records .editor-record').count()>0
+        dialog.get_by_role('combobox',name='資料類型',exact=True).select_option('團員')
+        expect(dialog.locator('.editor-date-heading')).to_have_count(0)
+        dialog.get_by_role('combobox',name='資料類型',exact=True).select_option('公積金')
+        page.screenshot(path='/tmp/accounting-date-groups-mobile.png')
         # Equal receipts/refunds use one amount, selection-only participants, and signed totals.
         for type_value, label, title, amount, expected in [
             ('儲值','每人收款金額（JPY）','共同收款測試','100',200),
@@ -257,24 +269,43 @@ with sync_playwright() as p:
         new_expense = dialog.get_by_role('textbox', name='行前費用 ID', exact=True).input_value()
         dialog.get_by_role('textbox', name='分類', exact=True).fill('活動')
         dialog.get_by_role('textbox', name='實際刷卡金額（TWD）', exact=True).fill('300')
+        before_pretrip_select=len(writes)
+        dialog.get_by_role('button',name='全選',exact=True).click()
+        expect(dialog.locator('.participant-options input:checked')).to_have_count(3)
+        assert len(writes)==before_pretrip_select
         for member in ['範例團員 A', '範例團員 B', '範例團員 C']:
-            dialog.get_by_label(member, exact=True).check()
-            amount = dialog.get_by_label(member + '金額', exact=True)
-            amount.fill('100')
-            amount.fill('1.5')
-            expect(amount).to_have_value('100')
-            amount.fill('abc')
-            expect(amount).to_have_value('100')
+            assert dialog.get_by_label(member + '金額',exact=True).count()==0
+        expect(dialog.get_by_role('status')).to_contain_text('100')
+        dialog.get_by_role('textbox',name='實際刷卡金額（TWD）',exact=True).fill('300.01')
+        dialog.get_by_role('button',name='儲存',exact=True).click()
+        expect(dialog.get_by_role('alert')).to_contain_text('整除')
+        assert len(writes)==before_pretrip_select
+        dialog.get_by_role('textbox',name='實際刷卡金額（TWD）',exact=True).fill('300')
+        page.screenshot(path='/tmp/pretrip-equal-participants-mobile.png')
         dialog.get_by_role('button', name='儲存', exact=True).click()
         expect(dialog.locator('.editor-record').filter(has_text='門票測試')).to_be_visible()
+        expected_rows=[dict(zip(book['行前費用分攤'][0],row)) for row in book['行前費用分攤'][1:] if row and row[0]==new_expense]
+        assert len(expected_rows)==3 and {row['應繳金額'] for row in expected_rows}=={'100.00'}
         dialog.get_by_role('combobox', name='資料類型', exact=True).select_option('收款')
         dialog.get_by_role('button', name='新增收款批次', exact=True).click()
         dialog.get_by_role('textbox', name='收款日期', exact=True).fill(start)
-        dialog.get_by_role('combobox', name='繳款團員', exact=True).select_option('M003')
+        dialog.get_by_role('checkbox',name='範例團員 A',exact=True).check()
+        dialog.get_by_role('checkbox',name='範例團員 C',exact=True).check()
         dialog.get_by_role('button', name='加入收款項目', exact=True).click()
         dialog.get_by_role('combobox', name='行前費用', exact=True).select_option(new_expense)
-        dialog.get_by_role('textbox', name='實收金額', exact=True).fill('100')
+        dialog.get_by_role('textbox', name='每人實收金額', exact=True).fill('100')
+        expect(dialog.get_by_role('status')).to_contain_text('200')
+        page.screenshot(path='/tmp/receipt-multiple-members-mobile.png')
+        before_receipt_write=len(writes)
+        before_receipt_ids={row[0] for row in book['收款明細'][1:] if row}
         dialog.get_by_role('button', name='儲存', exact=True).click()
+        expect(dialog.get_by_role('button',name='新增收款批次',exact=True)).to_be_visible()
+        assert len(writes)==before_receipt_write+1
+        added_receipts=[dict(zip(book['收款明細'][0],row)) for row in book['收款明細'][1:] if row and row[0] not in before_receipt_ids]
+        assert len(added_receipts)==2
+        assert {row['團員ID'] for row in added_receipts}=={'M001','M003'}
+        assert len({row['收款批次ID'] for row in added_receipts})==2
+        assert {row['實收金額'] for row in added_receipts}=={'100'}
         expect(dialog.locator('.editor-record').filter(has_text='範例團員 C')).to_be_visible()
         dialog.get_by_role('button', name='關閉', exact=True).click()
         page.get_by_role('button', name='編輯行程', exact=True).click()
