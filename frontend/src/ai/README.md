@@ -141,7 +141,7 @@ const provider = await initializeFirebaseProvider({
 3. 註冊 Web App 的 reCAPTCHA Enterprise App Check，加入實際網域，並對 Firebase AI Logic 啟用 enforcement。這不是 Sheets 授權替代品。
 4. 在開發環境依官方方式設定 App Check Debug Provider，僅在本機初始化前配置；debug token 不提交版本控制。本模組不自動啟用 debug。
 5. 設定 API 使用限制、用量／配額與費用警示；確認資料傳送符合團員與上傳文件的使用範圍。前端無法提供不可繞過的每人費用配額。
-6. 完成真實模型請求、Function Calling、App Check、PDF／圖片抽取及失敗情境驗證，再接 UI。尚未執行這些正式服務驗證。
+6. 在實際環境驗證模型請求、Function Calling、App Check、PDF／圖片抽取及失敗情境。本專案 UI 已接入；模擬測試不代表這些正式服務驗證已完成。
 
 Firebase Web config 可公開；**Gemini／OpenAI／Claude 的服務 Secret 不能放進 Vite bundle**。改用需要 Secret 的 Provider 時，由受控後端／Serverless 保管 Secret，再實作新的 adapter。OAuth token 僅由 Host 持有，不傳給模型、訊息、工具輸入或日誌。
 
@@ -324,3 +324,32 @@ Host 僅挑選公開航班／住宿欄位，包括行李、備註、當地時間
 
 
 公積金／支出／進度的回答範圍同樣受限：先查 `itinerary_get_travel_details`，只依每日行程內文／副標或航班／住宿備註中的明確紀錄回答並說明來源；沒有足夠紀錄時回覆對應項目「尚未開放查詢」。不能把預計收款、住宿報價或安排提醒推定為實際帳務、目前餘額或待辦完成狀態。其他公積金、分攤、支出、收款、團員及待辦表仍不暴露給 AI，導遊登入也不擴大此範圍，未來再擴充。
+
+## 旅程 UI 模擬測試
+
+在專案根目錄啟動獨立 Vite，使用以下假設定；測試攔截模型、OAuth、Sheets 與 EmailJS，不使用真實服務或 debug token：
+
+```sh
+# 終端一
+VITE_GUIDE_EMAILS='["admin@example.com","guide@example.com"]' \
+VITE_GOOGLE_CLIENT_ID=test-client \
+VITE_GOOGLE_SHEETS_API_KEY=test-key \
+VITE_GOOGLE_SHEETS_CATALOG_ID=test-catalog \
+VITE_AI_ENABLED=true \
+VITE_AI_FIREBASE_CONFIG='{"apiKey":"test-public-key","projectId":"test-project","appId":"test-app"}' \
+VITE_AI_DEFAULT_MODEL=test-model \
+VITE_AI_MODELS='["test-model","test-model-alternative-with-long-name"]' \
+VITE_AI_APP_CHECK_SITE_KEY=test-site \
+VITE_EMAILJS_ENABLED=true \
+VITE_EMAILJS_SERVICE_ID=service_test \
+VITE_EMAILJS_TEMPLATE_ID=template_test \
+VITE_EMAILJS_PUBLIC_KEY=public_test \
+npm run dev --workspace frontend -- --host 127.0.0.1 --port 5193 --strictPort
+
+# 終端二：需 Python Playwright 及可啟動的 Chromium
+python3 scripts/ai_browser_smoke.py
+# macOS 使用已安裝的 Chrome 時，可加入：
+# --chrome '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+```
+
+測試包含開啟／縮小、RWD、桌面與手機 Enter 行為、模型隔離、串流進度、工具確認、回覆評價與錯誤回報。依當次測試輸出判斷結果；真實模型品質、信件收件、Google 寫入、實體 Safari 及正式部署另行驗證。
