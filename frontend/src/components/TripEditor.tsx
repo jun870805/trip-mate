@@ -14,7 +14,7 @@ import { guideConfig } from "../hooks/useGuideAuth";
 import { nextRecordIdFromRows, nextRecordId } from "../data/record-id";
 import rules from "../data/id-rules.json" with { type: "json" };
 import type { RecordKind } from "../data/record-id";
-import { normalizeLocalDateTime } from "../data/timezone";
+import { dateInTimezone, normalizeLocalDateTime } from "../data/timezone";
 import { DatePicker } from "./DatePicker";
 import { RequiredMark } from "./RequiredMark";
 import {
@@ -332,14 +332,29 @@ export function TripEditor({
       confirmTripEditorClose(!!target, active.current || busy, (message) =>
         window.confirm(message),
       )
-    )
-      onClose();
+    ) {
+      if (target) setTarget(null);
+      else onClose();
+    }
   }
   return (
     <dialog
       ref={dialog}
       className="catalog-dialog trip-editor no-print"
       aria-labelledby="trip-editor-title"
+      onKeyDown={(event) => {
+        if (
+          event.key === "Escape" &&
+          !event.defaultPrevented &&
+          !event.currentTarget.querySelector(":popover-open") &&
+          event.target instanceof Element &&
+          event.target.closest("dialog") === event.currentTarget
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          requestClose();
+        }
+      }}
       onCancel={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -620,6 +635,10 @@ function defaultValues(book: Workbook, entity: Entity, row: Row | null): Row {
         排序: "10",
       };
   if (!row) {
+    if (entity === "公積金" || entity === "行前費用")
+      value["日期"] = dateInTimezone(new Date(), "Asia/Taipei");
+    if (entity === "收款")
+      value["收款日期"] = dateInTimezone(new Date(), "Asia/Taipei");
     if (entity === "公積金") value["類型"] = "儲值";
     if (entity === "開團待辦") value["狀態"] = "待辦";
   }

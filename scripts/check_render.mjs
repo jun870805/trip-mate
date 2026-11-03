@@ -33,6 +33,7 @@ try {
         import { GuideTools } from './src/components/ui'
         import { TripReadFailure } from './src/components/TripReadFailure'
         import { parseCatalog, parseTrip, tripSheets } from './src/data/portal'
+        import { dateInTimezone } from './src/data/timezone'
         import { DatePicker } from './src/components/DatePicker'
         import { pickerInputDisplay } from './src/data/date-picker'
         import { TimeWheel } from './src/components/TimeWheel'
@@ -394,7 +395,8 @@ try {
           }
           assert.ok(!/type="(?:date|datetime-local|time)"/.test(form), 'Editors must use custom pickers with editable text and 24-hour time')
           assert.ok(!form.includes(session.token) && !form.includes('草稿'))
-          for(const input of form.matchAll(/<input[^>]*aria-haspopup="dialog"[^>]*>/g)) assert.ok(input[0].includes('value=""'), entity+' must not prefill date/time inputs')
+          const defaultDate=['公積金','行前費用','收款'].includes(entity) ? pickerInputDisplay(dateInTimezone(new Date(),'Asia/Taipei')) : ''
+          for(const input of form.matchAll(/<input[^>]*aria-haspopup="dialog"[^>]*>/g)) assert.ok(input[0].includes('value="'+defaultDate+'"'), entity+' must use its confirmed initial date rule')
           if(entity==='團員') assert.ok(!form.includes('排序'), 'Member editor must not expose the legacy order field')
           if(entity==='開團待辦') assert.ok(form.includes('負責人') && form.includes('<select'))
           if(entity==='飯店') assert.ok(form.includes('入住時間') && form.includes('退房時間') && form.includes('飯店圖片網址') && form.includes('訂房網站') && form.includes('價格') && form.includes('副標題'))

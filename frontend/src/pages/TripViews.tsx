@@ -617,7 +617,7 @@ export function Fund({ data }: { data: TripData }) {
                 <strong className={m.balance < 0 ? "negative" : ""}>
                   {money(m.balance, data.currency)}
                 </strong>
-                <small>{m.balance < 0 ? "待補繳" : "目前可退餘額"}</small>
+                {m.balance < 0 && <small>待補繳</small>}
               </span>
             </button>
           ))}
