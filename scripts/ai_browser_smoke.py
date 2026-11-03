@@ -20,6 +20,7 @@ grids = [{'sheetId': index + 1, 'title': title, 'gridProperties': {'rowCount': 1
 writes = []
 emails = []
 error_reports = []
+reply_feedback = []
 mail_status = 200
 sdk = """window.google={accounts:{oauth2:{initTokenClient(options){return {requestAccessToken(){options.callback({access_token:'mock-guide-token',expires_in:3600,scope:'openid email https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file'});}};}}}};"""
 provider = """
@@ -101,7 +102,7 @@ with sync_playwright() as p:
             assert body['service_id']=='service_test' and body['template_id']=='template_test'
             assert body['user_id']=='public_test'
             assert 'to_email' not in body['template_params']
-            (error_reports if body['template_params'].get('name')=='錯誤回報' else emails).append(body)
+            (reply_feedback if body['template_params'].get('title')=='AI回覆不佳回報' else error_reports if body['template_params'].get('name')=='錯誤回報' else emails).append(body)
             route.fulfill(status=mail_status,headers=headers,content_type='text/plain',body='OK' if mail_status==200 else 'rejected')
         page.route('https://api.emailjs.com/api/v1.0/email/send',emailjs)
         page.goto(args.url)
@@ -182,6 +183,38 @@ with sync_playwright() as p:
         for author in ['你','AI 助手']:
             for label in dialog.get_by_role('log').get_by_text(author,exact=True).all():
                 assert label.evaluate('(el)=>getComputedStyle(el).clipPath') == 'inset(50%)'
+        good=dialog.get_by_role('button',name='回應良好',exact=True)
+        bad=dialog.get_by_role('button',name='回應不佳',exact=True)
+        expect(good).to_have_count(1);expect(bad).to_have_count(1)
+        copy_box=copy.bounding_box();good_box=good.bounding_box();bad_box=bad.bounding_box()
+        assert copy_box['x']<good_box['x']<bad_box['x']
+        assert good.evaluate('(el)=>getComputedStyle(el).borderTopWidth')=='0px'
+        good.click();expect(good).to_have_attribute('aria-pressed','true')
+        assert good.evaluate('(el)=>getComputedStyle(el).backgroundColor')=='rgba(0, 0, 0, 0)'
+        assert not reply_feedback and not emails
+        good.click();expect(good).to_have_attribute('aria-pressed','false')
+        good.click()
+        with page.expect_event('dialog') as feedback_popup:
+            bad.evaluate('(button)=>{button.click();button.click();}')
+        feedback_alert=feedback_popup.value
+        assert feedback_alert.type=='alert' and feedback_alert.message=='感謝您的反饋！'
+        feedback_alert.accept()
+        expect(bad).to_be_enabled();expect(bad).to_have_attribute('aria-pressed','false')
+        bad.click();expect(bad).to_have_attribute('aria-pressed','true')
+        assert bad.evaluate('(el)=>getComputedStyle(el).backgroundColor')=='rgba(0, 0, 0, 0)'
+        assert bad.locator('svg').evaluate('(el)=>getComputedStyle(el).fill')==bad.evaluate('(el)=>getComputedStyle(el).color')
+        expect(good).to_have_attribute('aria-pressed','false')
+        good.click();expect(good).to_have_attribute('aria-pressed','true')
+        expect(bad).to_have_attribute('aria-pressed','false')
+        assert good.locator('svg').evaluate('(el)=>getComputedStyle(el).fill')==good.evaluate('(el)=>getComputedStyle(el).color')
+        good.click();expect(good).to_have_attribute('aria-pressed','false')
+        bad.click();expect(bad).to_have_attribute('aria-pressed','true')
+        assert len(reply_feedback)==1 and not emails
+        feedback_params=reply_feedback[0]['template_params']
+        assert feedback_params['title']=='AI回覆不佳回報'
+        assert '總結行程' in feedback_params['message'] and '已收到實際操作結果。' in feedback_params['message']
+        assert '尚未送出的訊息' not in feedback_params['message']
+        page.screenshot(path='/tmp/trip-ai-reply-feedback-desktop.png')
         page.screenshot(path='/tmp/trip-ai-desktop.png')
         message.fill('模型切換保留輸入')
         models.select_option('test-model-alternative-with-long-name')
@@ -192,6 +225,20 @@ with sync_playwright() as p:
         expect(dialog.get_by_role('log')).to_contain_text('已收到實際操作結果')
         assert page.evaluate('window.__modelRequests.at(-1).model')=='test-model-alternative-with-long-name'
         assert not page.evaluate('window.__mockLastMessages.some(m=>m.parts.some(p=>p.text==="總結行程"))')
+        alt_bad=dialog.get_by_role('button',name='回應不佳',exact=True)
+        expect(alt_bad).to_be_enabled()
+        expect(dialog.get_by_role('button',name='回應良好',exact=True)).to_have_attribute('aria-pressed','false')
+        mail_status=500
+        alt_bad.click()
+        expect(dialog.get_by_text('回饋未確認寄送成功，請勿重複寄送。',exact=True)).to_be_visible()
+        expect(alt_bad).to_be_enabled()
+        alt_bad.click();expect(alt_bad).to_have_attribute('aria-pressed','false')
+        alt_bad.click();expect(alt_bad).to_have_attribute('aria-pressed','true')
+        assert len(reply_feedback)==2
+        assert '替代模型問題' in reply_feedback[1]['template_params']['message']
+        assert '總結行程' not in reply_feedback[1]['template_params']['message']
+        mail_status=200
+
         models.select_option('test-model')
         expect(message).to_be_enabled()
         expect(dialog.get_by_role('log')).to_contain_text('總結行程')
@@ -459,6 +506,8 @@ with sync_playwright() as p:
         expect(partial).to_contain_text('## 第一段')
         expect(dialog.get_by_role('status')).to_contain_text('正在回覆…')
         expect(partial.get_by_role('heading')).to_have_count(0)
+        expect(dialog.get_by_role('button',name='回應良好',exact=True)).to_have_count(0)
+        expect(dialog.get_by_role('button',name='回應不佳',exact=True)).to_have_count(0)
         expect(dialog.get_by_role('button',name='複製回覆',exact=True)).to_have_count(0)
         page.screenshot(path='/tmp/trip-ai-streaming-mobile.png')
         page.evaluate('window.__finishStreamReply()')

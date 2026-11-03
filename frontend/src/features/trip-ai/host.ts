@@ -23,7 +23,12 @@ export type ItineraryMutation = Extract<TripMutation, { kind: 'record' }>;
 export interface MutationPlan { summary: string; mutations: ItineraryMutation[]; warnings?: string[] }
 export const editableColumns = ['日期', '開始時間', '標題', '說明', '內文', '類型', '類別'] as const;
 export function activity(row: Row): Row {
-  return Object.fromEntries(['行程ID', ...editableColumns, '地點', '地圖網址', '排序'].map(key => [key, row[key] || '']));
+  return Object.fromEntries(['行程ID', ...editableColumns, '地點', '地圖網址', '航班ID', '住宿ID', '排序'].map(key => [key, row[key] || '']));
+}
+const flightColumns = ['航班ID','航空公司','航班編號','出發機場','抵達機場','出發時間','抵達時間','出發航廈','抵達航廈','航廈','行李說明','備註'];
+const hotelColumns = ['住宿ID','飯店名稱','副標題','入住日期','入住時間','退房日期','退房時間','地址','地圖網址','電話','備註','訂房網站網址','價格'];
+function booking(row: Row, columns: readonly string[]): Row {
+  return Object.fromEntries(columns.map(key => [key, row[key] || '']));
 }
 
 export function createTripHost(options: TripHostOptions) {
@@ -62,7 +67,9 @@ export function createTripHost(options: TripHostOptions) {
       if (data.trip.id !== trip.id || data.trip.spreadsheetId !== trip.spreadsheetId || data.sectionErrors?.itinerary)
         throw new Error('目前行程資料無法使用，請重新讀取。');
       return { trip: { id: trip.id, name: trip.name, destination: trip.destination, start: trip.start, end: trip.end },
-        timezone: data.timezone, activities: data.tables['每日行程'].map(activity) };
+        timezone: data.timezone, activities: data.tables['每日行程'].map(activity),
+        flights: data.tables['航班'].map(row => booking(row, flightColumns)),
+        hotels: data.tables['飯店'].map(row => booking(row, hotelColumns)) };
     },
     async prepare(context: AgentContext, signal: AbortSignal, build: (snapshot: EditorSnapshot) => MutationPlan): Promise<PreparedChange> {
       matches(context); signal.throwIfAborted();

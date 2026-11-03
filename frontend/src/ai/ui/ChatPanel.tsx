@@ -22,12 +22,13 @@ export interface ChatPanelProps {
   preview?: ReactNode;
   previewId?: string;
   renderMessage?(text: string, role: ChatEntry['role']): ReactNode;
+  renderMessageActions?(entry: ChatEntry): ReactNode;
   onSend(text: string, files: File[]): Promise<void>;
   onReset?(): void;
 }
 /** Portable controlled view: application owns the agent, permissions, modal and preview. */
 export function ChatPanel({ entries, disabled, status, thinking = false, partialText, enterToSend = true, error, errorAction, quotaExceeded = false, errorTone = 'default', modelSelector, notice, suggestions = [], preview, previewId,
-  renderMessage = text => text, onSend, onReset }: ChatPanelProps) {
+  renderMessage = text => text, renderMessageActions, onSend, onReset }: ChatPanelProps) {
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
@@ -86,7 +87,7 @@ export function ChatPanel({ entries, disabled, status, thinking = false, partial
           <span className={entry.role === 'status' ? styles.author : styles.srOnly}>{entry.role === 'user' ? '你' : entry.role === 'status' ? '操作結果' : 'AI 助手'}</span>
           <div className={styles.messageBody}>{renderMessage(entry.text, entry.role)}</div>
           {entry.files.length > 0 && <ul className={styles.sentFiles} aria-label="已送出的附件">{entry.files.map((name, index) => <li key={index}>{name}</li>)}</ul>}
-          {entry.role === 'model' && entry.text.trim() && <CopyMessageButton text={entry.text} />}
+          {entry.role === 'model' && entry.text.trim() && <CopyMessageButton text={entry.text}>{renderMessageActions?.(entry)}</CopyMessageButton>}
         </div>)}
         {partialText && <div className={`${styles.message} ${styles.model}`} aria-label="正在產生的回覆">
           <div className={`${styles.messageBody} ${styles.partialBody}`}>{partialText}</div>

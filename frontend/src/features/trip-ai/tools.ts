@@ -48,9 +48,12 @@ export function createTripTools(host: TripHost): Tool[] {
     })),
     read('itinerary_get_activities', '讀取目前旅程行程；日期可省略。未查證交通、營業時間與費用，不推定路線最佳化。', z.strictObject({ date: date.optional() }), (input, data) =>
       orderedItinerary(data.activities.filter(row => !(input as {date?: string}).date || row['日期'] === (input as {date?: string}).date))),
-    read('itinerary_search', '搜尋目前旅程已知景點，回傳穩定 ID。', z.strictObject({ query: z.string().trim().min(1).max(200) }), (input, data) => {
+    read('itinerary_get_travel_details', '唯讀取得目前旅程的全部航班（含各班次、行李及備註）、全部住宿（含入住退房及備註）與每日行程完整副標／內文。航班、住宿、集合或跨日安排問題須交叉確認，不只讀摘要或第一筆；公積金／支出／進度僅能回答這些來源明確記載的相關說明，未包含其他帳務／待辦資料表，無紀錄須回答尚未開放查詢。', z.strictObject({}), (_, data) => ({
+      trip: data.trip, timezone: data.timezone, flights: data.flights, hotels: data.hotels, activities: orderedItinerary(data.activities),
+    })),
+    read('itinerary_search', '搜尋目前旅程已知景點的標題、副標及內文，回傳穩定 ID。', z.strictObject({ query: z.string().trim().min(1).max(200) }), (input, data) => {
       const query = (input as {query: string}).query.toLocaleLowerCase();
-      return orderedItinerary(data.activities.filter(row => [row['標題'], itinerarySubtitle(row)].join('\n').toLocaleLowerCase().includes(query)));
+      return orderedItinerary(data.activities.filter(row => [row['標題'], itinerarySubtitle(row), row['內文'] || ''].join('\n').toLocaleLowerCase().includes(query)));
     }),
     read('itinerary_missing_maps', '找出沒有 Google Maps 連結的行程；搜尋連結未經地點核實。', z.strictObject({}), (_, data) =>
       data.activities.filter(row => !hasMapLink(row)).map(row => ({ id: row['行程ID'], date: row['日期'], title: row['標題'] }))),

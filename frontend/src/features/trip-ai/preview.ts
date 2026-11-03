@@ -2,6 +2,7 @@ import type { AgentActivity, Change, ToolResult } from '../../ai/contracts.ts';
 
 const toolActivities: Record<string, string> = {
   itinerary_get_summary: '正在查詢旅程摘要…', itinerary_get_activities: '正在查詢行程…',
+  itinerary_get_travel_details: '正在核對航班、住宿與行程…',
   itinerary_search: '正在搜尋行程…', itinerary_missing_maps: '正在檢查地圖資訊…',
   itinerary_add: '正在準備新增預覽…', itinerary_update: '正在準備修改預覽…',
   itinerary_delete: '正在準備刪除預覽…', itinerary_move: '正在準備調整順序預覽…',

@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 export function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const paths: Record<string, ReactNode> = {
+    "thumb-up": <path d="M7 10v11H3V10h4Zm0 0 5-8h1a2 2 0 0 1 2 2v6h5a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 2H7" />,
+    "thumb-down": <g transform="rotate(180 12 12)"><path d="M7 10v11H3V10h4Zm0 0 5-8h1a2 2 0 0 1 2 2v6h5a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 2H7" /></g>,
     assistant: (
       <>
         <path d="M4 4h16v12H9l-5 4V4Z" />

@@ -58,7 +58,10 @@ it('reads and searches real current itinerary without exposing account tokens or
   }
   assert.equal(f.writes,0);
   const sent=JSON.stringify(f.requests);
-  assert.ok(!sent.includes('secret-token')&&!sent.includes('guide@example.com')&&!sent.includes('公積金交易'));
+  assert.ok(!sent.includes('secret-token')&&!sent.includes('guide@example.com'));
+  // System rules name forbidden tables; only actual context/data must exclude them.
+  const payloads=JSON.stringify(f.requests.map(request=>({context:request.context,messages:request.messages})));
+  for(const table of ['公積金交易','公積金分攤','支出明細','收款明細','開團待辦']) assert.ok(!payloads.includes(`"${table}":`));
   await assert.rejects(f.host.read({...f.host.getContext(),scopeId:'T999'},signal()));
 });
 it('previews and commits add/update/delete with real mutation validation and one write each',async()=>{
@@ -164,4 +167,32 @@ it('rechecks actual session immediately before the write request',async()=>{
   f.onNextRead(()=>f.setSession(null));
   await f.agent.approve(f.agent.getState().pending!.id);
   assert.equal(f.writes,0);assert.equal(f.agent.getState().status,'error');
+});
+
+it('cross-checks all bookings and itinerary bodies through one read-only tool without exposing unrelated columns', async () => {
+  const f=setup();
+  const flights=f.book['航班'], hotels=f.book['飯店'], activities=f.book['每日行程'];
+  const flightNote=flights[0].indexOf('備註');flights[1][flightNote]='第一班需提前集合';
+  const extra=[...flights[1]];extra[flights[0].indexOf('航班ID')]='A099';extra[flights[0].indexOf('航班編號')]='ALT99';extra[flightNote]='第二班行李限制不同';flights.push(extra);
+  hotels[1][hotels[0].indexOf('備註')]='入住時出示訂房資料';
+  let bodyColumn=activities[0].indexOf('內文');if(bodyColumn<0){bodyColumn=activities[0].length;activities[0].push('內文');}
+  activities[1][bodyColumn]='## 機場集合\n\n第二班旅客需另行集合。午餐由公積金支付，每人預計 500。';
+  flights[0].push('內部資料');flights[1][flights[0].length-1]='private-flight-column';
+  hotels[0].push('內部資料');hotels[1][hotels[0].length-1]='private-hotel-column';
+  f.setSession(null);
+  f.replies.push(call('itinerary_get_travel_details',{}));await f.agent.send('有幾班飛機，住宿有什麼注意事項？');
+  const result=f.agent.getState().results.at(-1)!;
+  assert.equal(result.status,'success');
+  const details=result.data as {flights:Record<string,string>[];hotels:Record<string,string>[];activities:Record<string,string>[]};
+  assert.equal(details.flights.length,flights.length-1);
+  assert.ok(details.flights.some(row=>row['備註']==='第一班需提前集合'));
+  assert.ok(details.flights.some(row=>row['航班編號']==='ALT99'&&row['備註']==='第二班行李限制不同'));
+  assert.ok(details.hotels.some(row=>row['備註']==='入住時出示訂房資料'));
+  assert.ok(details.activities.some(row=>row['內文'].includes('第二班旅客')));
+  assert.ok(details.activities.some(row=>row['內文'].includes('午餐由公積金支付，每人預計 500')));
+  f.replies.push(call('itinerary_search',{query:'另行集合'}));await f.agent.send('查詢內文中的集合說明');
+  assert.equal((f.agent.getState().results.at(-1)!.data as unknown[]).length,1);
+  assert.equal(f.writes,0);
+  const sent=JSON.stringify(result.data);
+  for(const forbidden of ['private-flight-column','private-hotel-column','secret-token','公積金交易','公積金分攤','支出明細','行前費用分攤','收款明細','開團待辦','事項','個人金額'])assert.ok(!sent.includes(forbidden));
 });

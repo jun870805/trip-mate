@@ -25,7 +25,7 @@
 | 訊息與結果 | `ai/ui/presentation.ts`、`features/trip-ai/preview.ts` | 不顯示工具參數／原始結果／opaque／文件抽取原文；真實工具結果單獨顯示 |
 | 預覽 | `features/trip-ai/ChangePreview.tsx` | 旅程、操作、日期、欄位前後值、數量與警告；取消不寫入，確認僅傳 approval ID |
 | 核心 | `ai/core/controller.ts`、`registry.ts` | 嚴格 Schema、工具白名單、單一待確認操作、輪次／次數上限、Abort 與 scope 驗證 |
-| 資料及工具 | `features/trip-ai/host.ts`、`tools.ts` | 查詢／搜尋／摘要／缺地圖；增改刪／排序／整批匯入／補地圖。只允許目前旅程每日行程 |
+| 資料及工具 | `features/trip-ai/host.ts`、`tools.ts` | 唯讀查詢每日行程、航班／住宿及備註內文交叉資料；搜尋／摘要／缺地圖；增改刪／排序／整批匯入／補地圖僅限目前旅程每日行程 |
 | 授權儲存 | `data/trip-editor.ts` | `read`、`mutateTripBook`、`automaticTripIds`、`saveItineraryBatch`，沿用既有驗證、快照、ID 與差異儲存格更新 |
 | Provider | `ai/providers/firebase.ts`、`firebase-runtime.ts` | Firebase 官方 AI／App／App Check 模組；SDK 特有內容保留為 opaque，不交由 UI 顯示 |
 | 設定 | `features/trip-ai/config.ts` | 明確啟用的 `VITE_AI_*` 公開設定；Pages workflow 已接入對應 variables |
@@ -37,7 +37,7 @@
 
 `saveItineraryBatch` 僅接受 1～100 筆每日行程 mutation，沿用相同驗證、快照比對、自動 ID 與差異計算，合併成一次 batchUpdate；實際寫入前重查 session 與 AbortSignal。Sheets 先讀後寫仍不具伺服器原子鎖，送出後 Abort 不代表回滾。未知結果、拒絕與衝突後停止後續寫入，需重新讀取／登入。
 
-行程以穩定 ID 定位；新地圖搜尋連結存副標，舊地點／地圖與結束時間依既有編輯規則合併／清空，不另加雲端欄。其他舊關聯、時區、額外欄與未變更值保留。沒有全站、公積金、旅程目錄、航班或住宿 AI 操作。
+行程以穩定 ID 定位；新地圖搜尋連結存副標，舊地點／地圖與結束時間依既有編輯規則合併／清空，不另加雲端欄。其他舊關聯、時區、額外欄與未變更值保留。沒有全站、公積金或旅程目錄 AI 操作；航班／住宿僅唯讀查詢，不提供新增／修改／刪除。相關問題透過 `itinerary_get_travel_details` 交叉檢查全部班次、住宿備註及行程內文，規則見 `features/trip-ai/travel-context-rules.ts`。
 
 ## 自動驗證
 

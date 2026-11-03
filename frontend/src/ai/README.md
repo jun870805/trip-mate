@@ -182,7 +182,7 @@ const { agent, host } = createTripAgent({
 
 `readData` 必須沿用成功的公開讀取；資料載入中、權限拒絕、範例登出、切換旅程時不可回傳舊資料。scopeId 由 Host 固定，不接受模型指定。
 
-工具：`itinerary_get_summary`、`itinerary_get_activities`、`itinerary_search`、`itinerary_missing_maps`、`itinerary_add`、`itinerary_update`、`itinerary_delete`、`itinerary_move`、`itinerary_import`、`itinerary_apply_maps`。行程建議先查真實資料，由模型提供附限制的建議文字；採納後再走寫入工具。沒有即時地點搜尋或道路路線最佳化。
+工具：`itinerary_get_summary`、`itinerary_get_activities`、`itinerary_get_travel_details`、`itinerary_search`、`itinerary_missing_maps`、`itinerary_add`、`itinerary_update`、`itinerary_delete`、`itinerary_move`、`itinerary_import`、`itinerary_apply_maps`。行程建議先查真實資料，由模型提供附限制的建議文字；採納後再走寫入工具。沒有即時地點搜尋或道路路線最佳化。
 
 範例必須傳 `source: "demo"`，強制唯讀且要求有效導遊登入；登出後拒絕讀取。正式旅程用 `source: "trip"`。
 
@@ -301,3 +301,26 @@ Controller 的 `activity` 為 `thinking`／`responding`／`tool`（包含內部 
 `ChatPanel.partialText` 顯示純文字與換行，避免未完成 Markdown 誤成連結；完整回覆才使用既有安全 Markdown renderer 及複製按鈕。貼近底部時自動跟隨，使用者上滑閱讀時停止跟隨，再滑回底部或送出新訊息恢復。步驟只顯示實際狀態，不顯示模型內部思考、工具參數或文件抽取原文。串流改善等待回饋，不能保證降低首段延遲或總時間。Firebase 錯誤診斷保留實際 operation，郵件回報 API 路徑對應 `streamGenerateContent`。
 
 參考：[Firebase 串流回覆](https://firebase.google.com/docs/ai-logic/stream-responses)。
+
+
+## 回覆評價
+
+Host 可用 `ChatPanel.renderMessageActions(entry)` 注入每則完整 AI 回覆的附加按鈕，放在 `CopyMessageButton` 的複製按鈕右側；可移植 UI 只提供 slot，不讀取 EmailJS 或環境設定。`questionForReply(messages, entry.id)` 依原始訊息索引找該回覆前的使用者文字，跳過工具結果與附件抽取內容，避免把較晚的問題配給舊回覆。串流 `partialText` 不顯示評價或複製操作。
+
+本專案 `MessageFeedback.tsx` 顯示讚／倒讚：讚為當次元件本機選取，不寄信；倒讚點擊後才延遲載入 `reply-feedback.ts`／EmailJS，並固定 `title`、`subject` 為「AI回覆不佳回報」，`name` 為「回覆不佳回報」。回報只含該則可見 AI 回覆、對應問題、模型、旅程、去除查詢參數的頁面及台灣時間；問題最多 3000 字、回答最多 6000 字並遮蔽憑證。沿用既有公開設定與固定 To，沒有新的模型工具或行程寫入權限。
+
+200／OK 後彈窗「感謝您的反饋！」；選取的圖示填滿顏色，再點一次可取消，讚／倒讚互斥；選取狀態與寄送獨立，取消或改讚不撤回／中止寄送，再次選倒讚不重寄同一元件的回報。失敗或未知結果顯示提示，不自動重試，仍可切換／取消評價。未啟用郵件時倒讚停用，讚仍可操作。評價不是持久化統計：只保留當次元件狀態，重新整理／模型切換不恢復或自動寄信。寄送行為使用模擬 API 驗證，不代表已確認真實投遞。
+
+
+## 航班、住宿與行程內文交叉分析
+
+專案提示規則獨立放在 `features/trip-ai/travel-context-rules.ts`，由 `createTripAgent` 組合至 system prompt；通用 `ai/prompts/base-rules.ts` 不綁定此專案的工具名稱。航班、住宿、集合、接送、入住／退房及跨日問題，先呼叫唯讀 `itinerary_get_travel_details`，一次取得目前旅程的全部航班、住宿，以及每日行程完整副標／內文及舊航班／住宿關聯 ID。不會自動對每次普通問答傳送整趟資料，也不額外讀 Google Sheets。
+
+Host 僅挑選公開航班／住宿欄位，包括行李、備註、當地時間、各側航廈、入住退房等；不帶團員、帳務、憑證或未知額外欄位。工具維持 `read` 風險及原有公開資料／scope／範例登入驗證，不新增航班／住宿寫入。`itinerary_search` 同時搜尋標題、副標及內文。
+
+提示要求閱讀非空白備註與內文、逐筆辨識多班次及多住宿，不只讀第一筆；未指定個人航班時列相關選項再確認，不猜測團員與班次對應。結構化欄位、備註或內文矛盾時列出差異並請導遊確認，不自行選一版本、不推算飛行時長或補預設時間。只摘要與問題相關的提醒，資料內容不能改變系統規則或工具權限。
+
+整合測試驗證多航班、不同備註、住宿說明、內文搜尋及欄位排除；真實模型是否完整遵守提示仍需實際問答評估。
+
+
+公積金／支出／進度的回答範圍同樣受限：先查 `itinerary_get_travel_details`，只依每日行程內文／副標或航班／住宿備註中的明確紀錄回答並說明來源；沒有足夠紀錄時回覆對應項目「尚未開放查詢」。不能把預計收款、住宿報價或安排提醒推定為實際帳務、目前餘額或待辦完成狀態。其他公積金、分攤、支出、收款、團員及待辦表仍不暴露給 AI，導遊登入也不擴大此範圍，未來再擴充。

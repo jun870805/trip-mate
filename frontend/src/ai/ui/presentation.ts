@@ -18,6 +18,9 @@ export function lastUserMessage(messages: readonly Message[]): string {
   }
   return '';
 }
+export function questionForReply(messages: readonly Message[], replyId: number): string {
+  return lastUserMessage(messages.slice(0, replyId));
+}
 /** Never expose opaque provider data, tool arguments/results or extracted file contents. */
 export function chatEntries(messages: readonly Message[], formatResult?: (name: string, result: ToolResult) => string | null): ChatEntry[] {
   return messages.flatMap<ChatEntry>((message, id) => {

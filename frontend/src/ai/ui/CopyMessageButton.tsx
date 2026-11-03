@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import styles from './ChatPanel.module.css';
 
 /** Copies only the visible reply source, never raw tools, attachments or provider content. */
-export function CopyMessageButton({ text }: { text: string }) {
+export function CopyMessageButton({ text, children }: { text: string; children?: ReactNode }) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const alive = useRef(true), copying = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -30,6 +31,7 @@ export function CopyMessageButton({ text }: { text: string }) {
         {status === 'copied' ? <path d="m5 12 4 4L19 6" /> : <><rect x="8" y="8" width="12" height="13" rx="2" /><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3" /></>}
       </svg>
     </button>
+    {children}
     <span aria-live="polite" className={status === 'error' ? styles.copyError : styles.srOnly}>{status === 'copied' ? '已複製回覆' : status === 'error' ? '無法複製，請手動選取文字。' : ''}</span>
   </div>;
 }

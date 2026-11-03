@@ -2,7 +2,8 @@ import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'rea
 import type { AgentState } from '../../ai/contracts';
 import { trapDialogFocus } from '../../ai/ui/dialog-focus';
 import { ChatPanel } from '../../ai/ui/ChatPanel';
-import { chatEntries, lastUserMessage } from '../../ai/ui/presentation';
+import { chatEntries, lastUserMessage, questionForReply } from '../../ai/ui/presentation';
+import { MessageFeedback } from './MessageFeedback';
 import { createPortal } from 'react-dom';
 import { CloseButton } from '../../components/CloseButton';
 import { readModelOptions } from './model-options';
@@ -257,6 +258,9 @@ export function TripAIEntry(props: TripAIEntryProps) {
             pageUrl: typeof window === 'undefined' ? '' : `${window.location.origin}${window.location.pathname}` }} /></Suspense>}
           onSend={send}
           renderMessage={(text, role) => role === 'model' ? <MarkdownContent text={text} allowImages={false} /> : text}
+          renderMessageActions={entry => <MessageFeedback key={`${panelKey}:${selectedModel}:${entry.id}`} guideEmail={props.config.emails[0]}
+            report={{ question: questionForReply(state.messages, entry.id), answer: entry.text, tripName: props.trip.name,
+              tripId: props.trip.id, model: selectedModel, pageUrl: typeof window === 'undefined' ? '' : `${window.location.origin}${window.location.pathname}` }} />}
           previewId={state.pending?.id} preview={state.pending && (state.pending.toolName === 'itinerary_request_email' ? <EmailPreview preview={state.pending} disabled={writing || props.loading} onApprove={() => void decide(true)} onReject={() => void decide(false)} /> : <ChangePreview preview={state.pending} showIds={showIds} disabled={writing || props.loading}
             onApprove={() => void decide(true)} onReject={() => void decide(false)} />)} />
       </aside>

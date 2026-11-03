@@ -58,3 +58,8 @@
 .modelSelect:focus-visible { background-color: color-mix(in srgb, var(--brown) 12%, var(--paper)); }
 .modelSelect:not([multiple]):not([size]) { background-position: right 20px center; }
 .reportButton { display: inline; padding: 0; border: 0; background: transparent; color: var(--brown); font: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.feedbackButton { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 6px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); }
+.feedbackButton[aria-pressed="true"] { color: var(--brown); }
+.feedbackButton[aria-pressed="true"] svg { fill: currentColor; }
+.feedbackStatus { flex-basis: 100%; color: var(--orange); font-size: 12px; }
+@media (pointer: coarse) { .feedbackButton { width: 36px; height: 36px; } }
