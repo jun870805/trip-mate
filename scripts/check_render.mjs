@@ -142,7 +142,9 @@ try {
         assert.ok(groupedFund.includes('DAY 1') && groupedFund.includes('5/1 (六)') && groupedFund.includes('2026/12/31 (四)') && !groupedFund.includes('DAY 0'), 'Fund headings follow itinerary calendar rules')
         for(const type of ['支出','儲值','退款','調整']) {
           const ledgerHtml=renderToStaticMarkup(createElement(Fund,{data:{...data,transactions:[{...data.transactions[0],type,amount:-1000,shares:[{memberId:'M001',amount:-501},{memberId:'M002',amount:-501}]}]}}))
-          const rowHtml=ledgerHtml.slice(ledgerHtml.indexOf('<article class="ledger-row"'))
+          const rowHtml=ledgerHtml.slice(ledgerHtml.indexOf('<details class="ledger-row"'))
+          assert.ok(rowHtml.startsWith('<details class="ledger-row">'), 'Transactions start collapsed')
+          assert.ok(rowHtml.includes('<summary class="ledger-main">') && rowHtml.indexOf('</summary>') < rowHtml.indexOf('class="ledger-shares"'), 'Transaction heading toggles participant details')
           assert.ok(rowHtml.includes('class="ledger-shares"'), 'Every transaction type retains participant details: '+type)
           if(type==='支出') assert.ok(rowHtml.indexOf('公共餘款增加') < rowHtml.indexOf('</small>') && rowHtml.indexOf('</small>') < rowHtml.indexOf('class="ledger-shares"'), 'Complete allocation summary must precede participant details')
         }

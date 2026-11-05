@@ -196,7 +196,7 @@
   font-size: 12px;
 }
 .ledger {
-  --ledger-gap: 28px;
+  --ledger-gap: 16px;
   display: grid;
   gap: var(--ledger-gap);
   padding: var(--card-padding);
@@ -209,19 +209,24 @@
   position: relative;
   min-width: 0;
 }
-.ledger-row + .ledger-row::before {
-  content: "";
-  position: absolute;
-  top: calc(var(--ledger-gap) / -2);
-  left: 0;
-  right: 0;
-  border-top: 1px solid var(--line);
-}
 .ledger-main {
   display: flex;
   align-items: center;
   gap: 14px;
   font-size: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.ledger-main::-webkit-details-marker {
+  display: none;
+}
+.ledger-toggle {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--brown);
+}
+.ledger-row[open] > .ledger-main .ledger-toggle {
+  transform: rotate(180deg);
 }
 .ledger-main small {
   display: block;
@@ -252,7 +257,6 @@
 .ledger-shares b {
   font-weight: 500;
   color: #534338;
-  margin-left: 4px;
 }
 .expense-list {
   display: grid;
@@ -424,7 +428,7 @@ progress::-webkit-progress-value {
     padding: 4px 7px;
   }
   .ledger {
-    --ledger-gap: 24px;
+    --ledger-gap: 16px;
     padding: var(--card-padding);
   }
   .ledger-main {
@@ -559,6 +563,7 @@ progress::-webkit-progress-value {
 }
 
 .section-heading.fund-ledger-heading {
+  align-items: center;
   margin: 0;
   padding: 24px 0 0;
 }

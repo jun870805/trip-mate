@@ -19,6 +19,8 @@
 
 ## 接續開發與驗證
 
+- UI 檢查進度（2026/11/05，使用者確認）：總覽、行程、公積金、進度已完成 UI 檢查、修改與測試；剩下支出頁，待使用者接續指示後再進行。接續優先查看 `pages/TripViews.tsx` 的 `Expenses`、`data/expense-summary.ts` 與 `styles/trip-views.css`，保留實際記帳與每人參考金額的區分。此進度不代表真實雲端、部署或其他待實機驗證項目已完成。
+
 - 開始先讀 `README.md` 的實作入口與帳務計算區分，再查看 `git status --short`／`git diff`；保留未提交修改，不擅自 reset、覆蓋 `.env.local` 或清除使用者資料。
 - 優先入口：閱讀頁 `pages/TripViews.tsx`、表單 `components/TripEditor.tsx`、解析 `data/portal.ts`、寫入／均分／多人收款 `data/trip-editor.ts`、每人參考費用 `data/expense-summary.ts`、日期 `data/itinerary.ts`／`date-groups.ts`；路徑皆以 `frontend/src/` 為根。
 - 資料／計算修改執行 `npm run test:coverage`，AI 修改執行 `npm run test:ai:coverage` 與 `npm run check:ai:bundle`；畫面使用 `npm run test:render`、`npm run typecheck`，正式建置使用 `npm run build`。完整檢查為 `npm run check`，門檻與測試腳本以根目錄 package.json 為準。
@@ -175,11 +177,13 @@
 ### 公積金閱讀畫面
 
 - 團員餘額卡片保留姓名、餘額，不顯示「目前可退餘額」；負餘額在金額後接「（待補繳）」。手機卡片 gap 8px，姓名與右側金額以 Grid 垂直置中、不用 float。
-- 收支明細依日期由早到晚分組，同日維持原順序；團員篩選後只顯示符合交易的日期。標題沿用行程閱讀畫面的 `DAY N`＋`M/D (星期)`，跨年保留年份；範圍外不顯示 DAY，日期不逐筆重複。
-- 收支明細標題列 margin 0、padding-top 24px、padding-bottom 0；均分說明下方 margin 16px、padding-bottom 0。日期區塊各自 margin／padding 0，以容器 gap 16px 分隔；日期到下方交易卡片 12px。
-- 同日相鄰交易以 1px `--line` 分隔，置於既有交易 gap 中央，單筆不加線。交易標題 16px、金額 14px，桌面與手機一致。
-- 「分攤合計、公共餘款增加」只在該筆公共餘款增加不為 0 時顯示，放在團員明細上方，12px、margin-top 4px、區塊顯示；為 0 隱藏整行、保留團員明細。
-- 團員分攤資訊為 12px、padding-top 8px、margin 0，下方無額外留白。同額合併為「每人 幣別 金額，參與人員：姓名、姓名…」，姓名自然換行；不同額的歷史資料仍逐人列出，保留篩選及金額正負號。
+- 收支明細依日期由早到晚分組，同日維持原順序；團員篩選後只顯示該團員有參與的交易及符合交易的日期。標題沿用行程閱讀畫面的 `DAY N`＋`M/D (星期)`，跨年保留年份；範圍外不顯示 DAY，日期不逐筆重複。
+- 收支明細標題與右側團員下拉選單以 `align-items: center` 垂直置中，電腦、手機一致。標題列 margin 0、padding-top 24px、padding-bottom 0；均分說明下方 margin 16px、padding-bottom 0。日期區塊各自 margin／padding 0，以容器 gap 16px 分隔；日期到下方交易卡片 12px。
+- 同日交易間距使用 `--ledger-gap: 16px`，電腦、手機一致，不加每筆之間的分隔線；此變數僅作用於公積金收支明細，不影響其他頁面、編輯列表或不同日期區塊間距。交易標題 16px、金額 14px，桌面與手機一致。
+- 每筆交易預設收合，第一行保留類型、項目、金額與右側向下展開圖示；點擊或鍵盤操作可獨立展開／收合下方內容，展開時箭頭朝上，不持久保存展開狀態。
+- 選「所有團員」時，第一行顯示實際交易總額。展開後，同額分攤合併為「每人 幣別 金額，參與人員：姓名、姓名…」，姓名自然換行；不同額的歷史資料仍逐人列出。「分攤合計、公共餘款增加」只在該筆公共餘款增加不為 0 時顯示，放在團員明細上方，12px、margin-top 4px、區塊顯示；為 0 隱藏整行、保留團員明細。
+- 選定團員時，第一行改顯示該團員實際分攤金額；展開後以「x 人參與，總共 xxx」取代原本分攤／參與人員說明及公共餘款說明。人數以該筆完整分攤資料的不同團員計算，總共為實際交易總額；支出因向上取整使分攤合計超過實際支出時，後接「(向上取整後 xxx)」，括號內金額為全體分攤合計，無尾差不顯示。所有金額保留幣別及正負號，不改寫帳務資料。
+- 團員分攤資訊為 12px、padding-top 8px、margin 0，下方無額外留白；金額不加額外 margin-left，保留文字本身的空格。
 
 ### 行前費用與收款批次
 

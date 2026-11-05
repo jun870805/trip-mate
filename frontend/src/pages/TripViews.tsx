@@ -547,6 +547,15 @@ function FundParticipants({ data, transaction, memberId }: {
   const shares = transaction.shares.filter(share => memberId === "all" || share.memberId === memberId);
   const equal = shares.length > 0 && shares.every(share => share.amount === shares[0].amount);
   const memberName = (id: string) => data.members.find(member => member.id === id)?.name || "";
+  if (memberId !== "all") {
+    const allocated = transaction.shares.reduce((sum, share) => sum + share.amount, 0);
+    const roundedUp = transaction.type === "支出" && allocated < transaction.amount;
+    return (
+      <div className="ledger-shares">
+        <span>{new Set(transaction.shares.map(share => share.memberId)).size} 人參與，總共 <b>{money(transaction.amount, data.currency)}</b>{roundedUp && <> (向上取整後 <b>{money(allocated, data.currency)}</b>)</>}</span>
+      </div>
+    );
+  }
   return (
     <div className="ledger-shares">
       {equal ? (
@@ -678,17 +687,19 @@ export function Fund({ data }: { data: TripData }) {
               </div>
               <div className="ledger">
                 {transactions.filter((transaction) => transaction.date === date).map((t) => (
-                  <article className="ledger-row" key={t.id}>
-                    <div className="ledger-main">
+                  <details className="ledger-row" key={t.id}>
+                    <summary className="ledger-main">
                       <Badge soft>{fundTypeLabel(t.type)}</Badge>
                       <div>
                         <strong className="ledger-title">{t.title}</strong>
                       </div>
                       <strong className="ledger-amount">
-                        {money(t.amount, data.currency)}
+                        {money(memberId === "all" ? t.amount : t.shares.find(share => share.memberId === memberId)!.amount, data.currency)}
                       </strong>
-                    </div>
-                    {t.type === "支出" && -t.shares.reduce((sum, s) => sum + s.amount, 0) + t.amount !== 0 && (
+                      <span className="ledger-toggle" aria-hidden="true"><Icon name="down" size={16} /></span>
+                      <span className="sr-only">展開或收合分攤明細</span>
+                    </summary>
+                    {memberId === "all" && t.type === "支出" && -t.shares.reduce((sum, s) => sum + s.amount, 0) + t.amount !== 0 && (
                       <small className="muted ledger-summary">
                         分攤合計{" "}
                         {money(
@@ -703,7 +714,7 @@ export function Fund({ data }: { data: TripData }) {
                       </small>
                     )}
                     <FundParticipants data={data} transaction={t} memberId={memberId} />
-                  </article>
+                  </details>
                 ))}
               </div>
             </section>
