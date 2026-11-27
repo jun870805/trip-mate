@@ -14,7 +14,7 @@
 - 授權：真實寫入由 Google Sheets／Drive ACL 強制；前端隱藏與 email 比對不能取代授權。第一個 `VITE_GUIDE_EMAILS` 帳號是唯一超級使用者。
 - 驗證誠實：mock／測試替身不等於真實 Google 寫入、OAuth／Drive、AI 模型、App Check、郵件、部署、瀏覽器或 PDF 實機驗證；未執行就不宣稱，待驗與已驗要分開。
 - 資料：`frontend/src/data/schema.json` 為分頁／欄位來源，`frontend/src/data/id-rules.json` 為 ID 前綴來源；解析、建檔、Excel、範例與 Apps Script 須一致。ID 取同前綴最大號＋1，不補缺號。
-- 寫入：儲存前重讀並比對快照，不同則拒絕；跨表變更用單次 `batchUpdate`；結果不明須重讀後才可再寫；被引用資料禁止刪除。
+- 寫入：儲存前重讀並比對快照，不同則拒絕；跨表變更用單次 `batchUpdate`；結果不明須重讀後才可再寫；被引用的團員、航班、住宿禁止刪除（其他刪除情境依帳務等 spec）。
 - 帳務：實際記帳與每人參考金額分開，參考金額不改寫應繳、實收或餘額；公積金只收退當地貨幣。
 - 安全：不提交或公開 Secret／token／debug token；外連只接受 HTTP(S)；Markdown／HTML 內文只輸出允許的標籤，不用 `dangerouslySetInnerHTML`。
 - AI：僅限旅遊議題；寫入須先確認並重驗授權與快照；不開放帳務、團員、待辦表給 AI。

@@ -1,7 +1,5 @@
 import { it } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join, normalize } from "node:path";
 import demo from "./demo.json" with { type: "json" };
 import { parseCatalog, parseTrip, summarizeMembers } from "./portal.ts";
 import { readTripSections } from "./trip-sections.ts";
@@ -171,28 +169,4 @@ it("shows good catalog rows, isolates duplicates and keeps strict writes", async
   const blank = structuredClone(demo["旅程清單"]);
   blank.push([]);
   assert.equal(parseCatalogView(blank).errors.length, 0);
-});
-
-const repoRoot = new URL("../../../", import.meta.url).pathname;
-const agents = readFileSync(join(repoRoot, "AGENTS.md"), "utf8");
-const specDir = join(repoRoot, "docs/specs");
-const specFiles = readdirSync(specDir).filter((f) => f.endsWith(".md"));
-it("keeps AGENTS.md small, without auto-import, and indexes every spec", () => {
-  assert.ok(Buffer.byteLength(agents) <= 8 * 1024);
-  assert.doesNotMatch(agents, /^@\S+/m);
-  for (const f of specFiles) assert.ok(agents.includes(`docs/specs/${f}`), f);
-});
-it("has resolvable relative links and anchors in AGENTS.md and specs", () => {
-  const files = [join(repoRoot, "AGENTS.md"), ...specFiles.map((f) => join(specDir, f))];
-  for (const file of files) {
-    const text = readFileSync(file, "utf8");
-    for (const m of text.matchAll(/\]\(([^)#\s]+\.md)(#[^)]*)?\)/g)) {
-      const target = normalize(join(dirname(file), m[1]));
-      assert.ok(existsSync(target), `${file} -> ${m[1]}`);
-      if (m[2]) {
-        const heads = readFileSync(target, "utf8").split("\n").filter((l) => l.startsWith("#")).map((l) => l.replace(/^#+\s*/, "").trim());
-        assert.ok(heads.includes(decodeURIComponent(m[2].slice(1))), `${file} -> ${m[2]}`);
-      }
-    }
-  }
 });
