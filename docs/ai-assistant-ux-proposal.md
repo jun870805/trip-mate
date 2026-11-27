@@ -1,6 +1,6 @@
 # AI 助手右側介面與對話保存
 
-狀態：使用者已核准 `sketches/ai-sidebar` 版本並實作於正式旅程頁面。預覽服務已關閉；樣稿檔保留供對照，現行規格同步於 AGENTS.md。
+狀態：使用者已核准 `sketches/ai-sidebar` 版本並實作於正式旅程頁面。預覽服務已關閉；樣稿檔保留供對照，現行規格同步於 docs/specs/ai-chat-ui.md 等 AI spec。
 
 ## 已採用介面
 
